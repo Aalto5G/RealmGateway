@@ -7,7 +7,6 @@ DEFAULT:
 DNS:
     soa: cesa.ces.
     zonefile: db.cesa.ces
-    protocol: udp
     server:
         lan:
             ip: 192.168.0.1
@@ -22,16 +21,33 @@ DNS:
             ip: 127.0.0.1
             port: 65053
     timeouts:
-        ces_naptr:
+        naptr:
+            - 0.010
             - 0.100
             - 0.200
-            - 0.200
-        ces_a:
+        a:
+            - 0.010
             - 0.100
-            - 0.200
             - 0.200
         any:
             - 0
+
+NETWORK:
+    lan:
+        ip: 192.168.0.1
+        mask: 255.255.255.0
+        name: lan
+        port: 1
+    wan:
+        ip: 198.18.0.11
+        mask: 255.255.255.0
+        name: wan
+        port: 2
+    vtep:
+        ip: 1.1.1.1
+        mask: 255.255.255.255
+        name: vtep
+        port: 3
 
 ADDRESSPOOL:
     proxypool:
@@ -42,12 +58,5 @@ ADDRESSPOOL:
         - 198.18.0.12/32
         - 198.18.0.13/32
 
-NETWORK:
-    lan = lan0
-    wan = wan0
-    vtep = vtep
-    lanport = 1
-    wanport = 2
-    vtep = 3
+SDN:
     ryuurl = http://127.0.0.1/ofctl_rest/
-

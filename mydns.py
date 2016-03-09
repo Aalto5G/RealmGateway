@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import signal
+import socket
 import sys
 import time
 import traceback
@@ -42,20 +43,6 @@ def _sanitize_response(query, response):
         return False
     return True
 
-def _is_ipv4(ipaddr):
-    try:
-        assert(dns.ipv4.inet_aton(ipaddr))
-        return True
-    except:
-        return False
-    
-def _is_ipv6(ipaddr):
-    try:
-        assert(dns.ipv6.inet_aton(ipaddr))
-        return True
-    except:
-        return False
-
 def _get_dummy(zone):
     return '{}.{}'.format('__secret', zone.origin.to_text())
     
@@ -63,6 +50,9 @@ def load_zone(zone_file, origin):
     return dns.zone.from_file(zone_file, origin, relativize=False)
 
 def add_node(zone, name, rdtype, address, ttl=60):
+    import dns.rdtypes.IN.A
+    import dns.rdtypes.ANY.CNAME
+    
     print('Add node {} {}'.format(name, address))
     assert(rdtype == A)
     # Create A record with given IP address
@@ -344,13 +334,21 @@ class DNSResolverCESIPv4(object):
         self._host_rtx = host_rtx
         
         # Set timeout parameters
-        if timeouts is None:
-            self._timeouts = {'NAPTR': [0.010, 0.100, 0.300],
-                              'A':     [0.010, 0.100, 0.300]}
-
+        try:
+            # Validate the values
+            assert('naptr' in timeouts)
+            assert('a' in timeouts)
+            assert(type(timeouts['naptr'] is list))
+            assert(type(timeouts['a'] is list))
+            self._timeouts = timeouts
+        except:
+            self._timeouts = {'naptr': [0.002, 0.200, 0.300],
+                              'a':     [0.002, 0.200, 0.300]}
+        
+        self._logger.warning('Initiating CES IPv4 Resolver with timeouts {}'.format(self._timeouts))
+        
     def begin(self):
         # phase = (currentPhase, NAPTR_resolved, A_resolved, CETP_started, CETP_failed)
-        #assert self._phase == (0,0,0,0,0)
         self._do_NAPTR()
 
     def _do_NAPTR(self):
@@ -359,11 +357,11 @@ class DNSResolverCESIPv4(object):
         query_naptr = dns.message.make_query(q.name, dns.rdatatype.NAPTR)
 
         cb_func = self.callback
-        cb_args = ('NAPTR', query_naptr.id, q.name, dns.rdatatype.NAPTR,
+        cb_args = ('naptr', query_naptr.id, q.name, dns.rdatatype.NAPTR,
                    self._nameserver)
-        timeouts = self._timeouts['NAPTR']
+        timeouts = self._timeouts['naptr']
         resolver = ResolverWorker(self._loop, query_naptr, cb_func, cb_args,
-                                   timeouts)
+                                  self._host_rtx, timeouts)
         # Store resolver for host retransmissions
         self._resolver = resolver
         # Instantiate resolver
@@ -377,10 +375,10 @@ class DNSResolverCESIPv4(object):
         query_a = dns.message.make_query(q.name, dns.rdatatype.A)
 
         cb_func = self.callback
-        cb_args = ('A', query_a.id, q.name, dns.rdatatype.A, self._nameserver)
-        timeouts = self._timeouts['A']
+        cb_args = ('a', query_a.id, q.name, dns.rdatatype.A, self._nameserver)
+        timeouts = self._timeouts['a']
         resolver = ResolverWorker(self._loop, query_a, cb_func, cb_args,
-                                   timeouts)
+                                  self._host_rtx, timeouts)
         # Store resolver for host retransmissions
         self._resolver = resolver
         # Instantiate resolver
@@ -404,7 +402,7 @@ class DNSResolverCESIPv4(object):
                     queryid, name, dns.rdatatype.to_text(rdtype), addr[
                         0], addr[1]))
 
-        if phase == 'NAPTR':
+        if phase == 'naptr':
             # Validate NAPTR response for CES requirements? Let CETP module do that
             # Check only if there is any actual NAPTR record
 
@@ -421,17 +419,16 @@ class DNSResolverCESIPv4(object):
                     break
 
             if not found:
-                self._logger.warning(
-                    'Response does not contain any NAPTR record!')
+                self._logger.debug('No NAPTR record were found!')
                 # Continue to resolution of phase A
                 self._do_A()
                 return
 
-            self._logger.warning('Response contains NAPTR records!')
+            self._logger.warning('Found NAPTR records!')
             # Continue to CETP module
             self._do_A()
 
-        elif phase == 'A':
+        elif phase == 'a':
             # Call callback function
             # Make response to original query
             response.id = self._query.id
@@ -465,7 +462,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
         )
     '''
 
-    def __init__(self, loop, query, cb_func, cb_args, host_rtx=False, timeouts=None):
+    def __init__(self, loop, query, cb_func, cb_args, host_rtx=True, timeouts=None):
         self._logger = logging.getLogger('ResolverWorker #{}'.format(id(
             self)))
         self._logger.setLevel(LOGLEVELDNS)
@@ -481,7 +478,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
         # Set timeout parameters
         if timeouts is None:
             timeouts = [0]
-        self._toutlist = timeouts
+        self._timeouts = timeouts
         self._toutfuture = None
         
         # Get query parameters
@@ -491,12 +488,11 @@ class ResolverWorker(asyncio.DatagramProtocol):
         self._rdclass = q.rdclass
 
         self._tref = time.time()
+        self._logger.warning('Initiating ResolverWorker with timeouts {}'.format(self._timeouts))
+        
 
     def _get_runtime(self):
         return time.time() - self._tref
-
-    def _log(self, s):
-        print('[{0}] {1}'.format(id(self), s))
 
     def connection_made(self, transport):
         self._transport = transport
@@ -507,7 +503,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
             'Resolve {0} {1}/{2} via {3}:{4} > {5}:{6} with timeouts {7}'.format(
                 self._query.id, self._name.to_text(), dns.rdatatype.to_text(
                     self._rdtype), self._sockname[0], self._sockname[1],
-                self._peername[0], self._peername[1], self._toutlist))
+                self._peername[0], self._peername[1], self._timeouts))
 
         self._sendmsg(self._query)
         self._set_timeout()
@@ -584,7 +580,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
 
     def timeout_expired(self, t):
         self._logger.debug('Timer expired: {num:.3f} sec'.format(num=t))
-        if len(self._toutlist) > 0:
+        if len(self._timeouts) > 0:
             self._sendmsg(self._query)
             self._set_timeout()
         else:
@@ -601,7 +597,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
 
     def _get_timeout(self):
         try:
-            return self._toutlist.pop(0)
+            return self._timeouts.pop(0)
         except IndexError:
             return -1
 
@@ -687,10 +683,10 @@ class GenericDNSResolver(object):
             # Continue ongoing resolution
             (resolver, query) = self._activequeries[key]
             resolver.process_query(query, addr)
-        elif _is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A:
+        elif is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A:
             # Resolve DNS query for CES IPv4
             self._do_resolve_query_ces(query, addr, cback)
-        elif _is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA:
+        elif is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA:
             # Resolve DNS query for CES IPv6
             self._do_resolve_query_ces(query, addr, cback, ipv6=True)
         else:
