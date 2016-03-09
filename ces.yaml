@@ -1,0 +1,53 @@
+# CES Configuration Parameters
+
+DEFAULT:
+    name: cesa
+    id: cesa.ces.
+
+DNS:
+    soa: cesa.ces.
+    zonefile: db.cesa.ces
+    protocol: udp
+    server:
+        lan:
+            ip: 192.168.0.1
+            port: 53
+        wan:
+            ip: 198.18.0.11
+            port: 53
+        loopback:
+            ip: 127.0.0.1
+            port: 53
+        resolver:
+            ip: 127.0.0.1
+            port: 65053
+    timeouts:
+        ces_naptr:
+            - 0.100
+            - 0.200
+            - 0.200
+        ces_a:
+            - 0.100
+            - 0.200
+            - 0.200
+        any:
+            - 0
+
+ADDRESSPOOL:
+    proxypool:
+        - 172.16.0.0/25
+        - 172.16.0.128/25
+    circularpool:
+        - 198.18.0.11/32
+        - 198.18.0.12/32
+        - 198.18.0.13/32
+
+NETWORK:
+    lan = lan0
+    wan = wan0
+    vtep = vtep
+    lanport = 1
+    wanport = 2
+    vtep = 3
+    ryuurl = http://127.0.0.1/ofctl_rest/
+

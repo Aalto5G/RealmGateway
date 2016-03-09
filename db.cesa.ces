@@ -1,0 +1,10 @@
+$TTL 36000
+cesa.ces. IN      SOA     ns1.cesa.ces. hostmaster.cesa.ces. (
+               2016030901  ; serial
+               28800       ; refresh (8 hours)
+               1800        ; retry (30 mins)
+               2592000     ; expire (30 days)
+               86400 )     ; minimum (1 day)
+
+cesa.ces.            86400  NS      ns1.cesa.ces.
+ns1.cesa.ces.        86400  A       198.18.0.10

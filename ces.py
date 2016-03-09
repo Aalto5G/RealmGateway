@@ -3,8 +3,8 @@
 import asyncio
 import addresspool
 import configparser
-import dnsserver
-import dnsresolver
+import dns
+import mydns
 import logging
 import signal
 import sys
@@ -36,6 +36,7 @@ class CustomerEdgeSwitch(object):
         self._init_address_pools()
         
         # Initialize DNS
+        self._dns = {}
         self._init_dns()
         
     
@@ -69,50 +70,72 @@ class CustomerEdgeSwitch(object):
                 ap.add_to_pool(net)
     
     def _init_dns(self):
-        # Create DNS Zone file to be populated
-        
-        import dns
-        import dns.zone
-        
         loop = self._loop
         
-        soa = self._config['DNS']['soa']
-        zone = dns.zone.Zone(origin=soa, relativize=False)
+        # Create DNS Zone file to be populated
+        self._dns['zone'] = mydns.load_zone(self._config['DNS']['zonefile'] ,
+                                            self._config['DNS']['soa'])
         
-        # Create specific DNS servers
+        # Store all DNS related parameters in a dictionary
+        self._dns['addr'] = {}
+        self._dns['node'] = {}
+        self._dns['activequeries'] = {}
+        self._dns['soa'] = self._config['DNS']['soa']
+        self._dns['timeouts'] = self._config['DNS']['timeouts']
+        
+        # Get address tuple configuration of DNS servers
         for k, v in self._config['DNS']['server'].items():
-            self._logger.warning('Creating DNS Server {}@{}:{}'.format(k,v['ip'],v['port']))
+            self._dns['addr'][k] = (v['ip'], v['port'])
         
-        '''
-        # Create DNS Server in LAN
-        ipaddr = self._config['DNS']['server']['lan']['ip']
-        port = self._config['DNS']['server']['lan']['port']
-        cb_noerror = cb_nxdomain = cb_udpate = None
-        lan_addr = (ipaddr, port)
+        # Initiate specific DNS servers
+        self._init_dns_lan()
+        self._init_dns_wan()
+        self._init_dns_loopback()
         
-        factory = dnsserver.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
-        loop.create_task(loop.create_datagram_endpoint(lambda: factory, local_addr=lan_addr))
+    def _init_dns_lan(self):
+        # Initiate DNS Server in LAN
+        zone = self._dns['zone']
+        addr = self._dns['addr']['lan']
+        self._logger.warning('Creating LAN DNS Server @{}:{}'.format(addr[0],addr[1]))
         
-        # Create DNS Server in WAN
-        ipaddr = self._config['DNS']['server']['wan']['ip']
-        port = self._config['DNS']['server']['wan']['port']
-        cb_noerror = cb_nxdomain = cb_udpate = None
-        wan_addr = (ipaddr, port)
+        # Define callbacks for different DNS queries
+        cb_noerror = self.process_dns_query_lan_noerror
+        cb_nxdomain = self.process_dns_query_lan_nxdomain 
+        cb_udpate = None
         
-        factory = dnsserver.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
-        loop.create_task(loop.create_datagram_endpoint(lambda: factory, local_addr=wan_addr))
+        factory = mydns.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
+        self._dns['node']['lan'] = factory
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
         
-        '''
+    def _init_dns_wan(self):
+        # Initiate DNS Server in WAN
+        zone = self._dns['zone']
+        addr = self._dns['addr']['wan']
+        self._logger.warning('Creating WAN DNS Server @{}:{}'.format(addr[0],addr[1]))
         
-        # Create DNS Server in Loopback
-        ipaddr = self._config['DNS']['server']['loopback']['ip']
-        port = self._config['DNS']['server']['loopback']['port']
-        cb_noerror = cb_nxdomain = cb_udpate = None
-        wan_addr = (ipaddr, port)
+        # Define callbacks for different DNS queries
+        cb_noerror = self.process_dns_query_wan_noerror
+        cb_nxdomain = self.process_dns_query_wan_nxdomain 
+        cb_udpate = None
         
-        factory = dnsserver.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
-        loop.create_task(loop.create_datagram_endpoint(lambda: factory, local_addr=wan_addr))
+        factory = mydns.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
+        self._dns['node']['wan'] = factory
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
         
+    def _init_dns_loopback(self):
+        # Initiate DNS Server in Loopback
+        zone = self._dns['zone']
+        addr = self._dns['addr']['loopback']
+        self._logger.warning('Creating Loopback DNS Server @{}:{}'.format(addr[0],addr[1]))
+        
+        # Define callbacks for different DNS queries
+        cb_noerror = None
+        cb_nxdomain = self.process_dns_query
+        cb_udpate = self.process_dns_update
+        
+        factory = mydns.DNSServer(zone, cb_noerror, cb_nxdomain, cb_udpate)
+        self._dns['node']['loopback'] = factory
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
     
     def _set_verbose(self):
         self._logger.warning('Enabling logging.DEBUG')
@@ -126,8 +149,175 @@ class CustomerEdgeSwitch(object):
     def begin(self):
         print('CESv2 is starting...')
         self._loop.run_forever()
+    
+    ############################################################################
+    ########################  DNS PROCESSING FUNCTIONS  ########################
+    
+    def process_dns_query(self, query, addr, cback):
+        """ Perform public DNS resolutions of a query """
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+        
+        self._logger.warning('Resolve query {0} {1}/{2} from {3}:{4}'.format(query.id, q.name.to_text(), dns.rdatatype.to_text(q.rdtype), addr[0], addr[1]))
+        
+        if key in self._dns['activequeries']:
+            # Continue ongoing resolution
+            (resolver, query) = self._dns['activequeries'][key]
+            resolver.process_query(query, addr)
+        else:
+            # Resolve DNS query as is
+            self._do_resolve_dns_query(query, addr, cback)
 
+    def process_dns_query_lan_noerror(self, query, addr, cback):
+        """ Process DNS query from private network of an existing host """
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+        
+        self._logger.warning('Resolve query for CES discovery {0} {1}/{2} from {3}:{4}'.format(query.id, q.name.to_text(), dns.rdatatype.to_text(q.rdtype), addr[0], addr[1]))
+        
+        if key in self._dns['activequeries']:
+            # Continue ongoing resolution
+            (resolver, query) = self._dns['activequeries'][key]
+            resolver.process_query(query, addr)
+        elif _is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A:
+            # Resolve DNS query for CES IPv4
+            resolver = DNSResolverCESIPv4(self._loop, query, addr, self._dns['addr']['resolver'],
+                               self._do_resolver_callback, key)
+            self._dns['activequeries'][key] = (resolver, query)
+            resolver.begin()
+        elif _is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA:
+            # Resolve DNS query for CES IPv6
+            resolver = DNSResolverCESIPv6(self._loop, query, addr, self._dns['addr']['resolver'],
+                               self._do_resolver_callback, key)
+            self._dns['activequeries'][key] = (resolver, query)
+            resolver.begin()
+        else:
+            # Resolve DNS query as is
+            self._do_resolve_dns_query(query, addr, cback)
+    
+    def process_dns_query_lan_nxdomain(self, query, addr, cback):
+        """ Process DNS query from private network of a non existing host """
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
 
+        if _is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A:
+            # Resolve local CES policy
+            self._do_resolve_dns_query_ces(query, addr, cback)
+        elif _is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA:
+            # Resolve local CES policy
+            self._do_resolve_dns_query_ces(query, addr, cback, ipv6=True)
+        else:
+            # Answer with REFUSED any other query not in cache
+            cback(query, None, addr)
+    
+    def process_dns_query_wan_noerror(self, query, addr, cback):
+        """ Process DNS query from public Internet of an existing host """
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+        
+        # Serve public records...
+        
+        ## Filter NAPTR and A records
+        cback(query, None, addr)
+    
+    def process_dns_query_wan_nxdomain(self, query, addr, cback):
+        """ Process DNS query from public Internet of a non existing host """
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+        
+        # We have received a query for a domain that should exist in our zone but it doesn't
+        cback(query, None, addr)
+    
+    def process_dns_update(self, query, addr, cback):
+        """ Generate NoError DNS response """
+        self._logger.debug('process_update')
+        
+        try:
+            rr_a = None
+            #Filter hostname and operation
+            for rr in query.authority:
+                #Filter out non A record types
+                if rr.rdtype == dns.rdatatype.A:
+                    rr_a = rr
+                    break
+            
+            if not rr_a:
+                # isc-dhcp-server uses additional TXT records -> don't process
+                self._logger.debug('Failed to find an A record')
+                return
+            
+            name = rr_a.name
+            ipaddr = rr_a[0].address
+            
+            if rr_a.ttl:
+                self._logger.warning('Registering new user {} @{} {} sec'.format(name.to_text(), ipaddr, rr_a.ttl))
+            else:
+                self._logger.warning('Unregistering user {} @{}'.format(name.to_text(), ipaddr))
+        except:
+            self._logger.error('Failed to process UPDATE DNS message')
+            pass
+        finally:
+            # Send generic DDNS Response NOERROR
+            response = dns.message.make_response(query)
+            self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, response, addr)
+            
+    def _do_resolver_callback(self, metadata, response=None):
+        try:
+            (queryid, name, rdtype, rdclass, addr, cback) = metadata
+            (resolver, query) = self._dns['activequeries'].pop(metadata)
+        except KeyError:
+            self._logger.warning(
+                'Query has already been processed {0} {1}/{2} from {3}:{4}'.format(
+                    queryid, name, dns.rdatatype.to_text(rdtype), addr[
+                        0], addr[1]))
+            return
+
+        if response is None:
+            self._logger.warning(
+                'This seems a good place to create negative caching...')
+
+        # Callback to send response to host
+        cback(query, response, addr)
+
+    def _do_resolve_dns_query(self, query, addr, cback):
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+
+        self._logger.warning(
+            'Resolve normal query {0} {1}/{2} from {3}:{4}'.format(
+                query.id, q.name.to_text(), dns.rdatatype.to_text(
+                    q.rdtype), addr[0], addr[1]))
+
+        # This DNS resolution does not require any kind of mangling
+        timeouts = [0.001, 0.010, 0.500]
+        resolver = mydns.ResolverWorker(self._loop, query, self._do_resolver_callback,
+                                   key, timeouts)
+        self._dns['activequeries'][key] = (resolver, query)
+        self._loop.create_task(
+            self._loop.create_datagram_endpoint(lambda: resolver,
+                                                remote_addr=self._dns['addr']['resolver']))
+        '''
+    def _do_resolve_dns_query_ces(self, query, addr, cback, ipv6=False):
+        q = query.question[0]
+        key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
+
+        self._logger.warning(
+            'Resolve query for CES discovery {0} {1}/{2} from {3}:{4}'.format(
+                query.id, q.name.to_text(), dns.rdatatype.to_text(
+                    q.rdtype), addr[0], addr[1]))
+
+        if not ipv6:
+            resolverObj = DNSResolverCESIPv4
+        else:
+            resolverObj = DNSResolverCESIPv6
+
+        resolver = resolverObj(self._loop, query, addr, self._dns['addr']['resolver'],
+                               self._do_resolver_callback, key)
+        self._dns['activequeries'][key] = (resolver, query)
+        resolver.begin()
+        '''
+        
 if __name__ == '__main__':
     try:
         ces = CustomerEdgeSwitch()
