@@ -36,18 +36,18 @@ NETWORK:
     lan:
         ip: 192.168.0.1
         mask: 255.255.255.0
-        name: lan
+        name: cesa-lan
         port: 1
     wan:
         ip: 198.18.0.11
         mask: 255.255.255.0
-        name: wan
+        name: cesa-wan
         port: 2
     vtep:
         ip: 1.1.1.1
         mask: 255.255.255.255
-        name: vtep
-        port: 3
+        name: cesa-vtep
+        port: 5
 
 ADDRESSPOOL:
     proxypool:
@@ -59,4 +59,5 @@ ADDRESSPOOL:
         - 198.18.0.13/32
 
 SDN:
-    ryuurl = http://127.0.0.1/ofctl_rest/
+    api: ryu
+    url: http://localhost:8080/
