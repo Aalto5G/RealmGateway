@@ -282,9 +282,9 @@ echo ""
 echo "Enabling NAT via iptables..."
 
 for i in "${array[@]}"; do IFS=","; set $i
-    #/sbin/iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -j SNAT --to 198.18.0.12
-    #/sbin/iptables -A FORWARD -i cesb-wan -o cesb-lan -m state --state RELATED,ESTABLISHED -j ACCEPT
-    /sbin/iptables -t nat -A POSTROUTING -s $2/$3 -j SNAT --to $5
+    #/sbin/iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o cesa-wan -j SNAT --to 198.18.0.11
+    #/sbin/iptables -A FORWARD -i cesb-wan -o cesa-lan -m state --state RELATED,ESTABLISHED -j ACCEPT
+    /sbin/iptables -t nat -A POSTROUTING -s $2/$3 -o $4 -j SNAT --to $5
     /sbin/iptables -A FORWARD -i $4 -o $1 -m state --state RELATED,ESTABLISHED -j ACCEPT
 done
 IFS=$OLDIFS
