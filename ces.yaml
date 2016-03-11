@@ -29,25 +29,35 @@ DNS:
             - 0.010
             - 0.100
             - 0.200
+        aaaa:
+            - 0.010
+            - 0.100
+            - 0.200
         any:
             - 0
 
 NETWORK:
     lan:
+        name: cesa-lan
         ip: 192.168.0.1
         mask: 255.255.255.0
-        name: cesa-lan
+        mac: 00:00:00:00:01:AA
         port: 1
     wan:
+        name: cesa-wan
         ip: 198.18.0.11
         mask: 255.255.255.0
-        name: cesa-wan
+        mac: 00:00:00:00:01:BB
         port: 2
     vtep:
+        name: cesa-vtep
         ip: 1.1.1.1
         mask: 255.255.255.255
-        name: cesa-vtep
+        mac: 00:00:00:00:01:CC
         port: 5
+    sdn:
+        add: http://localhost:8080/stats/flowentry/add
+        delete: http://localhost:8080/stats/flowentry/delete
 
 ADDRESSPOOL:
     proxypool:
@@ -58,6 +68,16 @@ ADDRESSPOOL:
         - 198.18.0.12/32
         - 198.18.0.13/32
 
-SDN:
-    api: ryu
-    url: http://localhost:8080/
+HOSTS:
+    foo200:
+        name: foo200
+        ipv4: 192.168.0.200
+        hostid: foo200globalid
+    foo201:
+        name: foo201
+        ipv4: 192.168.0.201
+        hostid: foo201globalid
+    foo202:
+        name: foo202
+        ipv4: 192.168.0.202
+        hostid: foo202globalid

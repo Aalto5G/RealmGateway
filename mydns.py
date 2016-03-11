@@ -33,7 +33,7 @@ def _sanitize_query(query):
 def _sanitize_response(query, response):
     try:
         #assert (response.opcode() == dns.opcode.QUERY)  # Standard QUERY
-        assert (response.rcode() == dns.rcode.NOERROR)  # No Error
+        #assert (response.rcode() == dns.rcode.NOERROR)  # No Error
         assert ((response.flags & dns.flags.QR) ==
                 dns.flags.QR)  # Message is response
         assert (len(response.question) == 1)  # Query contains 1 question
@@ -55,18 +55,46 @@ def add_node(zone, name, rdtype, address, ttl=60):
     
     print('Add node {} {}'.format(name, address))
     assert(rdtype == A)
+    
+    # Make dns.name object
+    dnsname = dns.name.from_text(name)
+    if not zone.origin.is_superdomain(dnsname):
+        dnsname = dns.name.from_text(name, zone.origin)
+    
     # Create A record with given IP address
-    rdataset = zone.find_rdataset(name, rdtype, create=True)
+    rdataset = zone.find_rdataset(dnsname, rdtype, create=True)
     rdata = dns.rdtypes.IN.A.A(IN, A, address=address)
     rdataset.add(rdata, ttl=ttl)
     
     # Create CNAME record for NAPTR lookups
     target = dns.name.from_text(_get_dummy(zone))
-    rdataset = zone.find_rdataset(name, CNAME, create=True)
+    rdataset = zone.find_rdataset(dnsname, CNAME, create=True)
     rdata = dns.rdtypes.ANY.CNAME.CNAME(IN, CNAME, target)
     rdataset.add(rdata, ttl=ttl)
 
+def delete_node(zone, name):
+    try:
+        print('Delete node {}'.format(name))
+        # Make dns.name object
+        dnsname = dns.name.from_text(name)
+        if not zone.origin.is_superdomain(dnsname):
+            dnsname = dns.name.from_text(name, zone.origin)
+        del zone.nodes[dnsname]
+    except Exception as e:
+        print('Failed to delete node {}: {}'.format(name, e))
 
+
+def make_response_rcode(query, rcode):
+    response = dns.message.make_response(query, recursion_available=True)
+    response.set_rcode(rcode)
+    return response
+        
+def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
+    response = dns.message.make_response(query, recursion_available=True)
+    response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
+    return response
+    
+    
 class DNSServer(asyncio.DatagramProtocol):
     def __init__(self, zone, cb_noerror=None, cb_nxdomain=None, cb_update=None, cache=None):
         self._logger = logging.getLogger('DNSServer')
@@ -337,13 +365,16 @@ class DNSResolverCESIPv4(object):
         try:
             # Validate the values
             assert('naptr' in timeouts)
+            assert('aaaa' in timeouts)
             assert('a' in timeouts)
             assert(type(timeouts['naptr'] is list))
+            assert(type(timeouts['aaaa'] is list))
             assert(type(timeouts['a'] is list))
             self._timeouts = timeouts
         except:
             self._timeouts = {'naptr': [0.002, 0.200, 0.300],
-                              'a':     [0.002, 0.200, 0.300]}
+                              'aaaa':  [0.002, 0.200, 0.300],
+                              'a':     [0.002, 0.200, 0.300],}
         
         self._logger.warning('Initiating CES IPv4 Resolver with timeouts {}'.format(self._timeouts))
         
@@ -411,7 +442,13 @@ class DNSResolverCESIPv4(object):
                 # Continue to resolution of phase A
                 self._do_A()
                 return
-
+            
+            elif response.rcode() != dns.rcode.NOERROR:
+                self._logger.warning('NAPTR resolution failed with rcode={}!'.format(dns.rcode.to_text(response.rcode())))
+                # Continue to resolution of phase A
+                self._do_A()
+                return
+            
             found = False
             for rrset in response.answer:
                 if rrset.rdtype == dns.rdatatype.NAPTR:
@@ -478,7 +515,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
         # Set timeout parameters
         if timeouts is None:
             timeouts = [0]
-        self._timeouts = timeouts
+        self._timeouts = list(timeouts)
         self._toutfuture = None
         
         # Get query parameters
@@ -488,7 +525,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
         self._rdclass = q.rdclass
 
         self._tref = time.time()
-        self._logger.warning('Initiating ResolverWorker with timeouts {}'.format(self._timeouts))
+        self._logger.debug('Initiating ResolverWorker with timeouts {}'.format(self._timeouts))
         
 
     def _get_runtime(self):
@@ -510,13 +547,11 @@ class ResolverWorker(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         self._logger.debug(
-            'Received data from {0}:{1} ({2} bytes) "{3}"'.format(addr[
-                0], addr[1], len(data), data))
+            'Received data from {0}:{1} ({2} bytes) "{3}"'.format(addr[0], addr[1], len(data), data))
 
         if self._peername != addr:
             self._logger.error(
-                'Unexpected source! {0}:{1} instead of {2}:{3}'.format(
-                    self._peername[0], self._peername[1], addr[0], addr[1]))
+                'Unexpected source! {0}:{1} instead of {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
 
         try:
             # Build dns response message
@@ -563,6 +598,7 @@ class ResolverWorker(asyncio.DatagramProtocol):
         self._cb_func(self._cb_args, None)
 
     def process_query(self, query, addr):
+        q = query.question[0]
         if not self._host_rtx:
             self._logger.debug(
                 'Retransmission disabled for {0} {1}/{2} from {3}{4}'.format(

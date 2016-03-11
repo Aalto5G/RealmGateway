@@ -13,3 +13,4 @@ ovs-ofctl --protocols=OpenFlow13 add-flow  $@ table=0,in_port=1,actions=output:3
 ovs-ofctl --protocols=OpenFlow13 add-flow  $@ table=0,in_port=3,actions=output:1
 ovs-ofctl --protocols=OpenFlow13 add-flow  $@ table=0,in_port=2,actions=output:4
 ovs-ofctl --protocols=OpenFlow13 add-flow  $@ table=0,in_port=4,actions=output:2
+ovs-ofctl --protocols=OpenFlow13 add-flow  $@ table=0,in_port=5,ip,nw_dst='172.16.0.0/24',actions=goto_table:1

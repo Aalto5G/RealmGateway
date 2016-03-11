@@ -103,6 +103,14 @@ class AddressPoolUser(container3.ContainerNode):
         for addrmask in self._addrpool:
             ap.add_to_pool(addrmask)
     
+    def destroy_pool(self, userid):
+        if userid not in self._pool:
+            self._logger.warning('Failed to destroy pool for {}'.format(userid))
+            return
+        
+        self._logger.warning('Destroy pool for {}'.format(userid))
+        del self._pool[userid]
+            
     def get_pool(self, userid):
         return self._pool[userid].get_pool()
     

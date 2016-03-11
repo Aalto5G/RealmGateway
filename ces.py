@@ -1,9 +1,10 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python3
 
 import asyncio
 import addresspool
 import configparser
 import dns
+import network
 import mydns
 import logging
 import signal
@@ -15,6 +16,32 @@ from utils import is_ipv4, is_ipv6
 
 LOGLEVELCES = logging.WARNING
 
+class RetCodes(object):
+    POLICY_OK  = 0
+    POLICY_NOK = 1
+    
+    AP_AVAILABLE = 0
+    AP_DEPLETED = 1
+    
+    DNS_NOERROR  = 0    # DNS Query completed successfully
+    DNS_FORMERR  = 1    # DNS Query Format Error
+    DNS_SERVFAIL = 2    # Server failed to complete the DNS request
+    DNS_NXDOMAIN = 3    # Domain name does not exist.  For help resolving this error, read here.
+    DNS_NOTIMP   = 4    # Function not implemented
+    DNS_REFUSED  = 5    # The server refused to answer for the query
+    DNS_YXDOMAIN = 6    # Name that should not exist, does exist
+    DNS_XRRSET   = 7    # RRset that should not exist, does exist
+    DNS_NOTAUTH  = 8    # Server not authoritative for the zone
+    DNS_NOTZONE  = 9    # Name not in zone
+
+
+
+def trace():
+    print('Exception in user code:')
+    print('-' * 60)
+    traceback.print_exc(file=sys.stdout)
+    print('-' * 60)
+    
 class CustomerEdgeSwitch(object):
     def __init__(self, name='CustomerEdgeSwitch'):
         self._logger = logging.getLogger(name)
@@ -31,13 +58,18 @@ class CustomerEdgeSwitch(object):
         
         # Read configuration
         self._config = self._load_configuration('ces.yaml')
-        print(self._config)
+        
+        # Initialize Network
+        self._init_network()
         
         # Initialize Address Pools
         self._init_address_pools()
         
         # Initialize DNS
         self._init_dns()
+        
+        # Initialize Hosts
+        self._init_hosts()
     
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -63,7 +95,8 @@ class CustomerEdgeSwitch(object):
             for net in v:
                 self._logger.warning('Adding resources to pool {}: {}'.format(k, net))
                 ap.add_to_pool(net)
-    
+            self._addresspoolcontainer.add(ap)
+        
     def _init_dns(self):
         # Store all DNS related parameters in a dictionary
         self._dns = {}
@@ -134,6 +167,18 @@ class CustomerEdgeSwitch(object):
         self._dns['node']['loopback'] = factory
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
     
+    def _init_hosts(self):
+        self._logger.warning('Initializing hosts')
+        
+        for k, v in self._config['HOSTS'].items():
+            self._logger.warning('Registering host {}'.format(k))
+            ipaddr = self._config['HOSTS'][k]['ipv4']
+            self.register_user(k, 1, ipaddr)
+    
+    def _init_network(self):
+        kwargs = self._config['NETWORK']
+        self._network = network.Network(self._loop, **kwargs)
+        
     def _set_verbose(self):
         self._logger.warning('Enabling logging.DEBUG')
         logging.basicConfig(level=logging.DEBUG)
@@ -148,16 +193,48 @@ class CustomerEdgeSwitch(object):
                 self._logger.warning('Terminating DNS Server {} @{}:{}'.format(k, addr[0],addr[1]))
                 v.connection_lost(None)
         except:
-            print('Exception in user code:')
-            print('-' * 60)
-            traceback.print_exc(file=sys.stdout)
-            print('-' * 60)
+            trace()
         finally:
             self._loop.stop()
     
     def begin(self):
         print('CESv2 is starting...')
         self._loop.run_forever()
+    
+    ############################################################################
+    ######################  POLICY PROCESSING FUNCTIONS  #######################
+    
+    def _process_local_policy(self, src_policy, dst_policy):
+        self._logger.warning('Processing local policy for {} -> {}'.format(src_policy, dst_policy))
+        if src_policy is dst_policy:
+            return (RetCodes.POLICY_OK, True)
+        else:
+            return (RetCodes.POLICY_NOK, False)
+    
+    def create_local_connection(self, src_host, dst_service):
+        self._logger.warning('Connecting host {} to service {}'.format(src_host, dst_service))
+        import random
+        # Randomize policy check
+        retCode = self._process_local_policy(1, random.randint(0,1))
+        if retCode[0] is RetCodes.POLICY_NOK:
+            self._logger.warning('Failed to match policy!')
+            return (RetCodes.DNS_NXDOMAIN, 'PolicyMismatch')
+        
+        try:
+            self._logger.warning('Policy matched! Create a connection')
+            ap = self._addresspoolcontainer.get('proxypool')
+            ipaddr = ap.allocate(src_host)
+            
+            d = {'src':'192.168.0.50','psrc':'172.16.0.0',
+                 'dst':'192.168.0.50','pdst':'172.16.0.1'}
+            connection = network.ConnectionCESLocal(**d)
+            self._network.create_connection(connection)
+            
+            return (RetCodes.DNS_NOERROR, ipaddr)
+        except KeyError:
+            self._logger.warning('Failed to allocate proxy address for host')
+            return (RetCodes.DNS_REFUSED, 'PoolDepleted')
+    
     
     ############################################################################
     ########################  DNS PROCESSING FUNCTIONS  ########################
@@ -182,21 +259,18 @@ class CustomerEdgeSwitch(object):
         q = query.question[0]
         key = (query.id, q.name, q.rdtype, q.rdclass, addr, cback)
 
-        if is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A:
-            # Resolve local CES policy
-            #self._do_resolve_dns_query_ces(query, addr, cback)
-            print('Resolve local policy of hosts')
-            cback(query, None, addr)
-            
-        elif is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA:
-            # Resolve local CES policy
-            #self._do_resolve_dns_query_ces(query, addr, cback, ipv6=True)
-            print('Resolve local policy of hosts')
-            cback(query, None, addr)
-            
+        if (is_ipv4(addr[0]) and q.rdtype == dns.rdatatype.A) or \
+        (is_ipv6(addr[0]) and q.rdtype == dns.rdatatype.AAAA):
+            self._logger.warning('Resolve local CES policy')
+            retCode = self.create_local_connection(addr[0], q.name)
+            if retCode[0] is RetCodes.DNS_NOERROR:
+                response = mydns.make_response_answer_rr(query, q.name, q.rdtype, retCode[1])
+            else:
+                response = mydns.make_response_rcode(query, retCode[0])
+            cback(query, response, addr)
         else:
-            # Answer with REFUSED any other query not in cache
-            cback(query, None, addr)
+            # Resolve DNS query as is
+            self._do_resolve_dns_query(query, addr, cback)
     
     def process_dns_query_lan_nxdomain(self, query, addr, cback):
         """ Process DNS query from private network of a non existing host """
@@ -261,19 +335,18 @@ class CustomerEdgeSwitch(object):
                 self._logger.debug('Failed to find an A record')
                 return
             
-            name = rr_a.name
-            ipaddr = rr_a[0].address
-            
+            name_str = rr_a.name.to_text()
             if rr_a.ttl:
-                self._logger.warning('Registering new user {} @{} {} sec'.format(name.to_text(), ipaddr, rr_a.ttl))
+                self.register_user(name_str, rr_a.rdtype, rr_a[0].address)
             else:
-                self._logger.warning('Unregistering user {} @{}'.format(name.to_text(), ipaddr))
-        except:
+                self.deregister_user(name_str, rr_a.rdtype, rr_a[0].address)
+                
+        except Exception as e:
             self._logger.error('Failed to process UPDATE DNS message')
-            pass
+            trace()
         finally:
             # Send generic DDNS Response NOERROR
-            response = dns.message.make_response(query)
+            response = mydns.make_response_rcode(query, RetCodes.DNS_NOERROR)
             self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, response, addr)
             
@@ -308,17 +381,41 @@ class CustomerEdgeSwitch(object):
         self._dns['activequeries'][key] = (resolver, query)
         raddr = self._dns['addr']['resolver']
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: resolver, remote_addr=raddr))
-        
+    
+    
+    ############################################################################
+    #######################  USER PROCESSING FUNCTIONS  ########################
+    def register_user(self, name, rdtype, ipaddr):
+        self._logger.warning('Register new user {} @{}'.format(name, ipaddr))
+        # Add node to the DNS Zone
+        zone = self._dns['zone']
+        mydns.add_node(zone, name, rdtype, ipaddr)
+        # Initialize address pool for user
+        ap = self._addresspoolcontainer.get('proxypool')
+        ap.create_pool(ipaddr)
+        # Download user data
+        pass
+    
+    def deregister_user(self, name, rdtype, ipaddr):
+        self._logger.warning('Deregister user {} @{}'.format(name, ipaddr))
+        # Delete node from the DNS Zone
+        zone = self._dns['zone']
+        mydns.delete_node(zone, name)
+        # Delete all active connections
+        pass
+        # Destroy address pool for user
+        ap = self._addresspoolcontainer.get('proxypool')
+        ap.destroy_pool(ipaddr)
+    
+    
 if __name__ == '__main__':
     try:
+        loop = asyncio.get_event_loop()
         ces = CustomerEdgeSwitch()
         ces.begin()
-    except Exception:
-        print('Exception in user code:')
-        print('-' * 60)
-        traceback.print_exc(file=sys.stdout)
-        print('-' * 60)
+    except Exception as e:
+        print(format(e))
+        trace()
     finally:
-        loop = asyncio.get_event_loop()
         loop.close()
     print('Bye!')
