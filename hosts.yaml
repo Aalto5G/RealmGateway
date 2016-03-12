@@ -1,0 +1,1021 @@
+HOSTS:
+    foo001:
+        name: foo001
+        ipv4: 192.168.0.1
+        hostid: foo001-globalid
+    foo002:
+        name: foo002
+        ipv4: 192.168.0.2
+        hostid: foo002-globalid
+    foo003:
+        name: foo003
+        ipv4: 192.168.0.3
+        hostid: foo003-globalid
+    foo004:
+        name: foo004
+        ipv4: 192.168.0.4
+        hostid: foo004-globalid
+    foo005:
+        name: foo005
+        ipv4: 192.168.0.5
+        hostid: foo005-globalid
+    foo006:
+        name: foo006
+        ipv4: 192.168.0.6
+        hostid: foo006-globalid
+    foo007:
+        name: foo007
+        ipv4: 192.168.0.7
+        hostid: foo007-globalid
+    foo008:
+        name: foo008
+        ipv4: 192.168.0.8
+        hostid: foo008-globalid
+    foo009:
+        name: foo009
+        ipv4: 192.168.0.9
+        hostid: foo009-globalid
+    foo010:
+        name: foo010
+        ipv4: 192.168.0.10
+        hostid: foo010-globalid
+    foo011:
+        name: foo011
+        ipv4: 192.168.0.11
+        hostid: foo011-globalid
+    foo012:
+        name: foo012
+        ipv4: 192.168.0.12
+        hostid: foo012-globalid
+    foo013:
+        name: foo013
+        ipv4: 192.168.0.13
+        hostid: foo013-globalid
+    foo014:
+        name: foo014
+        ipv4: 192.168.0.14
+        hostid: foo014-globalid
+    foo015:
+        name: foo015
+        ipv4: 192.168.0.15
+        hostid: foo015-globalid
+    foo016:
+        name: foo016
+        ipv4: 192.168.0.16
+        hostid: foo016-globalid
+    foo017:
+        name: foo017
+        ipv4: 192.168.0.17
+        hostid: foo017-globalid
+    foo018:
+        name: foo018
+        ipv4: 192.168.0.18
+        hostid: foo018-globalid
+    foo019:
+        name: foo019
+        ipv4: 192.168.0.19
+        hostid: foo019-globalid
+    foo020:
+        name: foo020
+        ipv4: 192.168.0.20
+        hostid: foo020-globalid
+    foo021:
+        name: foo021
+        ipv4: 192.168.0.21
+        hostid: foo021-globalid
+    foo022:
+        name: foo022
+        ipv4: 192.168.0.22
+        hostid: foo022-globalid
+    foo023:
+        name: foo023
+        ipv4: 192.168.0.23
+        hostid: foo023-globalid
+    foo024:
+        name: foo024
+        ipv4: 192.168.0.24
+        hostid: foo024-globalid
+    foo025:
+        name: foo025
+        ipv4: 192.168.0.25
+        hostid: foo025-globalid
+    foo026:
+        name: foo026
+        ipv4: 192.168.0.26
+        hostid: foo026-globalid
+    foo027:
+        name: foo027
+        ipv4: 192.168.0.27
+        hostid: foo027-globalid
+    foo028:
+        name: foo028
+        ipv4: 192.168.0.28
+        hostid: foo028-globalid
+    foo029:
+        name: foo029
+        ipv4: 192.168.0.29
+        hostid: foo029-globalid
+    foo030:
+        name: foo030
+        ipv4: 192.168.0.30
+        hostid: foo030-globalid
+    foo031:
+        name: foo031
+        ipv4: 192.168.0.31
+        hostid: foo031-globalid
+    foo032:
+        name: foo032
+        ipv4: 192.168.0.32
+        hostid: foo032-globalid
+    foo033:
+        name: foo033
+        ipv4: 192.168.0.33
+        hostid: foo033-globalid
+    foo034:
+        name: foo034
+        ipv4: 192.168.0.34
+        hostid: foo034-globalid
+    foo035:
+        name: foo035
+        ipv4: 192.168.0.35
+        hostid: foo035-globalid
+    foo036:
+        name: foo036
+        ipv4: 192.168.0.36
+        hostid: foo036-globalid
+    foo037:
+        name: foo037
+        ipv4: 192.168.0.37
+        hostid: foo037-globalid
+    foo038:
+        name: foo038
+        ipv4: 192.168.0.38
+        hostid: foo038-globalid
+    foo039:
+        name: foo039
+        ipv4: 192.168.0.39
+        hostid: foo039-globalid
+    foo040:
+        name: foo040
+        ipv4: 192.168.0.40
+        hostid: foo040-globalid
+    foo041:
+        name: foo041
+        ipv4: 192.168.0.41
+        hostid: foo041-globalid
+    foo042:
+        name: foo042
+        ipv4: 192.168.0.42
+        hostid: foo042-globalid
+    foo043:
+        name: foo043
+        ipv4: 192.168.0.43
+        hostid: foo043-globalid
+    foo044:
+        name: foo044
+        ipv4: 192.168.0.44
+        hostid: foo044-globalid
+    foo045:
+        name: foo045
+        ipv4: 192.168.0.45
+        hostid: foo045-globalid
+    foo046:
+        name: foo046
+        ipv4: 192.168.0.46
+        hostid: foo046-globalid
+    foo047:
+        name: foo047
+        ipv4: 192.168.0.47
+        hostid: foo047-globalid
+    foo048:
+        name: foo048
+        ipv4: 192.168.0.48
+        hostid: foo048-globalid
+    foo049:
+        name: foo049
+        ipv4: 192.168.0.49
+        hostid: foo049-globalid
+    foo050:
+        name: foo050
+        ipv4: 192.168.0.50
+        hostid: foo050-globalid
+    foo051:
+        name: foo051
+        ipv4: 192.168.0.51
+        hostid: foo051-globalid
+    foo052:
+        name: foo052
+        ipv4: 192.168.0.52
+        hostid: foo052-globalid
+    foo053:
+        name: foo053
+        ipv4: 192.168.0.53
+        hostid: foo053-globalid
+    foo054:
+        name: foo054
+        ipv4: 192.168.0.54
+        hostid: foo054-globalid
+    foo055:
+        name: foo055
+        ipv4: 192.168.0.55
+        hostid: foo055-globalid
+    foo056:
+        name: foo056
+        ipv4: 192.168.0.56
+        hostid: foo056-globalid
+    foo057:
+        name: foo057
+        ipv4: 192.168.0.57
+        hostid: foo057-globalid
+    foo058:
+        name: foo058
+        ipv4: 192.168.0.58
+        hostid: foo058-globalid
+    foo059:
+        name: foo059
+        ipv4: 192.168.0.59
+        hostid: foo059-globalid
+    foo060:
+        name: foo060
+        ipv4: 192.168.0.60
+        hostid: foo060-globalid
+    foo061:
+        name: foo061
+        ipv4: 192.168.0.61
+        hostid: foo061-globalid
+    foo062:
+        name: foo062
+        ipv4: 192.168.0.62
+        hostid: foo062-globalid
+    foo063:
+        name: foo063
+        ipv4: 192.168.0.63
+        hostid: foo063-globalid
+    foo064:
+        name: foo064
+        ipv4: 192.168.0.64
+        hostid: foo064-globalid
+    foo065:
+        name: foo065
+        ipv4: 192.168.0.65
+        hostid: foo065-globalid
+    foo066:
+        name: foo066
+        ipv4: 192.168.0.66
+        hostid: foo066-globalid
+    foo067:
+        name: foo067
+        ipv4: 192.168.0.67
+        hostid: foo067-globalid
+    foo068:
+        name: foo068
+        ipv4: 192.168.0.68
+        hostid: foo068-globalid
+    foo069:
+        name: foo069
+        ipv4: 192.168.0.69
+        hostid: foo069-globalid
+    foo070:
+        name: foo070
+        ipv4: 192.168.0.70
+        hostid: foo070-globalid
+    foo071:
+        name: foo071
+        ipv4: 192.168.0.71
+        hostid: foo071-globalid
+    foo072:
+        name: foo072
+        ipv4: 192.168.0.72
+        hostid: foo072-globalid
+    foo073:
+        name: foo073
+        ipv4: 192.168.0.73
+        hostid: foo073-globalid
+    foo074:
+        name: foo074
+        ipv4: 192.168.0.74
+        hostid: foo074-globalid
+    foo075:
+        name: foo075
+        ipv4: 192.168.0.75
+        hostid: foo075-globalid
+    foo076:
+        name: foo076
+        ipv4: 192.168.0.76
+        hostid: foo076-globalid
+    foo077:
+        name: foo077
+        ipv4: 192.168.0.77
+        hostid: foo077-globalid
+    foo078:
+        name: foo078
+        ipv4: 192.168.0.78
+        hostid: foo078-globalid
+    foo079:
+        name: foo079
+        ipv4: 192.168.0.79
+        hostid: foo079-globalid
+    foo080:
+        name: foo080
+        ipv4: 192.168.0.80
+        hostid: foo080-globalid
+    foo081:
+        name: foo081
+        ipv4: 192.168.0.81
+        hostid: foo081-globalid
+    foo082:
+        name: foo082
+        ipv4: 192.168.0.82
+        hostid: foo082-globalid
+    foo083:
+        name: foo083
+        ipv4: 192.168.0.83
+        hostid: foo083-globalid
+    foo084:
+        name: foo084
+        ipv4: 192.168.0.84
+        hostid: foo084-globalid
+    foo085:
+        name: foo085
+        ipv4: 192.168.0.85
+        hostid: foo085-globalid
+    foo086:
+        name: foo086
+        ipv4: 192.168.0.86
+        hostid: foo086-globalid
+    foo087:
+        name: foo087
+        ipv4: 192.168.0.87
+        hostid: foo087-globalid
+    foo088:
+        name: foo088
+        ipv4: 192.168.0.88
+        hostid: foo088-globalid
+    foo089:
+        name: foo089
+        ipv4: 192.168.0.89
+        hostid: foo089-globalid
+    foo090:
+        name: foo090
+        ipv4: 192.168.0.90
+        hostid: foo090-globalid
+    foo091:
+        name: foo091
+        ipv4: 192.168.0.91
+        hostid: foo091-globalid
+    foo092:
+        name: foo092
+        ipv4: 192.168.0.92
+        hostid: foo092-globalid
+    foo093:
+        name: foo093
+        ipv4: 192.168.0.93
+        hostid: foo093-globalid
+    foo094:
+        name: foo094
+        ipv4: 192.168.0.94
+        hostid: foo094-globalid
+    foo095:
+        name: foo095
+        ipv4: 192.168.0.95
+        hostid: foo095-globalid
+    foo096:
+        name: foo096
+        ipv4: 192.168.0.96
+        hostid: foo096-globalid
+    foo097:
+        name: foo097
+        ipv4: 192.168.0.97
+        hostid: foo097-globalid
+    foo098:
+        name: foo098
+        ipv4: 192.168.0.98
+        hostid: foo098-globalid
+    foo099:
+        name: foo099
+        ipv4: 192.168.0.99
+        hostid: foo099-globalid
+    foo100:
+        name: foo100
+        ipv4: 192.168.0.100
+        hostid: foo100-globalid
+    foo101:
+        name: foo101
+        ipv4: 192.168.0.101
+        hostid: foo101-globalid
+    foo102:
+        name: foo102
+        ipv4: 192.168.0.102
+        hostid: foo102-globalid
+    foo103:
+        name: foo103
+        ipv4: 192.168.0.103
+        hostid: foo103-globalid
+    foo104:
+        name: foo104
+        ipv4: 192.168.0.104
+        hostid: foo104-globalid
+    foo105:
+        name: foo105
+        ipv4: 192.168.0.105
+        hostid: foo105-globalid
+    foo106:
+        name: foo106
+        ipv4: 192.168.0.106
+        hostid: foo106-globalid
+    foo107:
+        name: foo107
+        ipv4: 192.168.0.107
+        hostid: foo107-globalid
+    foo108:
+        name: foo108
+        ipv4: 192.168.0.108
+        hostid: foo108-globalid
+    foo109:
+        name: foo109
+        ipv4: 192.168.0.109
+        hostid: foo109-globalid
+    foo110:
+        name: foo110
+        ipv4: 192.168.0.110
+        hostid: foo110-globalid
+    foo111:
+        name: foo111
+        ipv4: 192.168.0.111
+        hostid: foo111-globalid
+    foo112:
+        name: foo112
+        ipv4: 192.168.0.112
+        hostid: foo112-globalid
+    foo113:
+        name: foo113
+        ipv4: 192.168.0.113
+        hostid: foo113-globalid
+    foo114:
+        name: foo114
+        ipv4: 192.168.0.114
+        hostid: foo114-globalid
+    foo115:
+        name: foo115
+        ipv4: 192.168.0.115
+        hostid: foo115-globalid
+    foo116:
+        name: foo116
+        ipv4: 192.168.0.116
+        hostid: foo116-globalid
+    foo117:
+        name: foo117
+        ipv4: 192.168.0.117
+        hostid: foo117-globalid
+    foo118:
+        name: foo118
+        ipv4: 192.168.0.118
+        hostid: foo118-globalid
+    foo119:
+        name: foo119
+        ipv4: 192.168.0.119
+        hostid: foo119-globalid
+    foo120:
+        name: foo120
+        ipv4: 192.168.0.120
+        hostid: foo120-globalid
+    foo121:
+        name: foo121
+        ipv4: 192.168.0.121
+        hostid: foo121-globalid
+    foo122:
+        name: foo122
+        ipv4: 192.168.0.122
+        hostid: foo122-globalid
+    foo123:
+        name: foo123
+        ipv4: 192.168.0.123
+        hostid: foo123-globalid
+    foo124:
+        name: foo124
+        ipv4: 192.168.0.124
+        hostid: foo124-globalid
+    foo125:
+        name: foo125
+        ipv4: 192.168.0.125
+        hostid: foo125-globalid
+    foo126:
+        name: foo126
+        ipv4: 192.168.0.126
+        hostid: foo126-globalid
+    foo127:
+        name: foo127
+        ipv4: 192.168.0.127
+        hostid: foo127-globalid
+    foo128:
+        name: foo128
+        ipv4: 192.168.0.128
+        hostid: foo128-globalid
+    foo129:
+        name: foo129
+        ipv4: 192.168.0.129
+        hostid: foo129-globalid
+    foo130:
+        name: foo130
+        ipv4: 192.168.0.130
+        hostid: foo130-globalid
+    foo131:
+        name: foo131
+        ipv4: 192.168.0.131
+        hostid: foo131-globalid
+    foo132:
+        name: foo132
+        ipv4: 192.168.0.132
+        hostid: foo132-globalid
+    foo133:
+        name: foo133
+        ipv4: 192.168.0.133
+        hostid: foo133-globalid
+    foo134:
+        name: foo134
+        ipv4: 192.168.0.134
+        hostid: foo134-globalid
+    foo135:
+        name: foo135
+        ipv4: 192.168.0.135
+        hostid: foo135-globalid
+    foo136:
+        name: foo136
+        ipv4: 192.168.0.136
+        hostid: foo136-globalid
+    foo137:
+        name: foo137
+        ipv4: 192.168.0.137
+        hostid: foo137-globalid
+    foo138:
+        name: foo138
+        ipv4: 192.168.0.138
+        hostid: foo138-globalid
+    foo139:
+        name: foo139
+        ipv4: 192.168.0.139
+        hostid: foo139-globalid
+    foo140:
+        name: foo140
+        ipv4: 192.168.0.140
+        hostid: foo140-globalid
+    foo141:
+        name: foo141
+        ipv4: 192.168.0.141
+        hostid: foo141-globalid
+    foo142:
+        name: foo142
+        ipv4: 192.168.0.142
+        hostid: foo142-globalid
+    foo143:
+        name: foo143
+        ipv4: 192.168.0.143
+        hostid: foo143-globalid
+    foo144:
+        name: foo144
+        ipv4: 192.168.0.144
+        hostid: foo144-globalid
+    foo145:
+        name: foo145
+        ipv4: 192.168.0.145
+        hostid: foo145-globalid
+    foo146:
+        name: foo146
+        ipv4: 192.168.0.146
+        hostid: foo146-globalid
+    foo147:
+        name: foo147
+        ipv4: 192.168.0.147
+        hostid: foo147-globalid
+    foo148:
+        name: foo148
+        ipv4: 192.168.0.148
+        hostid: foo148-globalid
+    foo149:
+        name: foo149
+        ipv4: 192.168.0.149
+        hostid: foo149-globalid
+    foo150:
+        name: foo150
+        ipv4: 192.168.0.150
+        hostid: foo150-globalid
+    foo151:
+        name: foo151
+        ipv4: 192.168.0.151
+        hostid: foo151-globalid
+    foo152:
+        name: foo152
+        ipv4: 192.168.0.152
+        hostid: foo152-globalid
+    foo153:
+        name: foo153
+        ipv4: 192.168.0.153
+        hostid: foo153-globalid
+    foo154:
+        name: foo154
+        ipv4: 192.168.0.154
+        hostid: foo154-globalid
+    foo155:
+        name: foo155
+        ipv4: 192.168.0.155
+        hostid: foo155-globalid
+    foo156:
+        name: foo156
+        ipv4: 192.168.0.156
+        hostid: foo156-globalid
+    foo157:
+        name: foo157
+        ipv4: 192.168.0.157
+        hostid: foo157-globalid
+    foo158:
+        name: foo158
+        ipv4: 192.168.0.158
+        hostid: foo158-globalid
+    foo159:
+        name: foo159
+        ipv4: 192.168.0.159
+        hostid: foo159-globalid
+    foo160:
+        name: foo160
+        ipv4: 192.168.0.160
+        hostid: foo160-globalid
+    foo161:
+        name: foo161
+        ipv4: 192.168.0.161
+        hostid: foo161-globalid
+    foo162:
+        name: foo162
+        ipv4: 192.168.0.162
+        hostid: foo162-globalid
+    foo163:
+        name: foo163
+        ipv4: 192.168.0.163
+        hostid: foo163-globalid
+    foo164:
+        name: foo164
+        ipv4: 192.168.0.164
+        hostid: foo164-globalid
+    foo165:
+        name: foo165
+        ipv4: 192.168.0.165
+        hostid: foo165-globalid
+    foo166:
+        name: foo166
+        ipv4: 192.168.0.166
+        hostid: foo166-globalid
+    foo167:
+        name: foo167
+        ipv4: 192.168.0.167
+        hostid: foo167-globalid
+    foo168:
+        name: foo168
+        ipv4: 192.168.0.168
+        hostid: foo168-globalid
+    foo169:
+        name: foo169
+        ipv4: 192.168.0.169
+        hostid: foo169-globalid
+    foo170:
+        name: foo170
+        ipv4: 192.168.0.170
+        hostid: foo170-globalid
+    foo171:
+        name: foo171
+        ipv4: 192.168.0.171
+        hostid: foo171-globalid
+    foo172:
+        name: foo172
+        ipv4: 192.168.0.172
+        hostid: foo172-globalid
+    foo173:
+        name: foo173
+        ipv4: 192.168.0.173
+        hostid: foo173-globalid
+    foo174:
+        name: foo174
+        ipv4: 192.168.0.174
+        hostid: foo174-globalid
+    foo175:
+        name: foo175
+        ipv4: 192.168.0.175
+        hostid: foo175-globalid
+    foo176:
+        name: foo176
+        ipv4: 192.168.0.176
+        hostid: foo176-globalid
+    foo177:
+        name: foo177
+        ipv4: 192.168.0.177
+        hostid: foo177-globalid
+    foo178:
+        name: foo178
+        ipv4: 192.168.0.178
+        hostid: foo178-globalid
+    foo179:
+        name: foo179
+        ipv4: 192.168.0.179
+        hostid: foo179-globalid
+    foo180:
+        name: foo180
+        ipv4: 192.168.0.180
+        hostid: foo180-globalid
+    foo181:
+        name: foo181
+        ipv4: 192.168.0.181
+        hostid: foo181-globalid
+    foo182:
+        name: foo182
+        ipv4: 192.168.0.182
+        hostid: foo182-globalid
+    foo183:
+        name: foo183
+        ipv4: 192.168.0.183
+        hostid: foo183-globalid
+    foo184:
+        name: foo184
+        ipv4: 192.168.0.184
+        hostid: foo184-globalid
+    foo185:
+        name: foo185
+        ipv4: 192.168.0.185
+        hostid: foo185-globalid
+    foo186:
+        name: foo186
+        ipv4: 192.168.0.186
+        hostid: foo186-globalid
+    foo187:
+        name: foo187
+        ipv4: 192.168.0.187
+        hostid: foo187-globalid
+    foo188:
+        name: foo188
+        ipv4: 192.168.0.188
+        hostid: foo188-globalid
+    foo189:
+        name: foo189
+        ipv4: 192.168.0.189
+        hostid: foo189-globalid
+    foo190:
+        name: foo190
+        ipv4: 192.168.0.190
+        hostid: foo190-globalid
+    foo191:
+        name: foo191
+        ipv4: 192.168.0.191
+        hostid: foo191-globalid
+    foo192:
+        name: foo192
+        ipv4: 192.168.0.192
+        hostid: foo192-globalid
+    foo193:
+        name: foo193
+        ipv4: 192.168.0.193
+        hostid: foo193-globalid
+    foo194:
+        name: foo194
+        ipv4: 192.168.0.194
+        hostid: foo194-globalid
+    foo195:
+        name: foo195
+        ipv4: 192.168.0.195
+        hostid: foo195-globalid
+    foo196:
+        name: foo196
+        ipv4: 192.168.0.196
+        hostid: foo196-globalid
+    foo197:
+        name: foo197
+        ipv4: 192.168.0.197
+        hostid: foo197-globalid
+    foo198:
+        name: foo198
+        ipv4: 192.168.0.198
+        hostid: foo198-globalid
+    foo199:
+        name: foo199
+        ipv4: 192.168.0.199
+        hostid: foo199-globalid
+    foo200:
+        name: foo200
+        ipv4: 192.168.0.200
+        hostid: foo200-globalid
+    foo201:
+        name: foo201
+        ipv4: 192.168.0.201
+        hostid: foo201-globalid
+    foo202:
+        name: foo202
+        ipv4: 192.168.0.202
+        hostid: foo202-globalid
+    foo203:
+        name: foo203
+        ipv4: 192.168.0.203
+        hostid: foo203-globalid
+    foo204:
+        name: foo204
+        ipv4: 192.168.0.204
+        hostid: foo204-globalid
+    foo205:
+        name: foo205
+        ipv4: 192.168.0.205
+        hostid: foo205-globalid
+    foo206:
+        name: foo206
+        ipv4: 192.168.0.206
+        hostid: foo206-globalid
+    foo207:
+        name: foo207
+        ipv4: 192.168.0.207
+        hostid: foo207-globalid
+    foo208:
+        name: foo208
+        ipv4: 192.168.0.208
+        hostid: foo208-globalid
+    foo209:
+        name: foo209
+        ipv4: 192.168.0.209
+        hostid: foo209-globalid
+    foo210:
+        name: foo210
+        ipv4: 192.168.0.210
+        hostid: foo210-globalid
+    foo211:
+        name: foo211
+        ipv4: 192.168.0.211
+        hostid: foo211-globalid
+    foo212:
+        name: foo212
+        ipv4: 192.168.0.212
+        hostid: foo212-globalid
+    foo213:
+        name: foo213
+        ipv4: 192.168.0.213
+        hostid: foo213-globalid
+    foo214:
+        name: foo214
+        ipv4: 192.168.0.214
+        hostid: foo214-globalid
+    foo215:
+        name: foo215
+        ipv4: 192.168.0.215
+        hostid: foo215-globalid
+    foo216:
+        name: foo216
+        ipv4: 192.168.0.216
+        hostid: foo216-globalid
+    foo217:
+        name: foo217
+        ipv4: 192.168.0.217
+        hostid: foo217-globalid
+    foo218:
+        name: foo218
+        ipv4: 192.168.0.218
+        hostid: foo218-globalid
+    foo219:
+        name: foo219
+        ipv4: 192.168.0.219
+        hostid: foo219-globalid
+    foo220:
+        name: foo220
+        ipv4: 192.168.0.220
+        hostid: foo220-globalid
+    foo221:
+        name: foo221
+        ipv4: 192.168.0.221
+        hostid: foo221-globalid
+    foo222:
+        name: foo222
+        ipv4: 192.168.0.222
+        hostid: foo222-globalid
+    foo223:
+        name: foo223
+        ipv4: 192.168.0.223
+        hostid: foo223-globalid
+    foo224:
+        name: foo224
+        ipv4: 192.168.0.224
+        hostid: foo224-globalid
+    foo225:
+        name: foo225
+        ipv4: 192.168.0.225
+        hostid: foo225-globalid
+    foo226:
+        name: foo226
+        ipv4: 192.168.0.226
+        hostid: foo226-globalid
+    foo227:
+        name: foo227
+        ipv4: 192.168.0.227
+        hostid: foo227-globalid
+    foo228:
+        name: foo228
+        ipv4: 192.168.0.228
+        hostid: foo228-globalid
+    foo229:
+        name: foo229
+        ipv4: 192.168.0.229
+        hostid: foo229-globalid
+    foo230:
+        name: foo230
+        ipv4: 192.168.0.230
+        hostid: foo230-globalid
+    foo231:
+        name: foo231
+        ipv4: 192.168.0.231
+        hostid: foo231-globalid
+    foo232:
+        name: foo232
+        ipv4: 192.168.0.232
+        hostid: foo232-globalid
+    foo233:
+        name: foo233
+        ipv4: 192.168.0.233
+        hostid: foo233-globalid
+    foo234:
+        name: foo234
+        ipv4: 192.168.0.234
+        hostid: foo234-globalid
+    foo235:
+        name: foo235
+        ipv4: 192.168.0.235
+        hostid: foo235-globalid
+    foo236:
+        name: foo236
+        ipv4: 192.168.0.236
+        hostid: foo236-globalid
+    foo237:
+        name: foo237
+        ipv4: 192.168.0.237
+        hostid: foo237-globalid
+    foo238:
+        name: foo238
+        ipv4: 192.168.0.238
+        hostid: foo238-globalid
+    foo239:
+        name: foo239
+        ipv4: 192.168.0.239
+        hostid: foo239-globalid
+    foo240:
+        name: foo240
+        ipv4: 192.168.0.240
+        hostid: foo240-globalid
+    foo241:
+        name: foo241
+        ipv4: 192.168.0.241
+        hostid: foo241-globalid
+    foo242:
+        name: foo242
+        ipv4: 192.168.0.242
+        hostid: foo242-globalid
+    foo243:
+        name: foo243
+        ipv4: 192.168.0.243
+        hostid: foo243-globalid
+    foo244:
+        name: foo244
+        ipv4: 192.168.0.244
+        hostid: foo244-globalid
+    foo245:
+        name: foo245
+        ipv4: 192.168.0.245
+        hostid: foo245-globalid
+    foo246:
+        name: foo246
+        ipv4: 192.168.0.246
+        hostid: foo246-globalid
+    foo247:
+        name: foo247
+        ipv4: 192.168.0.247
+        hostid: foo247-globalid
+    foo248:
+        name: foo248
+        ipv4: 192.168.0.248
+        hostid: foo248-globalid
+    foo249:
+        name: foo249
+        ipv4: 192.168.0.249
+        hostid: foo249-globalid
+    foo250:
+        name: foo250
+        ipv4: 192.168.0.250
+        hostid: foo250-globalid
+    foo251:
+        name: foo251
+        ipv4: 192.168.0.251
+        hostid: foo251-globalid
+    foo252:
+        name: foo252
+        ipv4: 192.168.0.252
+        hostid: foo252-globalid
+    foo253:
+        name: foo253
+        ipv4: 192.168.0.253
+        hostid: foo253-globalid
+    foo254:
+        name: foo254
+        ipv4: 192.168.0.254
+        hostid: foo254-globalid
+    foo255:
+        name: foo255
+        ipv4: 192.168.0.255
+        hostid: foo255-globalid

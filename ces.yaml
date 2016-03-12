@@ -68,16 +68,6 @@ ADDRESSPOOL:
         - 198.18.0.12/32
         - 198.18.0.13/32
 
-HOSTS:
-    foo200:
-        name: foo200
-        ipv4: 192.168.0.200
-        hostid: foo200globalid
-    foo201:
-        name: foo201
-        ipv4: 192.168.0.201
-        hostid: foo201globalid
-    foo202:
-        name: foo202
-        ipv4: 192.168.0.202
-        hostid: foo202globalid
+DATAREPOSITORY:
+    userdata: hosts.yaml
+    policydata: policy.yaml

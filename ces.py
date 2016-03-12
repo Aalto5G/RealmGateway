@@ -68,8 +68,8 @@ class CustomerEdgeSwitch(object):
         # Initialize DNS
         self._init_dns()
         
-        # Initialize Hosts
-        self._init_hosts()
+        # Initialize Data Repository
+        self._init_datarepository()
     
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -167,12 +167,18 @@ class CustomerEdgeSwitch(object):
         self._dns['node']['loopback'] = factory
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
     
-    def _init_hosts(self):
-        self._logger.warning('Initializing hosts')
+    def _init_datarepository(self):
+        self._logger.warning('Initializing data repository')
+        self._udr = self._config['DATAREPOSITORY']
+        self._init_userdata(self._udr['userdata'])
+    
+    def _init_userdata(self, filename):
+        self._logger.warning('Initializing user data')
         
-        for k, v in self._config['HOSTS'].items():
+        data = self._load_configuration(filename)
+        for k, v in data['HOSTS'].items():
             self._logger.warning('Registering host {}'.format(k))
-            ipaddr = self._config['HOSTS'][k]['ipv4']
+            ipaddr = data['HOSTS'][k]['ipv4']
             self.register_user(k, 1, ipaddr)
     
     def _init_network(self):
