@@ -81,11 +81,12 @@ iptables -A HOST_192.168.0.101_SERVICE2  -j ACCEPT
 
 ## CES LOCAL PROCESSING (INPUT chain)
 ## From LAN
-### DNS
-iptables -A INPUT -m mark --mark 0x1 -p udp --dport 53 -j DNS_LAN
-iptables -A INPUT -m mark --mark 0x1 -p udp --dport 53 -d 192.168.0.101 -j HOST_192.168.0.101
 ### DHCP
 iptables -A INPUT -m mark --mark 0x1 -p udp --sport 68 --dport 67 -j DHCP_LAN
+### DNS
+iptables -A INPUT -m mark --mark 0x1 -p udp --dport 53 -j DNS_LAN
+### Traffic from hosts
+iptables -A INPUT -m mark --mark 0x1 -s 192.168.0.101 -j HOST_192.168.0.101
 
 ## From WAN
 ### DNS
