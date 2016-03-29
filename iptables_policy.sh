@@ -51,9 +51,10 @@ iptables -t mangle -A INPUT   -i $WAN_NIC                               -j MARK 
 
 
 # doREJECT table - https://wiki.archlinux.org/index.php/Simple_stateful_firewall
-iptables -A doREJECT -p udp -j doREJECT --reject-with icmp-port-unreachable
-iptables -A doREJECT -p tcp -j doREJECT --reject-with tcp-reset
-iptables -A doREJECT -j doREJECT --reject-with icmp-proto-unreachable
+iptables -N doREJECT
+iptables -A doREJECT -p udp -j REJECT --reject-with icmp-port-unreachable
+iptables -A doREJECT -p tcp -j REJECT --reject-with tcp-reset
+iptables -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 
 
 # DEFINITION OF CES POLICIES AND CHAINS
