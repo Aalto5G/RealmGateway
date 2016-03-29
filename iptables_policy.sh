@@ -15,31 +15,96 @@ LAN_NIC="cesa-lan"
 LAN_NET="192.168.0.0/24"
 PROXY_NET="172.16.0.0/24"
 
+# Packet marks per interface
+iMARK_OUT_LAN2LOCAL="4"   #0b00100
+iMARK_OUT_LAN2WAN="6"     #0b00110
+iMARK_OUT_LAN2CES="7"     #0b00111
+iMARK_IN_WAN2LOCAL="24"   #0b11000
+iMARK_IN_WAN2LAN="25"     #0b11001
+iMARK_IN_CES2LAN="29"     #0b11101
+
+hMARK_OUT_LAN2LOCAL="0x4" #0b00100
+hMARK_OUT_LAN2WAN="0x6"   #0b00110
+hMARK_OUT_LAN2CES="0x7"   #0b00111
+hMARK_IN_WAN2LOCAL="0x18" #0b11000
+hMARK_IN_WAN2LAN="0x19"   #0b11001
+hMARK_IN_CES2LAN="0x1d"   #0b11101
+
 ## Enable NAT
 iptables -t nat -A POSTROUTING -s $LAN_NET -j MASQUERADE
 
 ## Packet clasification with mark
+iptables -t mangle -A PREROUTING -i lo        -j MARK --set-mark 0x0
 iptables -t mangle -A PREROUTING -i $LAN_NIC  -j MARK --set-mark 0x1
 iptables -t mangle -A PREROUTING -i $WAN_NIC  -j MARK --set-mark 0x2
 iptables -t mangle -A PREROUTING -i $VTEP_NIC -j MARK --set-mark 0x3
 
 
-# DEFINITION OF CES POLICIES
-# Create DHCP_LAN chain
-iptables -N DHCP_LAN
-iptables -A DHCP_LAN -m limit --limit 3/s --limit-burst 5 -j RETURN
-iptables -A DHCP_LAN -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DHCP LAN: " --log-level 7
-iptables -A DHCP_LAN -j REJECT
-# Create DNS_LAN chain
-iptables -N DNS_LAN
-iptables -A DNS_LAN -m limit --limit 3/s --limit-burst 5 -j RETURN
-iptables -A DNS_LAN -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS LAN: " --log-level 3
-iptables -A DNS_LAN -j REJECT
-# Create DNS_WAN chain
-iptables -N DNS_WAN
-iptables -A DNS_WAN -m limit --limit 3/s --limit-burst 5 -j RETURN
-iptables -A DNS_WAN -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS WAN: " --log-level 7
-iptables -A DNS_WAN -j REJECT
+# DEFINITION OF BASIC CES CHAINS
+
+# CES_LOCAL_SYSTEM e.g.: DHCP / DNS / HTTP Proxy - System wide policies
+iptables -N CES_LOCAL_SYSTEM
+
+# CES_LOCAL_HOST e.g.: DHCP / DNS / HTTP Proxy - Link to specific host policy
+iptables -N CES_LOCAL_HOST
+
+iptables -A CES_LOCAL_HOST -m mark --mark 0x1 -s 192.168.0.101 -j HOST_192.168.0.101
+iptables -A CES_LOCAL_HOST -m mark --mark 0x1 -s 192.168.0.102 -j HOST_192.168.0.102
+iptables -A CES_LOCAL_HOST -m mark --mark 0x1 -s 192.168.0.103 -j HOST_192.168.0.103
+iptables -A CES_LOCAL_HOST -m mark --mark 0x1 -s 192.168.0.104 -j HOST_192.168.0.104
+
+
+# CES_FORWARD
+iptables -N CES_FORWARD
+
+
+
+# Create CES_POLICY_OUT chain
+iptables -N CES_POLICY_OUT
+# Create CES_POLICY_IN chain
+iptables -N CES_POLICY_IN
+
+
+# Create LAN_DCHP chain
+iptables -N LAN_DCHP
+## Add trigger to CES_LOCAL_SYSTEM chain
+iptables -A CES_LOCAL_SYSTEM -m mark --mark 0x1 -p udp --sport 68 --dport 67 -j LAN_DCHP
+## Add rules to service chain
+iptables -A LAN_DCHP -m limit --limit 3/s --limit-burst 5 -j RETURN
+iptables -A LAN_DCHP -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DHCP LAN: " --log-level 7
+iptables -A LAN_DCHP -j REJECT
+
+## Create LAN_DNS chain
+##ptables -N LAN_DNS
+### Add trigger to CES_LOCAL_SYSTEM chain
+##ptables -A CES_LOCAL_SYSTEM -m mark --mark 0x1 -p udp --dport 53 -j LAN_DNS
+### Add rules to service chain
+##ptables -A LAN_DNS -m limit --limit 3/s --limit-burst 5 -j RETURN
+##ptables -A LAN_DNS -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS LAN: " --log-level 7
+##ptables -A LAN_DNS -j REJECT
+
+## Add trigger to CES_LOCAL_SYSTEM chain
+iptables -A CES_LOCAL_SYSTEM -m mark --mark 0x1 -j LAN_DNS
+iptables -A CES_LOCAL_SYSTEM -m mark --mark 0x1 -j LAN_DHCP
+
+## Add rules to service chain
+iptables -A LAN_DNS -p udp --dport 53 -m limit --limit 3/s --limit-burst 5 -j RETURN
+iptables -A LAN_DNS -p udp --dport 53 -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS LAN: " --log-level 7
+iptables -A LAN_DNS -p udp --dport 53 -j REJECT
+iptables -A LAN_DNS -p tcp --dport 53 -m limit --limit 3/s --limit-burst 5 -j RETURN
+iptables -A LAN_DNS -p tcp --dport 53 -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS LAN: " --log-level 7
+iptables -A LAN_DNS -p tcp --dport 53 -j REJECT
+iptables -A LAN_DNS -j RETURN
+
+
+# Create WAN_DNS chain
+iptables -N WAN_DNS
+## Add trigger to CES_LOCAL_SYSTEM chain
+iptables -A CES_LOCAL_SYSTEM -m mark --mark 0x2 -p udp --dport 53 -j WAN_DNS
+## Add rules to service chain
+iptables -A WAN_DNS -m limit --limit 3/s --limit-burst 5 -j RETURN
+iptables -A WAN_DNS -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "Exceeded DNS WAN: " --log-level 7
+iptables -A WAN_DNS -j REJECT
 
 
 # DEFINITION OF HOST POLICIES
@@ -79,18 +144,22 @@ iptables -A HOST_192.168.0.101_SERVICE2  -j ACCEPT
 
 
 
-## CES LOCAL PROCESSING (INPUT chain)
+## CES LOCAL PROCESSES (INPUT chain)
+iptables -A INPUT -j CES_LOCAL_HOST
+iptables -A INPUT -j CES_LOCAL_SYSTEM
+
+
 ## From LAN
 ### DHCP
-iptables -A INPUT -m mark --mark 0x1 -p udp --sport 68 --dport 67 -j DHCP_LAN
+iptables -A INPUT -m mark --mark 0x1 -p udp --sport 68 --dport 67 -j LAN_DCHP
 ### DNS
-iptables -A INPUT -m mark --mark 0x1 -p udp --dport 53 -j DNS_LAN
+iptables -A INPUT -m mark --mark 0x1 -p udp --dport 53 -j LAN_DNS
 ### Traffic from hosts
 iptables -A INPUT -m mark --mark 0x1 -s 192.168.0.101 -j HOST_192.168.0.101
 
 ## From WAN
 ### DNS
-iptables -A INPUT -m mark --mark 0x2 -p udp --dport 53 -j DNS_WAN
+iptables -A INPUT -m mark --mark 0x2 -p udp --dport 53 -j WAN_DNS
 ### HTTP Proxy
 iptables -A INPUT -m mark --mark 0x2 -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables -A INPUT -m mark --mark 0x2 -p tcp --dport 80  -m state --state NEW     -j ACCEPT
@@ -99,7 +168,7 @@ iptables -A INPUT -m mark --mark 0x2 -p tcp --dport 443 -m state --state NEW    
 
 ## CES FORWARDING PROCESSING (FORWARD chain)
 ### Apply outgoing DNS policy rate limit
-iptables -A FORWARD -m mark --mark 0x1 -p udp --dport 53 -j DNS_LAN
+iptables -A FORWARD -m mark --mark 0x1 -p udp --dport 53 -j LAN_DNS
 ### Match on host IP address
 iptables -A FORWARD -m mark --mark 0x1 -s 192.168.0.101 -j HOST_192.168.0.101
 iptables -A FORWARD -m mark --mark 0x2 -d 192.168.0.101 -j HOST_192.168.0.101
@@ -140,9 +209,9 @@ iptables -A FORWARD -j ACCEPT
 #iptables -F LOGnDROP
 #iptables -F LOGnACCEPT
 #iptables -F LOGnRETURN
-#iptables -F DHCP_LAN
-#iptables -F DNS_LAN
-#iptables -F DNS_WAN
+#iptables -F LAN_DCHP
+#iptables -F LAN_DNS
+#iptables -F WAN_DNS
 #iptables -F HOST_192.168.0.101
 #iptables -F HOST_192.168.0.101_SERVICE1
 #iptables -F HOST_192.168.0.101_SERVICE2
