@@ -56,6 +56,8 @@ iptables -A doREJECT -p udp -j REJECT --reject-with icmp-port-unreachable
 iptables -A doREJECT -p tcp -j REJECT --reject-with tcp-reset
 iptables -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 
+# DEFINITION OF FIREWALL POLICIES TO PROTECT FROM ATTACKS
+iptables -N FIREWALL_POLICY
 
 # DEFINITION OF CES POLICIES AND CHAINS
 
@@ -149,15 +151,17 @@ iptables -A HOST_192.168.0.101_SERVICE2 -j RETURN
 
 
 ## CES LOCAL PROCESS (INPUT chain)
-iptables -A INPUT -j HOST_POLICY # Return if the host policy was accepted
-iptables -A INPUT -j CES_POLICY  # Return if the CES policy was accepted
-iptables -A INPUT -j ACCEPT      # Accept traffic
+iptables -A INPUT -j FIREWALL_POLICY   # Return if not an attack
+iptables -A INPUT -j HOST_POLICY       # Return if the host policy was accepted
+iptables -A INPUT -j CES_POLICY        # Return if the CES policy was accepted
+iptables -A INPUT -j ACCEPT            # Accept traffic
 
 
 ## CES FORWARDING PROCESS (FORWARD chain)
-iptables -A FORWARD -j HOST_POLICY # Return if the host policy was accepted
-iptables -A FORWARD -j CES_POLICY  # Return if the CES policy was accepted
-iptables -A FORWARD -j ACCEPT      # Accept traffic
+iptables -A FORWARD -j FIREWALL_POLICY # Return if not an attack
+iptables -A FORWARD -j HOST_POLICY     # Return if the host policy was accepted
+iptables -A FORWARD -j CES_POLICY      # Return if the CES policy was accepted
+iptables -A FORWARD -j ACCEPT          # Accept traffic
 
 
 ###############################################################################################################################################################
