@@ -40,6 +40,12 @@ iptables -A FIREWALL_POLICY -p tcp --tcp-flags ALL ALL -j doREJECT
 # Drop all NULL packets
 iptables -A FIREWALL_POLICY -p tcp --tcp-flags ALL NONE -j doREJECT
 
+# Drop vulnerable multiport TCP services
+# http://howtonixnux.blogspot.fi/2008/03/iptables-using-multiport.html
+TCP_MULTIPORTS = "135,137,138,139"
+iptables -A FIREWALL_POLICY -p tcp -m state --state NEW -m multiport --dports $TCP_MULTIPORTS -j doREJECT
+
+
 # Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 # http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
 iptables -A FIREWALL_POLICY -i $VTEP_NIC ! -s $PROXY_NET -j doREJECT
