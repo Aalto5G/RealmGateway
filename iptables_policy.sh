@@ -16,13 +16,6 @@ LAN_NET="192.168.0.0/24"
 PROXY_NET="172.16.0.0/24"
 
 # Packet marks per interface
-#iMARK_OUT_LAN2LOCAL="4"   #0b00100
-#iMARK_OUT_LAN2WAN="6"     #0b00110
-#iMARK_OUT_LAN2CES="7"     #0b00111
-#iMARK_IN_WAN2LOCAL="24"   #0b11000
-#iMARK_IN_WAN2LAN="25"     #0b11001
-#iMARK_IN_CES2LAN="29"     #0b11101
-
 hMARK_OUT_LAN2LOCAL="0x4" #0b00100
 hMARK_OUT_LAN2WAN="0x6"   #0b00110
 hMARK_OUT_LAN2CES="0x7"   #0b00111
@@ -55,6 +48,20 @@ iptables -N doREJECT
 iptables -A doREJECT -p udp -j REJECT --reject-with icmp-port-unreachable
 iptables -A doREJECT -p tcp -j REJECT --reject-with tcp-reset
 iptables -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
+
+# doREJECTnLOG table - https://wiki.archlinux.org/index.php/Simple_stateful_firewall
+iptables -N doREJECTnLOG
+iptables -A doREJECTnLOG -m limit --limit 1/s --limit-burst 1 -j LOG --log-prefix "doREJECTnLOG: " --log-level 7
+iptables -A doREJECTnLOG -p udp -j REJECT --reject-with icmp-port-unreachable
+iptables -A doREJECTnLOG -p tcp -j REJECT --reject-with tcp-reset
+iptables -A doREJECTnLOG -j REJECT --reject-with icmp-proto-unreachable
+
+
+# DEFINITION OF BLACK & WHITE LISTS FOR ENHANCED PACKET FILTERING
+iptables -N BLACKLIST_SOURCES
+iptables -N WHITELIST_SOURCES
+## Test
+iptables -A BLACKLIST_SOURCES -s 192.168.0.102 -j doREJECT
 
 # DEFINITION OF FIREWALL POLICIES TO PROTECT FROM ATTACKS
 iptables -N FIREWALL_POLICY
@@ -151,17 +158,21 @@ iptables -A HOST_192.168.0.101_SERVICE2 -j RETURN
 
 
 ## CES LOCAL PROCESS (INPUT chain)
-iptables -A INPUT -j FIREWALL_POLICY   # Return if not an attack
-iptables -A INPUT -j HOST_POLICY       # Return if the host policy was accepted
-iptables -A INPUT -j CES_POLICY        # Return if the CES policy was accepted
-iptables -A INPUT -j ACCEPT            # Accept traffic
+iptables -A INPUT -j BLACKLIST_SOURCES   # Drop   if source is blacklisted
+iptables -A INPUT -j WHITELIST_SOURCES   # Accept if source is whitelisted
+iptables -A INPUT -j FIREWALL_POLICY     # Return if not an attack
+iptables -A INPUT -j HOST_POLICY         # Return if the host policy was accepted
+iptables -A INPUT -j CES_POLICY          # Return if the CES policy was accepted
+iptables -A INPUT -j ACCEPT              # Accept traffic if not dropped previously
 
 
 ## CES FORWARDING PROCESS (FORWARD chain)
-iptables -A FORWARD -j FIREWALL_POLICY # Return if not an attack
-iptables -A FORWARD -j HOST_POLICY     # Return if the host policy was accepted
-iptables -A FORWARD -j CES_POLICY      # Return if the CES policy was accepted
-iptables -A FORWARD -j ACCEPT          # Accept traffic
+iptables -A FORWARD -j BLACKLIST_SOURCES # Drop   if source is blacklisted
+iptables -A FORWARD -j WHITELIST_SOURCES # Accept if source is whitelisted
+iptables -A FORWARD -j FIREWALL_POLICY   # Return if not an attack
+iptables -A FORWARD -j HOST_POLICY       # Return if the host policy was accepted
+iptables -A FORWARD -j CES_POLICY        # Return if the CES policy was accepted
+iptables -A FORWARD -j ACCEPT            # Accept traffic if not dropped previously
 
 
 ###############################################################################################################################################################
