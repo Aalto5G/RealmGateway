@@ -97,13 +97,13 @@ def check_rule(kwrule):
     assert(kwrule.setdefault('protocol', 0) >= 0)
     assert(_check_proto(kwrule['protocol']))
     # Validate source and destination ports
-    if 'sport' in kwrule:
-        assert(_check_port(kwrule['sport'], kwrule['protocol']))
-    if 'dport' in kwrule:
-        assert(_check_port(kwrule['dport'], kwrule['protocol']))
+    if 'source-port' in kwrule:
+        assert(_check_port(kwrule['source-port'], kwrule['protocol']))
+    if 'destination-port' in kwrule:
+        assert(_check_port(kwrule['destination-port'], kwrule['protocol']))
     # Validate type and code for ICMP
-    if 'icmptype' in kwrule:
-        assert(_check_icmptype(kwrule['icmptype'], kwrule['protocol']))
+    if 'icmp-type' in kwrule:
+        assert(_check_icmp-type(kwrule['icmp-type'], kwrule['protocol']))
     # Validate action
     assert(kwrule['action'] in ['ACCEPT', 'DROP'])
     # Validate extra
@@ -115,10 +115,10 @@ def check_rule(kwrule):
 
 
 # Create rule for DNS over UDP
-rule1={'priority': 10, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 17, 'dport': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}}
+rule1={'priority': 10, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}}
 check_rule(rule1)
 # Create rule for DNS over TCP
-rule2={'priority': 20, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 6,  'dport': 53, 'action': 'DROP'}
+rule2={'priority': 20, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 6,  'destination-port': 53, 'action': 'DROP'}
 check_rule(rule2)
 # Create service for DNS with above rules
 
@@ -138,7 +138,7 @@ group2 = {'priority': 10, 'name': 'ICMP', 'uuid': 'uuid0002', 'rules': [rule3, r
 ###
 
 # Create rule for SSH
-rule5={'priority': 10, 'protocol': 6, 'dport':22, 'action': 'ACCEPT'}
+rule5={'priority': 10, 'protocol': 6, 'destination-port':22, 'action': 'ACCEPT'}
 check_rule(rule5)
 # Create service for SSH with above rules
 group3 = {'priority': 10, 'name': 'SSH', 'uuid': 'uuid0003', 'rules': [rule5]}
@@ -146,7 +146,7 @@ group3 = {'priority': 10, 'name': 'SSH', 'uuid': 'uuid0003', 'rules': [rule5]}
 ###
 
 # Create rule for mySQL
-rule6={'priority': 10, 'protocol': 6, 'dport':3306, 'action': 'DROP'}
+rule6={'priority': 10, 'protocol': 6, 'destination-port':3306, 'action': 'DROP'}
 check_rule(rule6)
 
 # Create service for mySQL with above rules
