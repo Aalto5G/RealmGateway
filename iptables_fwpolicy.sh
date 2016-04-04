@@ -42,7 +42,7 @@ iptables -A FIREWALL_POLICY -p tcp --tcp-flags ALL NONE -j doREJECT
 
 # Drop vulnerable multiport TCP services
 # http://howtonixnux.blogspot.fi/2008/03/iptables-using-multiport.html
-TCP_MULTIPORTS = "135,137,138,139"
+TCP_MULTIPORTS="135,137,138,139"
 iptables -A FIREWALL_POLICY -p tcp -m state --state NEW -m multiport --dports $TCP_MULTIPORTS -j doREJECT
 
 
@@ -54,7 +54,7 @@ iptables -A FIREWALL_POLICY -i $LAN_NIC  ! -s $LAN_NET   -j doREJECT
 ## Drop all other spoofed traffic
 for ip in $SPOOF_IPS
 do
- $IPT -A FIREWALL_POLICY -i $WAN_NIC -s $ip -j doREJECT
+    iptables -A FIREWALL_POLICY -i $WAN_NIC -s $ip -j doREJECT
 done
 
 
