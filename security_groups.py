@@ -71,12 +71,14 @@ def _check_icmpcode(port, proto):
         assert(int(b) >= 0) and (int(b) <= 255)
     return True 
             
-def _check_extra(extra):
+def _check_extra(extra, action):
     if 'ratelimit' in extra:
         assert(extra['ratelimit'] >= 0)
+        assert(action == 'ACCEPT')
     elif 'ratelimit' in extra and 'rateburst' in extra:
         # Matching only in rateburst is not recommended
         assert(extra['rateburst'] >= 0)
+        assert(action == 'ACCEPT')
     return True
 
 def check_rule(kwrule):
@@ -106,7 +108,7 @@ def check_rule(kwrule):
     assert(kwrule['action'] in ['ACCEPT', 'DROP'])
     # Validate extra
     if 'extra' in kwrule:
-        assert(_check_extra(kwrule['extra']))
+        assert(_check_extra(kwrule['extra'], kwrule['action']))
     
     # For assert checks
     return True
