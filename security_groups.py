@@ -15,14 +15,14 @@ def _direction_xlat(d):
         return '{}/{}'.format('0x00', '0x00')
     elif d == 'EGRESS':
         return '{}/{}'.format(hMARK_EGRESS_MASK, hMARK_MASK)
-    elif d == 'INGRESS':
-        return '{}/{}'.format(hMARK_INGRESS_MASK, hMARK_MASK)
     elif d == 'EGRESS_to_CES':
         return '{}'.format(hMARK_EGRESS_to_CES)
     elif d == 'EGRESS_to_WAN':
         return '{}'.format(hMARK_EGRESS_to_WAN)
     elif d == 'EGRESS_to_PROXY':
         return '{}'.format(hMARK_EGRESS_to_PROXY)
+    elif d == 'INGRESS':
+        return '{}/{}'.format(hMARK_INGRESS_MASK, hMARK_MASK)
     elif d == 'INGRESS_from_CES':
         return '{}'.format(hMARK_INGRESS_from_CES)
     elif d == 'INGRESS_from_WAN':
@@ -69,8 +69,8 @@ def _check_icmpcode(port, proto):
         assert(not(a is '' or b is ''))
         assert(int(a) >= 0) and (int(a) <= 255)
         assert(int(b) >= 0) and (int(b) <= 255)
-    return True 
-            
+    return True
+
 def _check_extra(extra, action):
     if 'ratelimit' in extra:
         assert(extra['ratelimit'] >= 0)
@@ -116,10 +116,10 @@ def check_rule(kwrule):
 
 # Create rule for DNS over UDP
 rule1={'priority': 10, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}}
-check_rule(rule1)
+assert(check_rule(rule1))
 # Create rule for DNS over TCP
 rule2={'priority': 20, 'direction': 'EGRESS', 'source': '0.0.0.0/0', 'protocol': 6,  'destination-port': 53, 'action': 'DROP'}
-check_rule(rule2)
+assert(check_rule(rule2))
 # Create service for DNS with above rules
 
 group1 = {'priority': 10, 'name': 'DNS', 'uuid': 'uuid0001', 'rules': [rule1, rule2]}
@@ -129,9 +129,9 @@ group1 = {'priority': 10, 'name': 'DNS', 'uuid': 'uuid0001', 'rules': [rule1, ru
 # Create rule for ICMP
 rule3={'priority': 10, 'direction': 'EGRESS' , 'destination': '0.0.0.0/0', 'protocol': 1, 'action': 'DROP'}
 rule4={'priority': 10, 'direction': 'INGRESS', 'destination': '0.0.0.0/0', 'protocol': 1, 'action': 'DROP'}
-rule4={'priority': 10, 'destination': '0.0.0.0/0', 'protocol': 1, 'action': 'DROP'}
-check_rule(rule3)
-check_rule(rule4)
+rule4={'priority': 20, 'destination': '0.0.0.0/0', 'protocol': 1, 'action': 'DROP'}
+assert(check_rule(rule3))
+assert(check_rule(rule4))
 # Create service for ICMP with above rules
 group2 = {'priority': 10, 'name': 'ICMP', 'uuid': 'uuid0002', 'rules': [rule3, rule4]}
 
@@ -139,7 +139,7 @@ group2 = {'priority': 10, 'name': 'ICMP', 'uuid': 'uuid0002', 'rules': [rule3, r
 
 # Create rule for SSH
 rule5={'priority': 10, 'protocol': 6, 'destination-port':22, 'action': 'ACCEPT'}
-check_rule(rule5)
+assert(check_rule(rule5))
 # Create service for SSH with above rules
 group3 = {'priority': 10, 'name': 'SSH', 'uuid': 'uuid0003', 'rules': [rule5]}
 
@@ -147,7 +147,7 @@ group3 = {'priority': 10, 'name': 'SSH', 'uuid': 'uuid0003', 'rules': [rule5]}
 
 # Create rule for mySQL
 rule6={'priority': 10, 'protocol': 6, 'destination-port':3306, 'action': 'DROP'}
-check_rule(rule6)
+(check_rule(rule6))
 
 # Create service for mySQL with above rules
 group4 = {'priority': 10, 'name': 'mySQL', 'uuid': 'uuid0004', 'rules': [rule6]}
