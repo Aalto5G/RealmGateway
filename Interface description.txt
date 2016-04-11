@@ -1,0 +1,40 @@
+### LAN Network ###
+l3-lana
+    | (*veth*)
+qve-l3-lana
+   ( ) (*br) 
+qbr-filter-lana
+   ( ) (*br)
+qve-phy-lana
+    | (*veth*)
+qve-l2-lana
+   ( ) (*br)
+qbr-int-lana
+
+
+### WAN Network ###
+l3-wana
+    | (*veth*)
+qve-l3-wana
+   ( ) (*br) 
+qbr-filter-wana
+   ( ) (*br)
+qve-phy-wana
+    | (*veth*)
+qve-l2-wana
+   ( ) (*br)
+qbr-int-wan
+
+
+### TUN Network ###
+l3-tuna
+    | (*veth*)
+qve-l3-tuna
+   ( ) (*br) 
+qbr-filter-tuna
+   ( ) (*br)
+qve-phy-tuna
+    | (*veth*)
+qve-l2-tuna
+   ( ) (*ovs)
+qbr-int-tuna
