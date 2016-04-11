@@ -98,6 +98,7 @@ sudo ip link set dev qbr-filter-lana up
 sudo ip link set dev qve-phy-lana    up promisc on
 sudo ip link set dev qve-l3-lana     up promisc on
 sudo ip link set dev l3-lana         up promisc off
+sudo ip link set dev l3-lana address 00:00:00:00:01:AA
 
 ## WAN side
 sudo ip link add qve-l3-wana type veth peer name l3-wana
@@ -108,6 +109,7 @@ sudo ip link set dev qbr-filter-wana up
 sudo ip link set dev qve-phy-wana    up promisc on
 sudo ip link set dev qve-l3-wana     up promisc on
 sudo ip link set dev l3-wana         up promisc off
+sudo ip link set dev l3-wana address 00:00:00:00:01:BB
 
 ## TUN side
 sudo ip link add qve-l3-tuna type veth peer name l3-tuna
@@ -118,6 +120,7 @@ sudo ip link set dev qbr-filter-tuna up
 sudo ip link set dev qve-phy-tuna    up promisc on
 sudo ip link set dev qve-l3-tuna     up promisc on
 sudo ip link set dev l3-tuna         up promisc off
+sudo ip link set dev l3-tuna address 00:00:00:00:01:CC
 
 ### Disable MAC learning in filtering bridges
 sudo brctl setageing qbr-filter-lana 0
@@ -148,6 +151,7 @@ sudo ip link set dev qbr-filter-lanb up
 sudo ip link set dev qve-phy-lanb    up promisc on
 sudo ip link set dev qve-l3-lanb     up promisc on
 sudo ip link set dev l3-lanb         up promisc off
+sudo ip link set dev l3-lanb address 00:00:00:00:02:AA
 
 ## WAN side
 sudo ip link add qve-l3-wanb type veth peer name l3-wanb
@@ -158,6 +162,7 @@ sudo ip link set dev qbr-filter-wanb up
 sudo ip link set dev qve-phy-wanb    up promisc on
 sudo ip link set dev qve-l3-wanb     up promisc on
 sudo ip link set dev l3-wanb         up promisc off
+sudo ip link set dev l3-wanb address 00:00:00:00:02:BB
 
 ## TUN side
 sudo ip link add qve-l3-tunb type veth peer name l3-tunb
@@ -168,6 +173,7 @@ sudo ip link set dev qbr-filter-tunb up
 sudo ip link set dev qve-phy-tunb    up promisc on
 sudo ip link set dev qve-l3-tunb     up promisc on
 sudo ip link set dev l3-tunb         up promisc off
+sudo ip link set dev l3-tunb address 00:00:00:00:02:CC
 
 ### Disable MAC learning in filtering bridges
 sudo brctl setageing qbr-filter-lanb 0
