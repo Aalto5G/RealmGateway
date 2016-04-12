@@ -15,6 +15,8 @@
 LAN_NIC="l3-lana"
 WAN_NIC="l3-wana"
 TUN_NIC="l3-tuna"
+BRIDGE_INTERFACES="qbf-lana qbf-wana qbf-tuna qbi-lana qbi-wana qbi-tuna"
+
 LAN_NET="192.168.0.0/24"
 CPOOL_NET="198.18.0.21/32 198.18.0.22/32 198.18.0.23/32"
 PROXY_NET="172.16.0.0/24"
@@ -47,17 +49,27 @@ iptables -A doREJECTnLOG -j REJECT --reject-with icmp-proto-unreachable
 
 
 # Configure raw PREROUTING for specific conntrack zones
-## Note: Use conntrack zone 1 for default connection track and zone 2 for packet filtering via qbr-filter-xyz
-iptables -t raw -A PREROUTING -i lo   -j CT --notrack
-iptables -t raw -A PREROUTING -i eth0 -j CT --notrack
-iptables -t raw -A PREROUTING -i eth1 -j CT --notrack
-
-iptables -t raw -A PREROUTING -m physdev --physdev-is-in  -j CT --zone 2
-#iptables -t raw -A PREROUTING -m physdev --physdev-is-out -j CT --notrack
+## Note: Use conntrack zone 1 for default connection track and zone 2 for packet filtering via qbf-xyz
 iptables -t raw -A PREROUTING -i $LAN_NIC -j CT --zone 1
 iptables -t raw -A PREROUTING -i $WAN_NIC -j CT --zone 1
 iptables -t raw -A PREROUTING -i $TUN_NIC -j CT --zone 1
-iptables -t raw -A PREROUTING -j TRACE
+for nic in $BRIDGE_INTERFACES
+do
+    iptables -t raw -A PREROUTING -i $nic -j CT --zone 2
+done
+
+## Note: for debugging, we could enable TRACE and --notrack on the other interfaces
+#iptables -t raw -F PREROUTING
+#iptables -t raw -A PREROUTING -i lo   -j CT --notrack
+#iptables -t raw -A PREROUTING -i eth1 -j CT --notrack
+#iptables -t raw -A PREROUTING -i eth0 -j CT --notrack
+#iptables -t raw -A PREROUTING -i lo   -j ACCEPT
+#iptables -t raw -A PREROUTING -i eth0 -j ACCEPT
+#iptables -t raw -A PREROUTING -i eth1 -j ACCEPT
+
+#iptables -t raw -A PREROUTING -j TRACE
+#iptables -t raw -A PREROUTING -j ACCEPT
+
 
 ## Packet processing for Circular Pool
 ### Note: We can rate limit the number of packets that are sent to the Control Plane to prevent DoS
