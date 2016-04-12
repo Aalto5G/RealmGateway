@@ -12,45 +12,45 @@ fi
 
 # [CES-A]
 ## LAN side
-ip link set dev qbr-int-lana    down
+ip link set dev qbi-lana    down
 ip link set dev qve-phy-lana    down
 ip link set dev qve-l2-lana     down
 ip link del qve-phy-lana
-brctl delbr qbr-int-lana
+brctl delbr qbi-lana
 
 ## WAN side
-ip link set dev qbr-int-wan     down
+ip link set dev qbi-wan     down
 ip link set dev qve-phy-wana    down
 ip link set dev qve-l2-wana     down
 ip link del qve-phy-wana
-brctl delbr qbr-int-wan
+brctl delbr qbi-wan
 
 ## TUN side
 ip link set dev qve-phy-tuna    down
 ip link set dev qve-l2-tuna     down
 ip link del qve-phy-tuna
-ovs-vsctl --if-exists del-br qbr-int-tuna
+ovs-vsctl --if-exists del-br qbi-tuna
 
 # [CES-B]
 ## LAN side
-ip link set dev qbr-int-lanb    down
+ip link set dev qbi-lanb    down
 ip link set dev qve-phy-lanb    down
 ip link set dev qve-l2-lanb     down
 ip link del qve-phy-lanb
-brctl delbr qbr-int-lanb
+brctl delbr qbi-lanb
 
 ## WAN side
-ip link set dev qbr-int-wan     down
+ip link set dev qbi-wan     down
 ip link set dev qve-phy-wanb    down
 ip link set dev qve-l2-wanb     down
 ip link del qve-phy-wanb
-brctl delbr qbr-int-wan
+brctl delbr qbi-wan
 
 ## TUN side
 ip link set dev qve-phy-tunb    down
 ip link set dev qve-l2-tunb     down
 ip link del qve-phy-tunb
-ovs-vsctl --if-exists del-br qbr-int-tunb
+ovs-vsctl --if-exists del-br qbi-tunb
 
 
 ###############################################################################
@@ -58,50 +58,50 @@ ovs-vsctl --if-exists del-br qbr-int-tunb
 ###############################################################################
 
 ## LAN side
-ip link set dev qbr-filter-lana down
+ip link set dev qbf-lana down
 ip link set dev qve-l3-lana     down
 ip link set dev l3-lana         down
 ip link del qve-l3-lana
-brctl delbr qbr-filter-lana
+brctl delbr qbf-lana
 
 ## WAN side
-ip link set dev qbr-filter-wana down
+ip link set dev qbf-wana down
 ip link set dev qve-l3-wana     down
 ip link set dev l3-wana         down
 ip link del qve-l3-wana 
-brctl delbr qbr-filter-wana
+brctl delbr qbf-wana
 
 ## TUN side
-ip link set dev qbr-filter-tuna down
+ip link set dev qbf-tuna down
 ip link set dev qve-l3-tuna     down
 ip link set dev l3-tuna         down
 ip link del qve-l3-tuna
-brctl delbr qbr-filter-tuna
+brctl delbr qbf-tuna
 
 ###############################################################################
 # Remove CES-B configuration
 ###############################################################################
 
 ## LAN side
-ip link set dev qbr-filter-lanb down
+ip link set dev qbf-lanb down
 ip link set dev qve-l3-lanb     down
 ip link set dev l3-lanb         down
 ip link del qve-l3-lanb
-brctl delbr qbr-filter-lanb
+brctl delbr qbf-lanb
 
 ## WAN side
-ip link set dev qbr-filter-wanb down
+ip link set dev qbf-wanb down
 ip link set dev qve-l3-wanb     down
 ip link set dev l3-wanb         down
 ip link del qve-l3-wanb 
-brctl delbr qbr-filter-wanb
+brctl delbr qbf-wanb
 
 ## TUN side
-ip link set dev qbr-filter-tunb down
+ip link set dev qbf-tunb down
 ip link set dev qve-l3-tunb     down
 ip link set dev l3-tunb         down
 ip link del qve-l3-tunb
-brctl delbr qbr-filter-tunb
+brctl delbr qbf-tunb
 
 
 ###############################################################################

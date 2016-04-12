@@ -6,7 +6,10 @@
 ## Reject with error code
 ## https://wiki.archlinux.org/index.php/Simple_stateful_firewall
 #
-#
+# Enable iptables TRACE:
+## sysctl 'net.netfilter.nf_log.2=nf_log_ipv4'
+## iptables -t raw -A OUTPUT -p icmp -j TRACE
+## iptables -t raw -A PREROUTING -p icmp -j TRACE
 
 # Definition of variables
 LAN_NIC="l3-lana"
@@ -45,11 +48,16 @@ iptables -A doREJECTnLOG -j REJECT --reject-with icmp-proto-unreachable
 
 # Configure raw PREROUTING for specific conntrack zones
 ## Note: Use conntrack zone 1 for default connection track and zone 2 for packet filtering via qbr-filter-xyz
-iptables -t raw -A PREROUTING -m physdev --physdev-is-in -j CT --zone 2
+iptables -t raw -A PREROUTING -i lo   -j CT --notrack
+iptables -t raw -A PREROUTING -i eth0 -j CT --notrack
+iptables -t raw -A PREROUTING -i eth1 -j CT --notrack
+
+iptables -t raw -A PREROUTING -m physdev --physdev-is-in  -j CT --zone 2
+#iptables -t raw -A PREROUTING -m physdev --physdev-is-out -j CT --notrack
 iptables -t raw -A PREROUTING -i $LAN_NIC -j CT --zone 1
 iptables -t raw -A PREROUTING -i $WAN_NIC -j CT --zone 1
 iptables -t raw -A PREROUTING -i $TUN_NIC -j CT --zone 1
-
+iptables -t raw -A PREROUTING -j TRACE
 
 ## Packet processing for Circular Pool
 ### Note: We can rate limit the number of packets that are sent to the Control Plane to prevent DoS
@@ -214,3 +222,16 @@ iptables -t nat -A POSTROUTING -m mark --mark $hMARK_EGRESS_to_WAN -s $LAN_NET -
 ###############################################################################################################################################################
 ###############################################################################################################################################################
 ###############################################################################################################################################################
+
+# Debugging
+# Enable iptables TRACE:
+## sysctl 'net.netfilter.nf_log.2=nf_log_ipv4'
+## iptables -t raw -A OUTPUT -p icmp -j TRACE
+## iptables -t raw -A PREROUTING -p icmp -j TRACE
+#
+# sudo iptables -t raw -A PREROUTING -i lo   -j ACCEPT
+# sudo iptables -t raw -A PREROUTING -i eth0 -j ACCEPT
+# sudo iptables -t raw -A PREROUTING -i eth1 -j ACCEPT
+# sudo iptables -t raw -A PREROUTING -j TRACE
+# sudo iptables -t raw -A PREROUTING -j ACCEPT
+#

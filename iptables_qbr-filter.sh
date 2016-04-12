@@ -12,9 +12,9 @@
 # 5. Add CT zone for ingress interfaces
 
 # Definition of variables
-LAN_NIC="qve-phy-lana"
-WAN_NIC="qve-phy-wana"
-TUN_NIC="qve-phy-tuna"
+PHYSDEV_LAN_NIC="qve-phy-lana"
+PHYSDEV_WAN_NIC="qve-phy-wana"
+PHYSDEV_TUN_NIC="qve-phy-tuna"
 LAN_NET="192.168.0.0/24"
 PROXY_NET="172.16.0.0/24"
 
@@ -53,12 +53,12 @@ iptables -F QBR_FILTER_TUN
 
 # Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 # http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
-iptables -A QBR_FILTER -m physdev --physdev-in $LAN_NIC --physdev-is-bridged ! -s $LAN_NET   -j DROP -m comment --comment "[E] IP Spoofing"
-iptables -A QBR_FILTER -m physdev --physdev-in $TUN_NIC --physdev-is-bridged ! -s $PROXY_NET -j DROP -m comment --comment "[I] IP Spoofing"
+iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_LAN_NIC --physdev-is-bridged ! -s $LAN_NET   -j DROP -m comment --comment "[E] IP Spoofing"
+iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_TUN_NIC --physdev-is-bridged ! -s $PROXY_NET -j DROP -m comment --comment "[I] IP Spoofing"
 ## Drop other spoofed traffic
 for ip in $SPOOF_IPS
 do
-    iptables -A QBR_FILTER -m physdev --physdev-in $WAN_NIC --physdev-is-bridged -s $ip -j DROP -m comment --comment "[I] IP Spoofing"
+    iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_WAN_NIC --physdev-is-bridged -s $ip -j DROP -m comment --comment "[I] IP Spoofing"
 done
 
 # Drop vulnerable multiport TCP services
@@ -69,9 +69,9 @@ iptables -A QBR_FILTER -p tcp                            -m multiport --dports $
 
 
 # Forward traffic specific chain
-sudo iptables -A QBR_FILTER -m physdev --physdev-in $LAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from LAN bridge interface" -j QBR_FILTER_LAN
-sudo iptables -A QBR_FILTER -m physdev --physdev-in $WAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from WAN bridge interface" -j QBR_FILTER_WAN
-sudo iptables -A QBR_FILTER -m physdev --physdev-in $TUN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from TUN bridge interface" -j QBR_FILTER_TUN
+sudo iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_LAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from LAN bridge interface" -j QBR_FILTER_LAN
+sudo iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_WAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from WAN bridge interface" -j QBR_FILTER_WAN
+sudo iptables -A QBR_FILTER -m physdev --physdev-in $PHYSDEV_TUN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from TUN bridge interface" -j QBR_FILTER_TUN
 
 
 # [Force Fragments packets check]
@@ -158,9 +158,9 @@ iptables -A QBR_FILTER_TUN -p tcp --syn -m conntrack --ctstate NEW -m comment --
 
 
 # Apply filtering only in qbr-filter interfaces
-sudo iptables -A FORWARD -m physdev --physdev-in $LAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
-sudo iptables -A FORWARD -m physdev --physdev-in $WAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
-sudo iptables -A FORWARD -m physdev --physdev-in $TUN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
+sudo iptables -A FORWARD -m physdev --physdev-in $PHYSDEV_LAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
+sudo iptables -A FORWARD -m physdev --physdev-in $PHYSDEV_WAN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
+sudo iptables -A FORWARD -m physdev --physdev-in $PHYSDEV_TUN_NIC --physdev-is-bridged -m comment --comment "Incoming traffic from 'physical' interface" -j QBR_FILTER
 
 # Set last rule to accept
 sudo iptables -A FORWARD -m physdev --physdev-is-in -m comment --comment "Traffic from other bridge interface" -j ACCEPT

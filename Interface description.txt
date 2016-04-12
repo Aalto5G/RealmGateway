@@ -1,40 +1,85 @@
-### LAN Network ###
-l3-lana
-    | (*veth*)
-qve-l3-lana
-   ( ) (*br) 
-qbr-filter-lana
-   ( ) (*br)
-qve-phy-lana
-    | (*veth*)
-qve-l2-lana
-   ( ) (*br)
-qbr-int-lana
+
+#####################################################################################
+#                NETWORK DIAGRAM FOR CUSTOMER EDGE SWITCHING V0.2                   #
+#####################################################################################
+
++-----------------------------------------------------------------------------------+
++        LAN Network        |        WAN Network        |         TUN Network       +
++-----------------------------------------------------------------------------------+
++  l3-lana                  |  l3-wana                  |  l3-tuna                  |
++      |            (veth)  |      |            (veth)  |      |            (veth)  |
++  qve-l3-lana              |  qve-l3-wana              |  qve-l3-tuna              |
++     (+)                   |     (+)                   |     (+)                   |
++  qbr-filter-lana   (br)   |  qbr-filter-wana   (br)   |  qbr-filter-tuna   (br)   |
++     (+)                   |     (+)                   |     (+)                   |
++  qve-phy-lana             |  qve-phy-wana             |  qve-phy-tuna             |
++      |            (veth)  |      |            (veth)  |      |            (veth)  |
++  qve-l2-lana              |  qve-l2-wana              |  qve-l2-tuna              |
++     (+)                   |     (+)                   |     (+)                   |
++  qbr-int-lana      (br)   |  qbr-int-wan       (br)   |  qbr-int-tuna      (ovs)  |
++-----------------------------------------------------------------------------------+
+
+
+#####################################################################################
+#                NETWORK DIAGRAM FOR CUSTOMER EDGE SWITCHING V0.2                   #
+#####################################################################################
+
++-----------------------------------------------------------------------------------+
++        LAN Network        |         TUN Network       |        WAN Network        +
++-----------------------------------------------------------------------------------+
++  l3-lana                  |  l3-tuna                  |  l3-wana                  |
++      |            (veth)  |      |            (veth)  |      |            (veth)  |
++  qve-l3-lana              |  qve-l3-tuna              |  qve-l3-wana              |
++     (+)                   |     (+)                   |     (+)                   |
++  qbr-filter-lana   (br)   |  qbr-filter-tuna   (br)   |  qbr-filter-wana   (br)   |
++     (+)                   |     (+)                   |     (+)                   |
++  qve-phy-lana             |  qve-phy-tuna             |  qve-phy-wana             |
++      |            (veth)  |      |            (veth)  |      |            (veth)  |
++  qve-l2-lana              |  qve-l2-tuna              |  qve-l2-wana              |
++     (+)                   |     (+)                   |     (+)                   |
++  qbr-int-lana      (br)   |  qbr-int-tuna      (ovs)  |  qbr-int-wan       (br)   |
++-----------------------------------------------------------------------------------+
+
+
+
+
+### LAN Network ###     
+l3-lana                 
+    |            (veth) 
+qve-l3-lana             
+   (+)                  
+qbr-filter-lana   (br)  
+   (+)                  
+qve-phy-lana            
+    |            (veth) 
+qve-l2-lana             
+   (+)                  
+qbr-int-lana      (br)  
 
 
 ### WAN Network ###
 l3-wana
-    | (*veth*)
+    |            (veth)
 qve-l3-wana
-   ( ) (*br) 
-qbr-filter-wana
-   ( ) (*br)
+   (+)
+qbr-filter-wana   (br)
+   (+)
 qve-phy-wana
-    | (*veth*)
+    |            (veth)
 qve-l2-wana
-   ( ) (*br)
-qbr-int-wan
+   (+)
+qbr-int-wan       (br)
 
 
 ### TUN Network ###
 l3-tuna
-    | (*veth*)
+    |            (veth)
 qve-l3-tuna
-   ( ) (*br) 
-qbr-filter-tuna
-   ( ) (*br)
+   (+)
+qbr-filter-tuna   (br)
+   (+)
 qve-phy-tuna
-    | (*veth*)
+    |            (veth)
 qve-l2-tuna
-   ( ) (*ovs)
-qbr-int-tuna
+   (+)
+qbr-int-tuna      (ovs)
