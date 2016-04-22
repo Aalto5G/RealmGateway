@@ -15,7 +15,7 @@
 LAN_NIC="l3-lana"
 WAN_NIC="l3-wana"
 TUN_NIC="l3-tuna"
-BRIDGE_INTERFACES="qbf-lana qbf-wana qbf-tuna qbi-lana qbi-wana qbi-tuna"
+BRIDGE_INTERFACES="qbf-lana qbf-wana qbf-tuna"
 
 LAN_NET="192.168.0.0/24"
 CPOOL_NET="198.18.0.21/32 198.18.0.22/32 198.18.0.23/32"
@@ -76,10 +76,10 @@ done
 iptables -t mangle -A PREROUTING -m physdev --physdev-is-in -j ACCEPT
 for ip in $CPOOL_NET
 do
-    iptables -t mangle -A PREROUTING -i $WAN_NIC -d $ip -m conntrack --ctstate NEW -j NFQUEUE --queue-num 10 -m comment --comment "New connection to Circular Pool $ip"
+    iptables -t mangle -A PREROUTING -i $WAN_NIC -d $ip -m mark --mark 0x00 -m conntrack --ctstate NEW -j NFQUEUE --queue-num 10 -m comment --comment "New connection to Circular Pool $ip"
 done
 
-### Note: Create new chain in nat table for Circular Pool connections and DNAT target
+### Note: Create new chain in nat table for Circular Pool connections and DNAT target with NEW conntrack state
 iptables -t nat -N CIRCULAR_POOL
 iptables -t nat -A PREROUTING -m mark ! --mark 0x00 -i $WAN_NIC -j CIRCULAR_POOL -m comment --comment "Continue to Circular Pool DNAT chain"
 ### Add rule per private host for DNAT operation
@@ -196,8 +196,8 @@ iptables -A HOST_192.168.0.101_SERVICE2 -j RETURN
 iptables -N BLACKLIST_SOURCES
 iptables -N WHITELIST_SOURCES
 ## Test
-iptables -A BLACKLIST_SOURCES -s 192.168.0.102 -j doREJECT
-iptables -A WHITELIST_SOURCES -s 192.168.0.101 -j ACCEPT
+#iptables -A BLACKLIST_SOURCES -s 192.168.0.102 -j doREJECT
+#iptables -A WHITELIST_SOURCES -s 192.168.0.101 -j ACCEPT
 
 
 ## CES LOCAL PROCESS (INPUT chain)
@@ -221,13 +221,25 @@ iptables -A FORWARD -j ACCEPT                                    # Accept traffi
 ## Enable NAT
 #iptables -t nat -A POSTROUTING -m physdev --physdev-is-bridged  -j ACCEPT -m comment --comment "Traffic from bridged interface"
 #iptables -t nat -F
-iptables -t nat -I POSTROUTING -o lo -j ACCEPT
-iptables -t nat -I POSTROUTING -o eth0 -j ACCEPT
-iptables -t nat -I POSTROUTING -o eth1 -j ACCEPT
+#iptables -t nat -I POSTROUTING -o lo -j ACCEPT
+#iptables -t nat -I POSTROUTING -o eth0 -j ACCEPT
+#iptables -t nat -I POSTROUTING -o eth1 -j ACCEPT
 
 #iptables -t nat -A POSTROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "nat.POST: mark!=0 "
 #iptables -t nat -A POSTROUTING -m mark   --mark 0x00 -j LOG --log-level 7 --log-prefix "nat.POST: mark==0 "
 iptables -t nat -A POSTROUTING -m mark --mark $hMARK_EGRESS_to_WAN -s $LAN_NET -j SNAT --to-source 198.18.0.11 -m comment --comment "Outgoing SNAT to 198.18.0.11"
+
+
+
+# Testing TCP Splice
+iptables -t mangle -I FORWARD -i $WAN_NIC -o $LAN_NIC -m mark ! --mark 0x00 -m tos --tos 0x04 -m conntrack  --ctstate NEW,DNAT   -j LOG --log-level 7 --log-prefix "mangle.fwd: tos 0x04 "
+iptables -t mangle -I FORWARD -i $WAN_NIC -o $LAN_NIC -m mark ! --mark 0x00 -m conntrack --ctstate NEW,DNAT   -j LOG --log-level 7 --log-prefix "mangle.fwd: NEW,DNAT "
+iptables -t mangle -I FORWARD -i $WAN_NIC -o $LAN_NIC -m mark ! --mark 0x00 -m conntrack --ctstate NEW,DNAT   -j TOS --set-tos 0x04 -m comment --comment "mangle.fwd: set-tos "
+
+iptables -t mangle -I PREROUTING -i $WAN_NIC -j CONNMARK --restore-mark
+iptables -t mangle -I PREROUTING -i $LAN_NIC -j CONNMARK --restore-mark
+#iptables -A POSTROUTING -p tcp --dport 80 -t mangle -j MARK --set-mark 2
+iptables -t mangle -A POSTROUTING -j CONNMARK --save-mark
 
 
 
