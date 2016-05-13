@@ -112,9 +112,14 @@ If the incoming packet is ACCEPTed in the qbf-xxxx Linux bridge, it will continu
 again by the kernel, this time entering a different connection track zone.
 
 
+## Protecting Customer Edge Switching
+
+### DNS
+
 ### Protecting DNS
 
-The following chains apply in qbf-xxxx Linux bridge when an incoming packet is UDP port 53.
+The following chains apply in qbf-xxxx Linux bridge when an incoming packet is UDP port 53:
+
 * Blacklist: Banned sources and/or domains.
   * Match IP source and DROP
   * Match (S)FQDN and DROP - Use string extension (include !string SOA record)
@@ -138,13 +143,36 @@ The following chains apply in qbf-xxxx Linux bridge when an incoming packet is U
   * T3 LIMIT and REJECT
   * 1/sec LIMIT and LOG - ERRO
   * T4 LIMIT and DROP
+* DomainLimit: Apply specific domain rate limit. The chain can be called to apply limits for Whitelist, Greylist_WK and Greylist ipsets.
+  * Match (S)FQDN and LIMIT and RETURN - Use string extension (include !string SOA record)
+  * Match (S)FQDN and LIMIT and LOG - INFO
+  * Match (S)FQDN and LIMIT and DROP - INFO
+* LanHostLimit: Apply specific rate limit per host in LAN network.
+  * Match IP source and LIMIT and RETURN
+  * Match IP source and LIMIT and LOG - INFO
+  * Match IP source and LIMIT and DROP - INFO
+* LanCESLimit: Apply global admision rate limit in LAN network.
+  * Match IP source and LIMIT and RETURN
+  * Match IP source and LIMIT and LOG - INFO
+  * Match IP source and LIMIT and DROP - INFO
+  
+Processing pipeline for incoming DNS packets from WAN:
 
-Processing pipeline when UDP and port 53 is detected:
 * Jump to Blacklist chain.
+* Jump to DomainLimit chain.
 * Match Whitelist_ipset and jump to Whitelist chain.
 * Match GreylistWK_ipset and jump to Greylist_WK chain.
 * !Match GreylistWK_ipset and jump to Greylist chain.
 * Jump to GlobalLimit chain. (Packet can be ACCEPT, DROP or REJECT)
 
+Processing pipeline for incoming DNS packets from LAN:
+* Jump to HostLimit chain.
+
 
 ### Protecting HTTP Proxy
+
+
+
+### Protecting from TCP SYN Spoofed Attacks
+
+### Protecting from (D)DoS SYN Spoofed Attacks
