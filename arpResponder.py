@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# Can be replaced with
+# ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 1.2.3.4 -j arpreply --arpreply-mac 00:00:00:12:34:56 --arpreply-target ACCEPT
+
+
 import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
