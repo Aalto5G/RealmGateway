@@ -20,13 +20,14 @@ extensions to be considered:
 * set (matching on ipset)
 * tcpmss
 * time
+* statistics (nth match)
 * string
 * AUDIT
 * CHECKSUM
 * CONNMARK
 * CT
 * HMARK
-* MIRROR
+* MIRROR - Removed from kernel
 * NFQUEUE
 * NFLOG?
 * NOTRACK
@@ -120,22 +121,22 @@ again by the kernel, this time entering a different connection track zone.
 
 The following chains apply in qbf-xxxx Linux bridge when an incoming packet is UDP port 53:
 
-* Blacklist: Banned sources and/or domains.
+* WanBlacklist: Banned sources and/or domains.
   * Match IP source and DROP
   * Match (S)FQDN and DROP - Use string extension (include !string SOA record)
-* Whitelist: Trusted sources with SLA, e.g. Elisa DNS. Accept traffic per SLA, report excess and leak to Greylist_WK.
+* WanWhitelist: Trusted sources with SLA, e.g. Elisa DNS. Accept traffic per SLA, report excess and leak to Greylist_WK.
   * [Match IP source] LIMIT and ACCEPT
   * [Match IP source] LIMIT and LOG - INFO
   * [Match IP source] LIMIT and JUMP to Greylist_WK
-* Greylist_WK: Known sources with high traffic and no-SLA plus leaky bucket from Whitelist, e.g. Google DNS, Elisa DNS.
+* WanGreylist_WK: Known sources with high traffic and no-SLA plus leaky bucket from Whitelist, e.g. Google DNS, Elisa DNS.
   * [Match IP source] LIMIT and RETURN
   * [Match IP source] LIMIT and LOG - INFO
   * [Match IP source] LIMIT and JUMP to Greylist
-* Greylist: Unknown sources plus leaky bucket from Greylist_WK, e.g. Random DNS, Google DNS.
+* WanGreylist: Unknown sources plus leaky bucket from Greylist_WK, e.g. Random DNS, Google DNS.
   * [Match IP source] LIMIT and RETURN
   * [Match IP source] LIMIT and LOG - INFO
   * [Match IP source] LIMIT and DROP
-* GlobalLimit: Apply global rate limits for Greylist_WK and Greylist "accepted" traffic.
+* WanGlobalLimit: Apply global rate limits for Greylist_WK and Greylist "accepted" traffic.
   * T1 LIMIT and ACCEPT (Max rate from non whitelist)
   * 1/sec LIMIT and LOG - WARN
   * T2 LIMIT and DROP
@@ -143,30 +144,33 @@ The following chains apply in qbf-xxxx Linux bridge when an incoming packet is U
   * T3 LIMIT and REJECT
   * 1/sec LIMIT and LOG - ERRO
   * T4 LIMIT and DROP
-* DomainLimit: Apply specific domain rate limit. The chain can be called to apply limits for Whitelist, Greylist_WK and Greylist ipsets.
+* WanDomainLimit: Apply specific domain rate limit. The chain can be called to apply limits for Whitelist, Greylist_WK and Greylist ipsets.
   * Match (S)FQDN and LIMIT and RETURN - Use string extension (include !string SOA record)
   * Match (S)FQDN and LIMIT and LOG - INFO
   * Match (S)FQDN and LIMIT and DROP - INFO
-* LanHostLimit: Apply specific rate limit per host in LAN network.
-  * Match IP source and LIMIT and RETURN
-  * Match IP source and LIMIT and LOG - INFO
-  * Match IP source and LIMIT and DROP - INFO
-* LanCESLimit: Apply global admision rate limit in LAN network.
-  * Match IP source and LIMIT and RETURN
-  * Match IP source and LIMIT and LOG - INFO
-  * Match IP source and LIMIT and DROP - INFO
   
-Processing pipeline for incoming DNS packets from WAN:
+* LanBlacklist: Banned sources and/or domains.
+  * Match IP source and DROP
+  * Match (S)FQDN and DROP - Use string extension
+* LanCESLimit: Apply global admision rate limit in LAN network.
+  * Match IP source and LIMIT-75% and ACCEPT
+  * Match IP source and LIMIT-1/s and LOG - INFO
+  * Match IP source and 1/4th DROP
+  * Match IP source and 1/4th REJECT
+  * Match IP source and DROP and LOG - WARN
+  
+Processing pipeline for incoming DNS packets from WAN at the Filtering Bridge:
 
-* Jump to Blacklist chain.
-* Jump to DomainLimit chain.
-* Match Whitelist_ipset and jump to Whitelist chain.
-* Match GreylistWK_ipset and jump to Greylist_WK chain.
-* !Match GreylistWK_ipset and jump to Greylist chain.
-* Jump to GlobalLimit chain. (Packet can be ACCEPT, DROP or REJECT)
+* Jump to WanBlacklist chain.
+* Jump to WanDomainLimit chain. (Maybe this should be called from the Greylist chains only?)
+* Match WanWhitelist_ipset and jump to WanWhitelist chain.
+* Match WanGreylistWK_ipset and jump to WanGreylist_WK chain.
+* !Match WanGreylistWK_ipset and jump to WanGreylist chain.
+* Jump to WanGlobalLimit chain. (Packet can be ACCEPT, DROP or REJECT)
 
-Processing pipeline for incoming DNS packets from LAN:
-* Jump to HostLimit chain.
+Processing pipeline for incoming DNS packets from LAN at the Filtering Bridge:
+* Jump to LanBlacklist chain.
+* Jump to LanCESLimit chain.
 
 
 ### Protecting HTTP Proxy
@@ -176,3 +180,37 @@ Processing pipeline for incoming DNS packets from LAN:
 ### Protecting from TCP SYN Spoofed Attacks
 
 ### Protecting from (D)DoS SYN Spoofed Attacks
+
+
+
+# Misc notes
+
+#NF_DROP vs NF_STOLEN
+http://stackoverflow.com/questions/19342950/what-is-the-difference-between-nf-drop-and-nf-stolen-in-netfilter-hooks
+
+sudo iptables -F OUTPUT
+
+# Matching on packet content with STRING module
+## FQDN in DNS are encoded following a specific pattern.
+## The first byte (06) is the length of google, followed by the 6 ASCII characters, then a count byte (03) for the length of com followed by... 
+## http://blog.nintechnet.com/how-to-block-w00tw00t-at-isc-sans-dfind-and-other-web-vulnerability-scanners/
+
+sudo iptables -A OUTPUT -m string --algo bm --hex-string "|06|google|03|com" -j DROP
+
+# Parental control matching on time of day with TIME module
+## Note time goes in UTC time, so beware of the current time zone!
+## http://www.cyberciti.biz/tips/iptables-for-restricting-access-by-time-of-day.html
+
+sudo iptables -A OUTPUT -d 8.8.8.8/32 -m time --timestart 12:00:00 --timestop 12:59:59 -j DROP
+
+
+# Using ebtables for ARP Response?
+http://ebtables.netfilter.org/examples/basic.html#ex_arpreply
+ebtables -t nat -A PREROUTING -p arp --arp-opcode Request -j arpreply \
+--arpreply-mac 10:11:12:13:14:15 --arpreply-target ACCEPT
+
+# If we want to let the packet go all the way
+ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.27 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target ACCEPT
+# If we want to stop the packet at the given interface
+ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.28 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target DROP
+
