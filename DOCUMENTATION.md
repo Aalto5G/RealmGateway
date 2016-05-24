@@ -69,7 +69,7 @@ The model uses 3 different network interfaces with routing (Layer-3) capabilitie
 +     (+)                   |     (+)                   |     (+)                   |
 +  qve-phy-lana             |  qve-phy-tuna             |  qve-phy-wana             |
 +      |            (veth)  |      |            (veth)  |      |            (veth)  |
-+  qve-l2-lana              |  qve-l2-tuna              |  qve-l2-wana              |
++  qvi-phy-lana             |  qvi-phy-tuna             |  qvi-phy-wana             |
 +     (+)                   |     (+)                   |     (+)                   |
 +  qbi-lana          (br)   |  qbi-tuna          (ovs)  |  qbi-wan           (br)   |
 +-----------------------------------------------------------------------------------+
@@ -82,10 +82,25 @@ Minimal requirements:
 
 Extended requirements for virtualization in same host:
 * qve-phy-xxxx: Layer-2 Virtual Ethernet pair connected to filtering Linux bridge.
-* qve-l2-xxxx: Layer-2 Virtual Ethernet pair connected to integration Linux bridge.
-* qbi-xxxx: Layer-2 Linux bridge connecting qve-l2 with qve-vhosts and network namespaces.
+* qvi-phy-xxxx: Layer-2 Virtual Ethernet pair connected to integration Linux bridge.
+* qbi-xxxx: Layer-2 Linux bridge connecting qvi-phy with qve-vhosts and network namespaces.
 
 
+### Traffic directionality
+
+Attending to the aforementioned network design we can distinguish between different routed traffic flows:
+
+* LAN originated
+  * To local CES services (DHCP and DNS)
+  * To a host in the Internet - via l3-wan
+  * To a host behind CES - via l3-tun (We could have different proxy pools for better control)
+* WAN originated
+  * To local CES services (HTTP and DNS)
+  * To a host behind CES - via l3-lan
+* TUN originated
+  * To a host behind CES - via l3-lan
+
+For the definition of rules and policies this is very important as it will allow us to define very specific scopes.
 
 ## Iptables 
 
@@ -97,11 +112,15 @@ is the case for TRACE(ing) packets and the LOG target.
 
 To minimize the amount of tracked connections (conntrack), we will stop the tracking of packets in specific network interfaces.
 
-Because the network architecture uses Linux bridges for packet filtering, we need to create different connection tracks when the packet flows through different interfaces.
+Because the network architecture uses Linux bridges for packet filtering, we need to create different connection tracks when the packet flows through different interfaces and Linux bridges.
+Therefore, we aggregate all Layer-3 routing interfaces in the same connection tracking zone (like a normal router would act) and create new tracking zones for each one of the other filtering scopes.
+These scopes include WAN, LAN and TUN.
 
-Within a CES we make use of 2 different connection tracking zones "CT zone". 
-- Zone 1: The packet enters via the Layer-3 routed interface l3-xxxx.
-- Zone 2: The packet enters via the Layer-2 "physical" interface qve-phy-xxxx.
+Within a CES we make use of 4 different connection tracking zones "CT zone".:
+* Zone 1: The packet enters any Layer-3 routed interface l3-xxxx i.e. l3-wan, l3-lan, l3-tun.
+* Zone 2: The packet enters the Linux filtering bridge qbf-wan for WAN qve-phy-wan or qve-l3-wan.
+* Zone 3: The packet enters the Linux filtering bridge qbf-lan for LAN qve-phy-lan or qve-l3-lan.
+* Zone 4: The packet enters the Linux filtering bridge qbf-tun for TUN qve-phy-tun or qve-l3-tun.
 
 ### Iptables chains
 
@@ -111,6 +130,31 @@ Major packet filtering occurs when a packet enters the qbf-xxxx Linux bridge fro
 The packet then traverses at least all iptables standard tables and chains, hitting a number of rules that may ACCEPT or DROP the packet, among other options.
 If the incoming packet is ACCEPTed in the qbf-xxxx Linux bridge, it will continue it's way towards the Layer-3 routed interface l3-xxxx, where it will be processed
 again by the kernel, this time entering a different connection track zone.
+
+
+### Packet marking
+
+Depending on the input interface we can set a mark on the packet to provide scope throughout the rest of the iptables processing. This mark can bet set to match with that of the connection tracking zone.
+The packet marking takes place in the table raw and prerouting chain. The mark is a 32-bit integer that can be masked.
+For example, we can use the 4-msbit of the 1-msbyte as follows:
+
+* Zone 1: The packet is marked with 1-msbyte as 0x10/0xF0 -> 0x10000000/0xF0000000
+* Zone 2: The packet is marked with 1-msbyte as 0x20/0xF0 -> 0x20000000/0xF0000000
+* Zone 3: The packet is marked with 1-msbyte as 0x30/0xF0 -> 0x30000000/0xF0000000
+* Zone 4: The packet is marked with 1-msbyte as 0x40/0xF0 -> 0x40000000/0xF0000000
+
+Additionally, in the case of Linux filtering bridges, we can use the 4-lsbit of the 1-msbyte to indicate the direction of the packet when entering the bridge interface.
+The direction is based on whether the packet is going-to (mark 0) or coming-from the associated Layer-3 routing interface.
+* Zone 1: The packet is not handled by a Linux filtering bridges
+* Zone 2: The packet enters the Linux filtering bridge qbf-wan
+  * qve-phy-wan: The packet is marked with 1-msbyte as 0x00/0x0F -> 0x00000000/0x0F000000
+  * qve-l3-wan:  The packet is marked with 1-msbyte as 0x01/0x0F -> 0x01000000/0x0F000000
+* Zone 3: The packet enters the Linux filtering bridge qbf-lan
+  * qve-phy-lan: The packet is marked with 1-msbyte as 0x00/0x0F -> 0x00000000/0x0F000000
+  * qve-l3-tun:  The packet is marked with 1-msbyte as 0x01/0x0F -> 0x01000000/0x0F000000
+* Zone 4: The packet enters the Linux filtering bridge qbf-tun
+  * qve-phy-tun: The packet is marked with 1-msbyte as 0x00/0x0F -> 0x00000000/0x0F000000
+  * qve-l3-tun:  The packet is marked with 1-msbyte as 0x01/0x0F -> 0x01000000/0x0F000000
 
 
 ## Protecting Customer Edge Switching

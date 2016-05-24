@@ -30,9 +30,9 @@ PHYSDEV_LAN_NIC="qve-phy-lana"
 PHYSDEV_WAN_NIC="qve-phy-wana"
 PHYSDEV_TUN_NIC="qve-phy-tuna"
 
-PHYSDEV_LAN_NIC_pair="qve-l2-lana"
-PHYSDEV_WAN_NIC_pair="qve-l2-wana"
-PHYSDEV_TUN_NIC_pair="qve-l2-tuna"
+PHYSDEV_LAN_NIC_pair="qvi-phy-lana"
+PHYSDEV_WAN_NIC_pair="qvi-phy-wana"
+PHYSDEV_TUN_NIC_pair="qvi-phy-tuna"
 
 LAN_NET="192.168.0.0/24"
 CPOOL_NET="198.18.0.21/32 198.18.0.22/32 198.18.0.23/32"
@@ -100,31 +100,40 @@ iptables -t raw -A CT_ZONES -j CT --notrack
 iptables -t raw -N PKT_ZONES
 iptables -t raw -F PKT_ZONES
 # Set Zone-1 for L3-routing interfaces
-iptables -t raw -A PKT_ZONES -i $LAN_NIC -j MARK --set-mark 0x01 -m comment --comment "[L3] to L3-LAN"
-iptables -t raw -A PKT_ZONES -i $WAN_NIC -j MARK --set-mark 0x01 -m comment --comment "[L3] to L3-WAN"
-iptables -t raw -A PKT_ZONES -i $TUN_NIC -j MARK --set-mark 0x01 -m comment --comment "[L3] to L3-TUN"
+iptables -t raw -A PKT_ZONES -i $LAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-lan"
+iptables -t raw -A PKT_ZONES -i $WAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-wan"
+iptables -t raw -A PKT_ZONES -i $TUN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-tun"
 # Set Zone-2 for BridgeFiltering @WAN interface
 ## Restore the CONNMARK if the packet was mangled by the TCP Splicer
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-wana -j CONNMARK --restore-mark -m comment --comment "[QBF] to L3-WAN"
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-wana  -j CONNMARK --restore-mark -m comment --comment "[QBF] from L3-WAN"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-wana -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-wana  -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
 # Set MARK if no CONNMARK was set
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-wana -m mark --mark 0x00 -j MARK --set-mark 0x02 -m comment --comment "[QBF] to L3-WAN"
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-wana  -m mark --mark 0x00 -j MARK --set-mark 0x12 -m comment --comment "[QBF] from L3-WAN"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-wana -m mark --mark 0x00 -j MARK --set-mark 0x20000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-wan"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-wana  -m mark --mark 0x00 -j MARK --set-mark 0x21000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-wan"
 # Set Zone-3 for BridgeFiltering @LAN interface
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-lana -j MARK --set-mark 0x03 -m comment --comment "[QBF] to L3-LAN"
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-lana  -j MARK --set-mark 0x13 -m comment --comment "[QBF] from L3-LAN"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-lana -j MARK --set-mark 0x30000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-lan"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-lana  -j MARK --set-mark 0x31000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-lan"
 # Set Zone-4 for BridgeFiltering @TUN interface
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-tuna -j MARK --set-mark 0x04 -m comment --comment "[QBF] to L3-TUN"
-iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-tuna  -j MARK --set-mark 0x14 -m comment --comment "[QBF] from L3-TUN"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-phy-tuna -j MARK --set-mark 0x40000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-tun"
+iptables -t raw -A PKT_ZONES -m physdev --physdev-in qve-l3-tuna  -j MARK --set-mark 0x41000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-tun"
+
 
 # Flush PREROUTING chain in RAW table
 iptables -t raw -F PREROUTING
+#NOTRACK loopback traffic
+iptables -t raw -A PREROUTING -i lo -j NOTRACK
+iptables -t raw -A OUTPUT -o lo -j NOTRACK
+
 # Jump to CT_ZONES and set appropriate conntrack zone
 iptables -t raw -A PREROUTING -j CT_ZONES
 # Jump to PKT_ZONES and set packet mark according to zone
 iptables -t raw -A PREROUTING -j PKT_ZONES
 
-iptables -t raw -A PREROUTING -m mark ! --mark 0x00 -j TRACE
+iptables -t raw -A PREROUTING -m mark ! --mark 0x00000000/0xFF000000 -j TRACE
+
+#
+#iptables -t raw -A PREROUTING -i lo -j NOTRACK
+#iptables -t raw -A OUTPUT -o lo -j NOTRACK
 
 #iptables -t raw -A PREROUTING -j TRACE
 #iptables -t raw -A PREROUTING -j ACCEPT
