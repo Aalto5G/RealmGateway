@@ -32,25 +32,25 @@ sysctl -w "net.bridge.bridge-nf-pass-vlan-input-dev=0"
 
 # [CES-A]
 ## LAN side
-ip link add qve-phy-lana type veth peer name qve-l2-lana
+ip link add qve-phy-lana type veth peer name qvi-phy-lana
 brctl addbr qbi-lana
-brctl addif qbi-lana qve-l2-lana
+brctl addif qbi-lana qvi-phy-lana
 ip link set dev qbi-lana    up
 ip link set dev qve-phy-lana    up promisc on
-ip link set dev qve-l2-lana     up promisc on
+ip link set dev qvi-phy-lana     up promisc on
 
 ## WAN side
-ip link add qve-phy-wana type veth peer name qve-l2-wana
+ip link add qve-phy-wana type veth peer name qvi-phy-wana
 brctl addbr qbi-wan
-brctl addif qbi-wan qve-l2-wana
+brctl addif qbi-wan qvi-phy-wana
 ip link set dev qbi-wan     up
 ip link set dev qve-phy-wana    up promisc on
-ip link set dev qve-l2-wana     up promisc on
+ip link set dev qvi-phy-wana     up promisc on
 
 ## TUN side
-ip link add qve-phy-tuna type veth peer name qve-l2-tuna
+ip link add qve-phy-tuna type veth peer name qvi-phy-tuna
 ip link set dev qve-phy-tuna    up promisc on
-ip link set dev qve-l2-tuna     up promisc on
+ip link set dev qvi-phy-tuna     up promisc on
 # Create and add interfaces to OpenvSwitch
 service openvswitch-switch restart
 ovs-vsctl --if-exists del-br qbi-tuna
@@ -59,29 +59,29 @@ ovs-vsctl set bridge qbi-tuna other-config:datapath-id=0000000000000001
 ovs-vsctl set bridge qbi-tuna protocols=OpenFlow13
 ovs-vsctl set-controller qbi-tuna tcp:127.0.0.1:6633
 #Add the tunnel interface to the Openvswitch bridge
-ovs-vsctl --may-exist add-port qbi-tuna qve-l2-tuna
+ovs-vsctl --may-exist add-port qbi-tuna qvi-phy-tuna
 
 # [CES-B]
 ## LAN side
-ip link add qve-phy-lanb type veth peer name qve-l2-lanb
+ip link add qve-phy-lanb type veth peer name qvi-phy-lanb
 brctl addbr qbi-lanb
-brctl addif qbi-lanb qve-l2-lanb
+brctl addif qbi-lanb qvi-phy-lanb
 ip link set dev qbi-lanb    up
 ip link set dev qve-phy-lanb    up promisc on
-ip link set dev qve-l2-lanb     up promisc on
+ip link set dev qvi-phy-lanb     up promisc on
 
 ## WAN side
-ip link add qve-phy-wanb type veth peer name qve-l2-wanb
+ip link add qve-phy-wanb type veth peer name qvi-phy-wanb
 brctl addbr qbi-wan
-brctl addif qbi-wan qve-l2-wanb
+brctl addif qbi-wan qvi-phy-wanb
 ip link set dev qbi-wan     up
 ip link set dev qve-phy-wanb    up promisc on
-ip link set dev qve-l2-wanb     up promisc on
+ip link set dev qvi-phy-wanb     up promisc on
 
 ## TUN side
-ip link add qve-phy-tunb type veth peer name qve-l2-tunb
+ip link add qve-phy-tunb type veth peer name qvi-phy-tunb
 ip link set dev qve-phy-tunb    up promisc on
-ip link set dev qve-l2-tunb     up promisc on
+ip link set dev qvi-phy-tunb     up promisc on
 # Create and add interfaces to OpenvSwitch
 service openvswitch-switch restart
 ovs-vsctl --if-exists del-br qbi-tunb
@@ -90,7 +90,7 @@ ovs-vsctl set bridge qbi-tunb other-config:datapath-id=0000000000000002
 ovs-vsctl set bridge qbi-tunb protocols=OpenFlow13
 ovs-vsctl set-controller qbi-tunb tcp:127.0.0.1:6633
 #Add the tunnel interface to the Openvswitch bridge
-ovs-vsctl --may-exist add-port qbi-tunb qve-l2-tunb
+ovs-vsctl --may-exist add-port qbi-tunb qvi-phy-tunb
 
 
 ###############################################################################
