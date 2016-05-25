@@ -3,6 +3,10 @@
 ## Requirements
 iptables
 ebtables
+bridge-utils
+libnfnetlink-dev
+libnetfilter-queue-dev
+
 python3.4 is required. Any lower version won't be supported.
 
 ## Package dependencies

@@ -7,6 +7,7 @@
 ## https://wiki.archlinux.org/index.php/Simple_stateful_firewall
 #
 # Enable iptables TRACE:
+## modprobe nf_log_ipv4 
 ## sysctl 'net.netfilter.nf_log.2=nf_log_ipv4'
 ## iptables -t raw -A OUTPUT -p icmp -j TRACE
 ## iptables -t raw -A PREROUTING -p icmp -j TRACE
