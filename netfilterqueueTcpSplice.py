@@ -58,8 +58,9 @@ class NetfilterTcpSplice(object):
         pkt.set_payload(bytes(ip_r))
         print('\t>> {}'.format(ip_r.summary()))
         # Set mark for CONNMARK
-        #mark = pkt.get_mark()
-        pkt.set_mark(0x222)
+        mark = pkt.get_mark()
+        mark |= 0x01
+        pkt.set_mark(mark)
         pkt.accept()
         
     def callback(self, pkt):
@@ -74,8 +75,8 @@ class NetfilterTcpSplice(object):
         # Filter packet mark
         mark = pkt.get_mark()
         
-        if (mark & 0xFF == 0x02):
-            #print('MARK WanToLan')
+        if (mark & 0xFF000000 == 0x20000000):
+            #print('MARK incoming QBF-WAN')
             
             if flags == 0x02: #SYN
                 print('WAN: SYN_RECV')
@@ -93,7 +94,7 @@ class NetfilterTcpSplice(object):
                 # Add state
                 self._syn_wan[(ipsrc, ipdst, psrc, pdst)] = ('SYN_RECV', ip, tcp.seq, isn)
                 # Option 1 - Drop packet and  sendp() with crafted Ethernet response
-                tcp_r = TCP(sport=pdst, dport=psrc, flags="SA", seq=isn, ack=tcp.seq+1, window=0)
+                tcp_r = TCP(sport=pdst, dport=psrc, seq=isn, ack=tcp.seq+1, flags='SA')
                 ip_r = IP(src=ipdst, dst=ipsrc) / tcp_r
         
                 # Receive SYN and send SYN,ACK via L2 raw socket
@@ -101,6 +102,10 @@ class NetfilterTcpSplice(object):
                 # Receive SYN and send SYN,ACK via packet mangling (Fails to send via the incoming interface)
                 ## This does not work! Maybe with REJECT like behaviour, we could send something back.
                 #self._wan_syn_recv2(pkt, ip)
+                
+                ls(tcp)
+                print('')
+                ls(tcp_r)
                 return
             
             elif flags == 0x10: #ACK
@@ -131,8 +136,8 @@ class NetfilterTcpSplice(object):
                 return
         
         
-        elif (mark & 0xFF == 0x12):
-            #print('MARK LanToWan')
+        elif (mark & 0xFF000000 == 0x21000000):
+            #print('MARK outging QBF-WAN')
             if flags == 0x12: #SYN,ACK
                 print('LAN: SYN,ACK_RECV')
                 
