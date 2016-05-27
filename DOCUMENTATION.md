@@ -264,3 +264,8 @@ ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.28 -j 
 ipset create test hash:ip timeout 300
 ipset add test 192.168.0.1 timeout 60
 ipset -exist add test 192.168.0.1 timeout 600
+
+
+# Send/Receive with Scapy for testing TCP Splice?
+https://github.com/phaethon/scapy/issues/92
+
