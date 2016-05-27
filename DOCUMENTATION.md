@@ -34,6 +34,7 @@ extensions to be considered:
 * TCPMSS
 * TEE
 * TPROXY for TCPSplice?
+* target SET (--add-set with timeout)
 
 
 ## Networking Architecture
@@ -258,3 +259,8 @@ ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.27 -j 
 # If we want to stop the packet at the given interface
 ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.28 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target DROP
 
+
+# Banning hosts with ipset ?
+ipset create test hash:ip timeout 300
+ipset add test 192.168.0.1 timeout 60
+ipset -exist add test 192.168.0.1 timeout 600

@@ -1,6 +1,7 @@
 # Customer Edge Switching
 
 ## Requirements
+ipset
 iptables
 ebtables
 bridge-utils

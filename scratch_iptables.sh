@@ -62,6 +62,8 @@ hMARK_EGRESS_MASK="0x00"        #0b00000
 hMARK_INGRESS_MASK="0x10"       #0b10000
 
 
+#################################### EBTABLES #################################
+
 # Build ARP Responder with ebtables
 CPOOL_MAC="00:00:00:00:01:bb"
 ebtables -t nat -F
@@ -71,115 +73,223 @@ do
 done
 
 
-# Configure raw PREROUTING for specific conntrack zones
-## Note: Use conntrack zone 1 for default connection track and zones 2/3/4 for packet filtering via qbf filtering bridges
+#################################### IPTABLES #################################
+# Note: Use conntrack zone 1 for default connection track and zones 2/3/4 for packet filtering via qbf filtering bridges
 
-## Definition of CONNTRACK ZONES
-#iptables -t raw -N CT_ZONES
-#iptables -t raw -F CT_ZONES
-## Set Zone-1 for L3-routing interfaces
-#iptables -t raw -A CT_ZONES -i $LAN_NIC -j CT --zone 1
-#iptables -t raw -A CT_ZONES -i $WAN_NIC -j CT --zone 1
-#iptables -t raw -A CT_ZONES -i $TUN_NIC -j CT --zone 1
-## Set Zone-2 for BridgeFiltering @WAN interface
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -j CT --zone 2
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CT --zone 2
-## Set Zone-3 for BridgeFiltering @LAN interface
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3  -j CT --zone 3
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j CT --zone 3
-## Set Zone-4 for BridgeFiltering @TUN interface
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3  -j CT --zone 4
-#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j CT --zone 4
-## Set notrack for everything else
-#iptables -t raw -A CT_ZONES -j CT --notrack
-#
-## Definition of PACKET MARK ZONES
-#iptables -t raw -N PKT_ZONES
-#iptables -t raw -F PKT_ZONES
-## Set Zone-1 for L3-routing interfaces
-#iptables -t raw -A PKT_ZONES -i $LAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-lan"
-#iptables -t raw -A PKT_ZONES -i $WAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-wan"
-#iptables -t raw -A PKT_ZONES -i $TUN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-tun"
-## Set Zone-2 for BridgeFiltering @WAN interface
-### Restore the CONNMARK if the packet was mangled by the TCP Splicer
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
-## Set MARK if no CONNMARK was set
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -m mark --mark 0x00 -j MARK --set-mark 0x20000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-wan"
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -m mark --mark 0x00 -j MARK --set-mark 0x21000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-wan"
-## Set Zone-3 for BridgeFiltering @LAN interface
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j MARK --set-mark 0x30000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-lan"
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3  -j MARK --set-mark 0x31000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-lan"
-## Set Zone-4 for BridgeFiltering @TUN interface
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j MARK --set-mark 0x40000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-tun"
-#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3  -j MARK --set-mark 0x41000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-tun"
+# Build ipset for the addresses of the Circular Pool
+ipset create circularpool_set hash:ip
+for ip in $CPOOL_NET
+do
+    ipset add circularpool_set $ip
+done
 
-
-# Flush PREROUTING chain in RAW table
-#iptables -t raw -F PREROUTING
-# Jump to CT_ZONES and set appropriate conntrack zone
-#iptables -t raw -A PREROUTING -j CT_ZONES
-# Jump to PKT_ZONES and set packet mark according to zone
-#iptables -t raw -A PREROUTING -j PKT_ZONES
-
+# --- RAW TABLE ---  #
 
 # Definition of connection tracking zones and packet marks for Layer-3 routing interfaces
-iptables -t raw -N CT_ZONES_MARK_L3
-iptables -t raw -F CT_ZONES_MARK_L3
+iptables -t raw -N RAW_CT_ZONES_MARK_L3
+iptables -t raw -F RAW_CT_ZONES_MARK_L3
 # Set Zone-1 and packet mark for Layer-3 routing interfaces
-iptables -t raw -A CT_ZONES_MARK_L3 -i $WAN_NIC -j CT --zone 1                           -m comment --comment "[l3-wan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $WAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[l3-wan] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $WAN_NIC -j ACCEPT
-iptables -t raw -A CT_ZONES_MARK_L3 -i $LAN_NIC -j CT --zone 1                           -m comment --comment "[l3-lan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $LAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[l3-lan] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $LAN_NIC -j ACCEPT
-iptables -t raw -A CT_ZONES_MARK_L3 -i $TUN_NIC -j CT --zone 1                           -m comment --comment "[l3-tun] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $TUN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[l3-tun] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L3 -i $TUN_NIC -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $WAN_NIC -j CT --zone 1                           -m comment --comment "[l3-wan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $WAN_NIC -j MARK --set-mark 0x12000000/0xFF000000 -m comment --comment "[l3-wan] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $WAN_NIC -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $LAN_NIC -j CT --zone 1                           -m comment --comment "[l3-lan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $LAN_NIC -j MARK --set-mark 0x13000000/0xFF000000 -m comment --comment "[l3-lan] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $LAN_NIC -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $TUN_NIC -j CT --zone 1                           -m comment --comment "[l3-tun] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $TUN_NIC -j MARK --set-mark 0x14000000/0xFF000000 -m comment --comment "[l3-tun] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L3 -i $TUN_NIC -j ACCEPT
 
 # Definition of connection tracking zones and packet marks for Linux filtering bridge interfaces
-iptables -t raw -N CT_ZONES_MARK_L2
-iptables -t raw -F CT_ZONES_MARK_L2
+iptables -t raw -N RAW_CT_ZONES_MARK_L2
+iptables -t raw -F RAW_CT_ZONES_MARK_L2
+# Restore the CONNMARK if the packet was mangled by the TCP Splicer
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CONNMARK --restore-mark -m comment --comment "[qbf-wan] Restore inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j LOG --log-level 7
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j CONNMARK --restore-mark -m comment --comment "[qbf-wan] Restore outbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j LOG --log-level 7
 # Set Zone-2 and packet mark for Linux bridge filtering interface @QBF-WAN
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CT --zone 2                           -m comment --comment "[qbf-wan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j MARK --set-mark 0x20000000/0xFF000000 -m comment --comment "[qbf-wan] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j ACCEPT
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j CT --zone 2                           -m comment --comment "[qbf-wan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j MARK --set-mark 0x21000000/0xFF000000 -m comment --comment "[qbf-wan] outbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CT --zone 2                           -m comment --comment "[qbf-wan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j MARK --set-mark 0x20000000/0xFF000000 -m comment --comment "[qbf-wan] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j CT --zone 2                           -m comment --comment "[qbf-wan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j MARK --set-mark 0x21000000/0xFF000000 -m comment --comment "[qbf-wan] outbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3 -j ACCEPT
 # Set Zone-3 and packet mark for Linux bridge filtering interface @QBF-LAN
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j CT --zone 3                           -m comment --comment "[qbf-lan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j MARK --set-mark 0x30000000/0xFF000000 -m comment --comment "[qbf-lan] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j ACCEPT
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j CT --zone 3                           -m comment --comment "[qbf-lan] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j MARK --set-mark 0x31000000/0xFF000000 -m comment --comment "[qbf-lan] outbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j CT --zone 3                           -m comment --comment "[qbf-lan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j MARK --set-mark 0x30000000/0xFF000000 -m comment --comment "[qbf-lan] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j CT --zone 3                           -m comment --comment "[qbf-lan] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j MARK --set-mark 0x31000000/0xFF000000 -m comment --comment "[qbf-lan] outbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3 -j ACCEPT
 # Set Zone-4 and packet mark for Linux bridge filtering interface @QBF-TUN
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j CT --zone 4                           -m comment --comment "[qbf-tun] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j MARK --set-mark 0x40000000/0xFF000000 -m comment --comment "[qbf-tun] inbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j ACCEPT
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j CT --zone 4                           -m comment --comment "[qbf-tun] CT zone"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j MARK --set-mark 0x41000000/0xFF000000 -m comment --comment "[qbf-tun] outbound MARK"
-iptables -t raw -A CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j CT --zone 4                           -m comment --comment "[qbf-tun] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j MARK --set-mark 0x40000000/0xFF000000 -m comment --comment "[qbf-tun] inbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j ACCEPT
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j CT --zone 4                           -m comment --comment "[qbf-tun] CT zone"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j MARK --set-mark 0x41000000/0xFF000000 -m comment --comment "[qbf-tun] outbound MARK"
+iptables -t raw -A RAW_CT_ZONES_MARK_L2 -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3 -j ACCEPT
 
 
 
-# Flush PREROUTING & OUTPUT chains in RAW table
+# Flush PREROUTING & OUTPUT chains of RAW table
 iptables -t raw -F PREROUTING
 iptables -t raw -F OUTPUT
-# Jump to CT_ZONES_MARK and set appropriate conntrack zone and packet mark
-## Alternative way of matching incoming interface
-#iptables -t raw -A PREROUTING -m physdev --physdev-in qve-+ -j CT_ZONES_MARK_L2
-iptables -t raw -A PREROUTING -i qbf-+ -j CT_ZONES_MARK_L2
-iptables -t raw -A PREROUTING -i l3-+  -j CT_ZONES_MARK_L3
+# Populate PREROUTING chain of RAW table
+## Jump to RAW_CT_ZONES_MARK_Lx to appropriate conntrack zone and packet mark
+iptables -t raw -A PREROUTING -i qbf-+ -j RAW_CT_ZONES_MARK_L2
+iptables -t raw -A PREROUTING -i l3-+  -j RAW_CT_ZONES_MARK_L3
+## Note: Alternative way of matching incoming interface
+#iptables -t raw -A PREROUTING -m physdev --physdev-in qve-+ -j RAW_CT_ZONES_MARK_L2
+
+
 # NOTRACK loopback traffic
 iptables -t raw -A PREROUTING -i lo -j NOTRACK
 iptables -t raw -A OUTPUT     -o lo -j NOTRACK
+# NOTRACK eth1 traffic
+iptables -t raw -A PREROUTING -i eth1 -j NOTRACK
+iptables -t raw -A OUTPUT     -o eth1 -j NOTRACK
+# NOTRACK rest of incoming traffic
+iptables -t raw -A PREROUTING -j NOTRACK
 
 # Trace traffic for debugging
 #iptables -t raw -A PREROUTING -m mark ! --mark 0x00000000/0xFF000000 -j TRACE
-iptables -t raw -I PREROUTING -i qbf-+ -j TRACE
-iptables -t raw -I PREROUTING -i l3-+  -j TRACE
+#iptables -t raw -I PREROUTING -i qbf-+ -j TRACE
+#iptables -t raw -I PREROUTING -i l3-+  -j TRACE
+#Alternatively
+iptables -t raw -I PREROUTING -i qbf-+ -j LOG --log-level 7 --log-prefix "RAW.PRE "
+iptables -t raw -I PREROUTING -i l3-+  -j LOG --log-level 7 --log-prefix "RAW.PRE "
+
+
+# --- MANGLE TABLE ---  #
+
+iptables -t mangle -F PREROUTING
+# Create chains in MANGLE table for packet processing at L3 and QBF interfaces
+# NIC: l3-wan - Packet processing for Circular Pool @L3-WAN
+iptables -t mangle -N MANGLE_PRE_WAN_L3
+iptables -t mangle -F MANGLE_PRE_WAN_L3
+iptables -t mangle -A MANGLE_PRE_WAN_L3 -m set --match-set circularpool_set dst -m conntrack --ctstate NEW -j NFQUEUE --queue-num 2 -m comment --comment "Process in Circular Pool"
+iptables -t mangle -A MANGLE_PRE_WAN_L3 -j ACCEPT
+# NIC: qbf-wan (both directions) - Testing TCP Splice function attached to QBF-WAN filtering bridge
+iptables -t mangle -N MANGLE_PRE_WAN_L2
+iptables -t mangle -F MANGLE_PRE_WAN_L2
+# Send packets through the bridge - do not attempt splice
+#iptables -t mangle -A MANGLE_PRE_WAN_L2 -m mark --mark 0x20000000/0xFF000000 -m set --match-set circularpool_set dst -m conntrack --ctstate NEW -j LOG --log-level 7 --log-prefix "MANGLE.PRE.L2 Splice in"
+#iptables -t mangle -A MANGLE_PRE_WAN_L2 -m mark --mark 0x20000000/0xFF000000 -m set --match-set circularpool_set dst -m conntrack --ctstate NEW -j NFQUEUE --queue-num 1 -m comment --comment "To TCPSplice in"
+#iptables -t mangle -A MANGLE_PRE_WAN_L2 -m mark --mark 0x21000001/0xFF00000F -m set --match-set circularpool_set src                            -j LOG --log-level 7 --log-prefix "MANGLE.PRE.L2 Splice out"
+#iptables -t mangle -A MANGLE_PRE_WAN_L2 -m mark --mark 0x21000001/0xFF00000F -m set --match-set circularpool_set src                            -j NFQUEUE --queue-num 1 -m comment --comment "To TCPSplice out"
+iptables -t mangle -A MANGLE_PRE_WAN_L2 -j ACCEPT
+# NIC: l3-lan
+iptables -t mangle -N MANGLE_PRE_LAN_L3
+iptables -t mangle -F MANGLE_PRE_LAN_L3
+iptables -t mangle -A MANGLE_PRE_LAN_L3 -j ACCEPT
+# NIC: qbf-lan (both directions)
+iptables -t mangle -N MANGLE_PRE_LAN_L2
+iptables -t mangle -F MANGLE_PRE_LAN_L2
+iptables -t mangle -A MANGLE_PRE_LAN_L2 -j ACCEPT
+# NIC: l3-tun
+iptables -t mangle -N MANGLE_PRE_TUN_L3
+iptables -t mangle -F MANGLE_PRE_TUN_L3
+iptables -t mangle -A MANGLE_PRE_TUN_L3 -j ACCEPT
+# NIC: qbf-tun (both directions)
+iptables -t mangle -N MANGLE_PRE_TUN_L2
+iptables -t mangle -F MANGLE_PRE_TUN_L2
+iptables -t mangle -A MANGLE_PRE_TUN_L2 -j ACCEPT
+
+# Add flows to main chain in MANGLE table
+iptables -t mangle -A PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "MANGLE.PRE "
+iptables -t mangle -A PREROUTING -m mark --mark 0x12000000/0xFF000000 -j MANGLE_PRE_WAN_L3
+iptables -t mangle -A PREROUTING -m mark --mark 0x13000000/0xFF000000 -j MANGLE_PRE_LAN_L3
+iptables -t mangle -A PREROUTING -m mark --mark 0x14000000/0xFF000000 -j MANGLE_PRE_TUN_L3
+iptables -t mangle -A PREROUTING -m mark --mark 0x20000000/0xF0000000 -j MANGLE_PRE_WAN_L2
+iptables -t mangle -A PREROUTING -m mark --mark 0x30000000/0xF0000000 -j MANGLE_PRE_LAN_L2
+iptables -t mangle -A PREROUTING -m mark --mark 0x40000000/0xF0000000 -j MANGLE_PRE_TUN_L2
+
+
+# --- NAT TABLE ---  #
+
+iptables -t nat -F PREROUTING
+# Create chains in NAT table for packet processing at L3 and QBF interfaces
+# NIC: l3-wan
+## Do DNAT towards private host @L3-WAN - Add 1 rule per private host
+iptables -t nat -N NAT_PRE_WAN_L3_CPOOL
+iptables -t nat -F NAT_PRE_WAN_L3_CPOOL
+iptables -t nat -A NAT_PRE_WAN_L3_CPOOL -j LOG --log-level 7 --log-prefix "NAT.PRE.WAN.L3.CPOOL DNAT " -m comment --comment "DNAT to private host"
+iptables -t nat -A NAT_PRE_WAN_L3_CPOOL -m mark --mark 0x12A80065/0xFFFFFFFF -j DNAT --to-destination 192.168.0.101 -m comment --comment "DNAT to private host"
+iptables -t nat -A NAT_PRE_WAN_L3_CPOOL -m mark --mark 0x12A80066/0xFFFFFFFF -j DNAT --to-destination 192.168.0.102 -m comment --comment "DNAT to private host"
+iptables -t nat -A NAT_PRE_WAN_L3_CPOOL -m mark --mark 0x12A80067/0xFFFFFFFF -j DNAT --to-destination 192.168.0.103 -m comment --comment "DNAT to private host"
+## Divert to Circular Pool chain for DNAT if packet was mangled in Control Plane
+iptables -t nat -N NAT_PRE_WAN_L3
+iptables -t nat -F NAT_PRE_WAN_L3
+iptables -t nat -A NAT_PRE_WAN_L3 -m mark ! --mark 0x12000000/0xFFFFFFFF -m set --match-set circularpool_set dst -j NAT_PRE_WAN_L3_CPOOL -m comment --comment "Send to CPool for DNAT"
+iptables -t nat -A NAT_PRE_WAN_L3 -j ACCEPT
+# NIC: qbf-wan (both directions)
+iptables -t nat -N NAT_PRE_WAN_L2
+iptables -t nat -F NAT_PRE_WAN_L2
+# Send packets through the bridge - do not attempt splice
+#iptables -t nat -A NAT_PRE_WAN_L2 -m mark --mark 0x20000001/0xFF00000F -j LOG --log-level 7 --log-prefix "NAT.PRE.WAN.L2 save-mark IN "
+#iptables -t nat -A NAT_PRE_WAN_L2 -m mark --mark 0x20000001/0xFF00000F -j CONNMARK --save-mark
+iptables -t nat -A NAT_PRE_WAN_L2 -j ACCEPT
+# NIC: l3-lan
+iptables -t nat -N NAT_PRE_LAN_L3
+iptables -t nat -F NAT_PRE_LAN_L3
+iptables -t nat -A NAT_PRE_LAN_L3 -j ACCEPT
+# NIC: qbf-lan (both directions)
+iptables -t nat -N NAT_PRE_LAN_L2
+iptables -t nat -F NAT_PRE_LAN_L2
+iptables -t nat -A NAT_PRE_LAN_L2 -j ACCEPT
+# NIC: l3-tun
+iptables -t nat -N NAT_PRE_TUN_L3
+iptables -t nat -F NAT_PRE_TUN_L3
+iptables -t nat -A NAT_PRE_TUN_L3 -j ACCEPT
+# NIC: qbf-tun (both directions)
+iptables -t nat -N NAT_PRE_TUN_L2
+iptables -t nat -F NAT_PRE_TUN_L2
+iptables -t nat -A NAT_PRE_TUN_L2 -j ACCEPT
+
+# Add flows to main chain in NAT table
+iptables -t nat -A PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "NAT.PRE "
+iptables -t nat -A PREROUTING -m mark --mark 0x12000000/0xFF000000 -j NAT_PRE_WAN_L3
+iptables -t nat -A PREROUTING -m mark --mark 0x13000000/0xFF000000 -j NAT_PRE_LAN_L3
+iptables -t nat -A PREROUTING -m mark --mark 0x14000000/0xFF000000 -j NAT_PRE_TUN_L3
+iptables -t nat -A PREROUTING -m mark --mark 0x20000000/0xF0000000 -j NAT_PRE_WAN_L2
+iptables -t nat -A PREROUTING -m mark --mark 0x30000000/0xF0000000 -j NAT_PRE_LAN_L2
+iptables -t nat -A PREROUTING -m mark --mark 0x40000000/0xF0000000 -j NAT_PRE_TUN_L2
+
+
+# --- MANGLE TABLE ---  #
+
+Continue here with specific tables per interface as in previous cases
+
+iptables -t mangle -F FORWARD
+iptables -t mangle -F INPUT
+# Packet clasification with mark in MANGLE table only for L3-routing interfaces
+iptables -t mangle -A FORWARD -m physdev --physdev-is-in -j ACCEPT -m comment --comment "Traffic from QBF"
+### LAN & WAN
+iptables -t mangle -A FORWARD -i $LAN_NIC -o $WAN_NIC -j MARK --set-mark $hMARK_EGRESS_to_WAN/0x000000FF    -m comment --comment "Egress LAN to WAN"
+iptables -t mangle -A FORWARD -i $WAN_NIC -o $LAN_NIC -j MARK --set-mark $hMARK_INGRESS_from_WAN/0x000000FF -m comment --comment "Ingress WAN to LAN"
+### LAN & TUN
+iptables -t mangle -A FORWARD -i $LAN_NIC -o $TUN_NIC -j MARK --set-mark $hMARK_EGRESS_to_TUN/0x000000FF    -m comment --comment "Egress LAN to TUN"
+iptables -t mangle -A FORWARD -i $TUN_NIC -o $LAN_NIC -j MARK --set-mark $hMARK_INGRESS_from_TUN/0x000000FF -m comment --comment "Ingress TUN to LAN"
+### LAN & WAN to CES Local
+iptables -t mangle -A INPUT   -i $LAN_NIC             -j MARK --set-mark $hMARK_EGRESS_to_CES/0x000000FF    -m comment --comment "Egress LAN to CES"
+iptables -t mangle -A INPUT   -i $WAN_NIC             -j MARK --set-mark $hMARK_INGRESS_to_CES/0x000000FF   -m comment --comment "Ingress WAN to CES"
+iptables -t mangle -A INPUT   -i $TUN_NIC             -j DROP                                               -m comment --comment "Ingress TUN to CES"
+
+
+
+# LOG FOR EASY READING
+iptables -t nat -A POSTROUTING -j LOG --log-level 7 --log-prefix "######### END ######### "
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -192,36 +302,6 @@ iptables -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 # DEFINITION OF FILTERING POLICIES TO PROTECT FROM ATTACKS
 iptables -N QBR_FILTER
 iptables -F QBR_FILTER
-
-
-
-# Testing TCP Splice function attached to QBF-WAN filtering bridge
-iptables -t mangle -F PREROUTING
-# LOG netfilter application
-#iptables -t mangle -A PREROUTING -m mark --mark 0x22 -j LOG --log-level 7 --log-prefix "1.0.0.NFQUEUE "                   -m comment --comment "Before TEE"
-#iptables -t mangle -A PREROUTING -m mark --mark 0x22 -j TEE --gateway 198.18.0.101 --oif qve-phy-wana
-#iptables -t mangle -A PREROUTING -m mark --mark 0x22 -j LOG --log-level 7 --log-prefix "1.0.1.NFQUEUE "                   -m comment --comment "After TEE"
-
-#iptables -t mangle -A PREROUTING -m mark --mark 0x02 -j LOG --log-level 7 --log-prefix "1.1.NFQUEUE "                   -m comment --comment "Before NFQUEUE"
-#Forward Circular Pool connections to TCP Splice
-iptables -t mangle -A PREROUTING -m mark --mark 0x02 -d 198.18.0.21 -m conntrack --ctstate NEW -j NFQUEUE --queue-num 1 -m comment --comment "Do NFQUEUE"
-#iptables -t mangle -A PREROUTING -m mark --mark 0x02 -j LOG --log-level 7 --log-prefix "1.2. !NEW "                     -m comment --comment "After NFQUEUE"
-
-
-# Testing TCP Splice function attached to QBF-WAN filtering bridge
-iptables -t nat -F PREROUTING
-# LOG netfilter application
-#iptables -t nat -A PREROUTING -m mark --mark 0x01 -j LOG --log-level 7 --log-prefix "2.1.DNAT "                         -m comment --comment "Before DNAT"
-# Do DNAT towards private host
-iptables -t nat -A PREROUTING -m mark --mark 0x01 -d 198.18.0.21 -j DNAT --to-destination 192.168.0.101                 -m comment --comment "Do DNAT"
-
-# Mark 222 means the TCP Splice has received the last ACK of the 3-way handsake. We should create connmark
-iptables -t nat -A PREROUTING -m mark --mark 0x222/0xFFF -j LOG --log-level 7 --log-prefix "should match here "
-iptables -t nat -A PREROUTING -m mark --mark 0x222/0xFFF -j CONNMARK --save-mark
-
-iptables -t nat -A POSTROUTING -j LOG --log-level 7 --log-prefix "########### "
-iptables -t nat -A POSTROUTING -j LOG --log-level 7 --log-prefix "### END ### "
-iptables -t nat -A POSTROUTING -j LOG --log-level 7 --log-prefix "########### "
 
 
 ## Packet processing for Circular Pool
@@ -300,4 +380,59 @@ iptables -t nat -I POSTROUTING -o eth1 -j ACCEPT
 iptables -t nat -A POSTROUTING -j LOG --log-level 7 --log-prefix "nat.POSTROUTING:"
 #iptables -t nat -A POSTROUTING -m mark   --mark 0x00 -j LOG --log-level 7 --log-prefix "nat.POST: mark==0 "
 iptables -t nat -A POSTROUTING -m mark --mark $hMARK_EGRESS_to_WAN -s $LAN_NET -j SNAT --to-source 198.18.0.11 -m comment --comment "Outgoing SNAT to 198.18.0.11"
+
+
+
+
+###############################################################################
+# Configure raw PREROUTING for specific conntrack zones
+## Note: Use conntrack zone 1 for default connection track and zones 2/3/4 for packet filtering via qbf filtering bridges
+
+## Definition of CONNTRACK ZONES
+#iptables -t raw -N CT_ZONES
+#iptables -t raw -F CT_ZONES
+## Set Zone-1 for L3-routing interfaces
+#iptables -t raw -A CT_ZONES -i $LAN_NIC -j CT --zone 1
+#iptables -t raw -A CT_ZONES -i $WAN_NIC -j CT --zone 1
+#iptables -t raw -A CT_ZONES -i $TUN_NIC -j CT --zone 1
+## Set Zone-2 for BridgeFiltering @WAN interface
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -j CT --zone 2
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CT --zone 2
+## Set Zone-3 for BridgeFiltering @LAN interface
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3  -j CT --zone 3
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j CT --zone 3
+## Set Zone-4 for BridgeFiltering @TUN interface
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3  -j CT --zone 4
+#iptables -t raw -A CT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j CT --zone 4
+## Set notrack for everything else
+#iptables -t raw -A CT_ZONES -j CT --notrack
+#
+## Definition of PACKET MARK ZONES
+#iptables -t raw -N PKT_ZONES
+#iptables -t raw -F PKT_ZONES
+## Set Zone-1 for L3-routing interfaces
+#iptables -t raw -A PKT_ZONES -i $LAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-lan"
+#iptables -t raw -A PKT_ZONES -i $WAN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-wan"
+#iptables -t raw -A PKT_ZONES -i $TUN_NIC -j MARK --set-mark 0x10000000/0xFF000000 -m comment --comment "[L3] via l3-tun"
+## Set Zone-2 for BridgeFiltering @WAN interface
+### Restore the CONNMARK if the packet was mangled by the TCP Splicer
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -j CONNMARK --restore-mark -m comment --comment "[QBF] Restore mark at qbf-wan"
+## Set MARK if no CONNMARK was set
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L2 -m mark --mark 0x00 -j MARK --set-mark 0x20000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-wan"
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_WAN_NIC_L3  -m mark --mark 0x00 -j MARK --set-mark 0x21000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-wan"
+## Set Zone-3 for BridgeFiltering @LAN interface
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L2 -j MARK --set-mark 0x30000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-lan"
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_LAN_NIC_L3  -j MARK --set-mark 0x31000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-lan"
+## Set Zone-4 for BridgeFiltering @TUN interface
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L2 -j MARK --set-mark 0x40000000/0xFF000000 -m comment --comment "[QBF] via qve-phy-tun"
+#iptables -t raw -A PKT_ZONES -m physdev --physdev-in $PHYSDEV_TUN_NIC_L3  -j MARK --set-mark 0x41000000/0xFF000000 -m comment --comment "[QBF] via qve-l3-tun"
+
+
+# Flush PREROUTING chain in RAW table
+#iptables -t raw -F PREROUTING
+# Jump to CT_ZONES and set appropriate conntrack zone
+#iptables -t raw -A PREROUTING -j CT_ZONES
+# Jump to PKT_ZONES and set packet mark according to zone
+#iptables -t raw -A PREROUTING -j PKT_ZONES
 
