@@ -158,6 +158,19 @@ The direction is based on whether the packet is going-to (mark 0) or coming-from
   * qve-l3-tun:  The packet is marked with 1-msbyte as 0x01/0x0F -> 0x01000000/0x0F000000
 
 
+Summary of packet marks:
+
+* 0x12000000/0xFF000000: Conntrack Zone 1. Incoming traffic @Layer-3: l3-wan
+* 0x13000000/0xFF000000: Conntrack Zone 1. Incoming traffic @Layer-3: l3-lan
+* 0x14000000/0xFF000000: Conntrack Zone 1. Incoming traffic @Layer-3: l3-tun
+* 0x20000000/0xFF000000: Conntrack Zone 2. Incoming traffic @Layer-2: qbf-wan via qve-phy-wan
+* 0x30000000/0xFF000000: Conntrack Zone 3. Incoming traffic @Layer-2: qbf-lan via qve-phy-lan
+* 0x40000000/0xFF000000: Conntrack Zone 4. Incoming traffic @Layer-2: qbf-tun via qve-phy-tun
+* 0x21000000/0xFF000000: Conntrack Zone 2. Outgoing traffic @Layer-2: qbf-wan via qve-l3-wan
+* 0x31000000/0xFF000000: Conntrack Zone 3. Outgoing traffic @Layer-2: qbf-lan via qve-l3-lan
+* 0x41000000/0xFF000000: Conntrack Zone 4. Outgoing traffic @Layer-2: qbf-tun via qve-l3-tun
+
+
 ## Protecting Customer Edge Switching
 
 ### DNS
