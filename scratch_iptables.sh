@@ -64,6 +64,17 @@ hMARK_MASK="0x10"               #0b10000
 hMARK_EGRESS_MASK="0x00"        #0b00000
 hMARK_INGRESS_MASK="0x10"       #0b10000
 
+# Packet marks per interface
+hMARK_EGRESS_to_CES="0x4"       #0b00100
+hMARK_EGRESS_to_WAN="0x6"       #0b00110
+hMARK_EGRESS_to_PROXY="0x7"     #0b00111
+hMARK_INGRESS_from_CES="0x18"   #0b11000
+hMARK_INGRESS_from_WAN="0x19"   #0b11001
+hMARK_INGRESS_from_PROXY="0x1d" #0b11101
+hMARK_MASK="0x10"               #0b10000
+hMARK_EGRESS_MASK="0x00"        #0b00000
+hMARK_INGRESS_MASK="0x10"       #0b10000
+
 
 #################################### EBTABLES #################################
 

@@ -89,17 +89,18 @@ Extended requirements for virtualization in same host:
 
 ### Traffic directionality
 
-Attending to the aforementioned network design we can distinguish between different routed traffic flows:
+Attending to the aforementioned network design we can distinguish between different routed traffic flows (Layer-3 interfaces):
 
 * LAN originated
   * To local CES services (DHCP and DNS)
   * To a host in the Internet - via l3-wan
-  * To a host behind CES - via l3-tun (We could have different proxy pools for better control)
+  * To a host behind CES - via l3-tun (We could have different proxy pools for better control - Separation of local/remote hosts)
 * WAN originated
   * To local CES services (HTTP and DNS)
   * To a host behind CES - via l3-lan
 * TUN originated
-  * To a host behind CES - via l3-lan
+  * To local CES services ??? (Maybe we want to drop this traffic ?)
+  * To a host behind CES - via l3-lan (We could have different proxy pools for better control - Separation of local/remote hosts)
 
 For the definition of rules and policies this is very important as it will allow us to define very specific scopes.
 
@@ -108,8 +109,7 @@ For the definition of rules and policies this is very important as it will allow
 ### Iptables zones
 
 There are a number of tweaks required in iptables for virtualizing several CES in the same machine without spawning Linux containers.
-It would be possible to run the virtual CES in a Linux namespace, but certain iptables extensions do not appear to work properly, e.g. This 
-is the case for TRACE(ing) packets and the LOG target.
+It would be possible to run the virtual CES in a Linux namespace, but certain iptables extensions do not appear to work properly, e.g. This is the case for TRACE(ing) packets and the LOG target.
 
 To minimize the amount of tracked connections (conntrack), we will stop the tracking of packets in specific network interfaces.
 
@@ -145,7 +145,7 @@ For example, we can use the 4-msbit of the 1-msbyte as follows:
 * Zone 4: The packet is marked with 1-msbyte as 0x40/0xF0 -> 0x40000000/0xF0000000
 
 Additionally, in the case of Linux filtering bridges, we can use the 4-lsbit of the 1-msbyte to indicate the direction of the packet when entering the bridge interface.
-The direction is based on whether the packet is going-to (mark 0) or coming-from the associated Layer-3 routing interface.
+The direction is based on whether the packet is going-towards (mark 0) or coming-from the associated Layer-3 routing interface.
 * Zone 1: The packet is not handled by a Linux filtering bridges
 * Zone 2: The packet enters the Linux filtering bridge qbf-wan
   * qve-phy-wan: The packet is marked with 1-msbyte as 0x00/0x0F -> 0x00000000/0x0F000000
@@ -158,7 +158,7 @@ The direction is based on whether the packet is going-to (mark 0) or coming-from
   * qve-l3-tun:  The packet is marked with 1-msbyte as 0x01/0x0F -> 0x01000000/0x0F000000
 
 
-Summary of packet marks:
+Summary of packet marks at the prerouting stage:
 
 * 0x12000000/0xFF000000: Conntrack Zone 1. Incoming traffic @Layer-3: l3-wan
 * 0x13000000/0xFF000000: Conntrack Zone 1. Incoming traffic @Layer-3: l3-lan
@@ -173,11 +173,26 @@ Summary of packet marks:
 
 ## Protecting Customer Edge Switching
 
+### Firewall Policy Definition
+
+CES defines a number of policies for securing end-to-end communications.
+
+* Host based policies: These are applied for both Internet and CES-to-CES traffic directions.
+  * Originating traffic from host
+  * Destination traffic to host
+  * Destination traffic to service@host
+* CES based policies: These are applied for LOCAL services operated by CES.
+  * Originating traffic from hosts in local network
+  * Originating traffic from hosts in public network
+  * Originating traffic from hosts in other CES network
+
+
 ### DNS
 
-### Protecting DNS
+CES provides DNS resolver functionality to own hosts and public resolvers.
+This service could easily be exploited if no additional mechanisms are installed.
 
-The following chains apply in qbf-xxxx Linux bridge when an incoming packet is UDP port 53:
+The following chains have been defined to protect and limit the incoming UDP traffic:
 
 * WanBlacklist: Banned sources and/or domains.
   * Match IP source and DROP
@@ -217,7 +232,7 @@ The following chains apply in qbf-xxxx Linux bridge when an incoming packet is U
   * Match IP source and 1/4th REJECT
   * Match IP source and DROP and LOG - WARN
   
-Processing pipeline for incoming DNS packets from WAN at the Filtering Bridge:
+Processing pipeline for incoming DNS packets from WAN at the filtering-bridge:
 
 * Jump to WanBlacklist chain.
 * Jump to WanDomainLimit chain. (Maybe this should be called from the Greylist chains only?)
@@ -226,7 +241,7 @@ Processing pipeline for incoming DNS packets from WAN at the Filtering Bridge:
 * !Match WanGreylistWK_ipset and jump to WanGreylist chain.
 * Jump to WanGlobalLimit chain. (Packet can be ACCEPT, DROP or REJECT)
 
-Processing pipeline for incoming DNS packets from LAN at the Filtering Bridge:
+Processing pipeline for incoming DNS packets from LAN at the filtering-bridge:
 * Jump to LanBlacklist chain.
 * Jump to LanCESLimit chain.
 
@@ -282,3 +297,6 @@ ipset -exist add test 192.168.0.1 timeout 600
 # Send/Receive with Scapy for testing TCP Splice?
 https://github.com/phaethon/scapy/issues/92
 
+
+# NFQUEUE verdict
+The target function may return either IPT_CONTINUE (-1) if traversing should continue, or a netfilter verdict (NF_DROP, NF_ACCEPT, NF_STOLEN etc.)
