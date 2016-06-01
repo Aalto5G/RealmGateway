@@ -143,7 +143,7 @@ ip link set dev l3-tuna arp off
 ip route add 172.16.0.0/24 dev l3-tuna
 
 ovs-vsctl --may-exist add-port qbi-tuna tuna-gre0 -- set interface tuna-gre0 type=gre options:local_ip=198.18.0.11 options:remote_ip=198.18.0.12 options:in_key=flow options:out_key=flow \
-                                                      -- set interface tuna-gre0 ofport_request=10
+                                                  -- set interface tuna-gre0 ofport_request=10
                                                       
 
 ###############################################################################
@@ -196,7 +196,7 @@ ip link set dev l3-tunb arp off
 ip route add 172.16.1.0/24 dev l3-tunb
 
 ovs-vsctl --may-exist add-port qbi-tunb tunb-gre0 -- set interface tunb-gre0 type=gre options:local_ip=198.18.0.12 options:remote_ip=198.18.0.11 options:in_key=flow options:out_key=flow \
-                                                      -- set interface tunb-gre0 ofport_request=10
+                                                  -- set interface tunb-gre0 ofport_request=10
 
                                                            
 ###############################################################################
