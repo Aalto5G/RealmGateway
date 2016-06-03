@@ -225,7 +225,7 @@ The following chains have been defined to protect and limit the incoming UDP tra
 * LanBlacklist: Banned sources and/or domains.
   * Match IP source and DROP
   * Match (S)FQDN and DROP - Use string extension
-* LanCESLimit: Apply global admision rate limit in LAN network.
+* LanGlobalLimit: Apply global admision rate limit in LAN network.
   * Match IP source and LIMIT-75% and ACCEPT
   * Match IP source and LIMIT-1/s and LOG - INFO
   * Match IP source and 1/4th DROP
@@ -243,12 +243,10 @@ Processing pipeline for incoming DNS packets from WAN at the filtering-bridge:
 
 Processing pipeline for incoming DNS packets from LAN at the filtering-bridge:
 * Jump to LanBlacklist chain.
-* Jump to LanCESLimit chain.
+* Jump to LanGlobalLimit chain.
 
 
 ### Protecting HTTP Proxy
-
-
 
 ### Protecting from TCP SYN Spoofed Attacks
 
