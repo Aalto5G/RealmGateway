@@ -129,6 +129,7 @@ ip link set dev qve-phy-tuna    up promisc on
 ip link set dev qve-l3-tuna     up promisc on
 ip link set dev l3-tuna         up promisc off
 ip link set dev l3-tuna address 00:00:00:00:01:CC
+ip link set dev l3-tuna mtu 1400
 
 ### Disable MAC learning in filtering bridges
 brctl setageing qbf-lana 0
@@ -182,6 +183,7 @@ ip link set dev qve-phy-tunb    up promisc on
 ip link set dev qve-l3-tunb     up promisc on
 ip link set dev l3-tunb         up promisc off
 ip link set dev l3-tunb address 00:00:00:00:02:CC
+ip link set dev l3-tunb mtu 1400
 
 ### Disable MAC learning in filtering bridges
 brctl setageing qbf-lanb 0
@@ -219,7 +221,7 @@ done
 ### [NS-LAN-A]
 ip link add link qbi-lana dev lan0 type macvlan
 ip link set lan0 netns nslana
-ip netns exec nslana ip link set dev lan0 mtu 1400
+ip netns exec nslana ip link set dev lan0 mtu 1500
 ip netns exec nslana ip link set dev lan0 address 00:00:C0:A8:00:65
 ip netns exec nslana ip link set dev lan0 up
 ip netns exec nslana ip address add 192.168.0.101/24 dev lan0
@@ -228,7 +230,7 @@ ip netns exec nslana ip route add default via 192.168.0.1
 ### [NS-LAN-B]
 ip link add link qbi-lanb dev lan0 type macvlan
 ip link set lan0 netns nslanb
-ip netns exec nslanb ip link set dev lan0 mtu 1400
+ip netns exec nslanb ip link set dev lan0 mtu 1500
 ip netns exec nslanb ip link set dev lan0 address 00:00:C0:A8:01:65
 ip netns exec nslanb ip link set dev lan0 up
 ip netns exec nslanb ip address add 192.168.1.101/24 dev lan0
