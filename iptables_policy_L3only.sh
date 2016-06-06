@@ -191,7 +191,11 @@ iptables -t filter -A doREJECT -p tcp -j REJECT --reject-with tcp-reset
 iptables -t filter -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 
 # Populate chains of FILTER table
-iptables -t filter -A INPUT   -i lo -j ACCEPT
+## Add default values for loopback and IPSec
+iptables -t filter -A INPUT -i lo -j ACCEPT
+iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
+iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
+## Add default filtering for CES
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_IP_BLACKLIST -m comment --comment "Drop blacklisted sources"
 iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_IP_BLACKLIST -m comment --comment "Drop blacklisted sources"
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_IP_WHITELIST -m comment --comment "Accept whitelisted sources / sysadmin"
