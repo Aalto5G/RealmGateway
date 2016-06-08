@@ -35,7 +35,7 @@ extensions to be considered:
 * TEE
 * TPROXY for TCPSplice?
 * target SET (--add-set with timeout)
-
+* SYNPROXY
 
 ## Networking Architecture
 
@@ -298,3 +298,35 @@ https://github.com/phaethon/scapy/issues/92
 
 # NFQUEUE verdict
 The target function may return either IPT_CONTINUE (-1) if traversing should continue, or a netfilter verdict (NF_DROP, NF_ACCEPT, NF_STOLEN etc.)
+
+
+# Modify timeouts in iptables
+The current timeouts are stored in the following location: /proc/sys/net/netfilter/nf_conntrack_*_timeout_*
+They can be changed via the CT extension: http://ipset.netfilter.org/iptables-extensions.man.html
+
+
+The CT target allows to set parameters for a packet or its associated connection. The target attaches a "template" connection tracking entry to the packet, which is then used by the conntrack core when initializing a new ct entry. This target is thus only valid in the "raw" table.
+--notrack
+Disables connection tracking for this packet.
+--helper name
+Use the helper identified by name for the connection. This is more flexible than loading the conntrack helper modules with preset ports.
+--ctevents event[,...]
+Only generate the specified conntrack events for this connection. Possible event types are: new, related, destroy, reply, assured, protoinfo, helper, mark (this refers to the ctmark, not nfmark), natseqinfo, secmark (ctsecmark).
+--expevents event[,...]
+Only generate the specified expectation events for this connection. Possible event types are: new.
+--zone id
+Assign this packet to zone id and only have lookups done in that zone. By default, packets have zone 0.
+--timeout name
+Use the timeout policy identified by name for the connection. This is provides more flexible timeout policy definition than global timeout values available at /proc/sys/net/netfilter/nf_conntrack_*_timeout_*.
+ 
+ 
+ # nf-HiPAC
+nf-HiPAC is a full featured packet filter for Linux which demonstrates the power and flexibility of HiPAC. HiPAC is a novel framework for packet classification which uses an advanced algorithm to reduce the number of memory lookups per packet. It is ideal for environments involving large rulesets and/or high bandwidth networks.
+http://www.hipac.org/
+ 
+ 
+# Netfilter SYNPROXY
+http://people.netfilter.org/hawk/presentations/devconf2014/iptables-ddos-mitigation_JesperBrouer.pdf
+https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY
+
+ 
