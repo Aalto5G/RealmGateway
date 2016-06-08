@@ -155,13 +155,13 @@ iptables -t mangle -F INPUT
 iptables -t mangle -A FORWARD -i $PREFIX_L3 -j MANGLE_FWD_MARK
 iptables -t mangle -A INPUT   -i $PREFIX_L3 -j MANGLE_INPUT_MARK
 # Populate custom chains of MANGLE PREROUTING table
-iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_NIC -o $LAN_NIC -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_NIC -o $LAN_NIC -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_NIC -o $WAN_NIC -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_NIC -o $TUN_NIC -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $LAN_NIC           -j MARK --set-mark $INPUT_LAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $WAN_NIC           -j MARK --set-mark $INPUT_WAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $TUN_NIC           -j MARK --set-mark $INPUT_TUN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
+iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
+iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
+iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $LAN_L3           -j MARK --set-mark $INPUT_LAN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $WAN_L3           -j MARK --set-mark $INPUT_WAN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $TUN_L3           -j MARK --set-mark $INPUT_TUN       -m comment --comment "Mark INPUT"
 
 
 # --- FILTER TABLE ---  #
@@ -222,9 +222,9 @@ iptables -t filter -A FILTER_ESTABLISHED -m conntrack --ctstate INVALID         
 
 ## Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 ## http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
-iptables -t filter -A FILTER_IP_SPOOFING -i $LAN_NIC -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_NIC] IP Spoofing"
-iptables -t filter -A FILTER_IP_SPOOFING -i $WAN_NIC -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_NIC] IP Spoofing"
-iptables -t filter -A FILTER_IP_SPOOFING -i $TUN_NIC -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_NIC] IP Spoofing"
+iptables -t filter -A FILTER_IP_SPOOFING -i $LAN_L3 -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_IP_SPOOFING -i $WAN_L3 -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_IP_SPOOFING -i $TUN_L3 -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_L3] IP Spoofing"
 ## Create ipset for blacklist/whitelist sources - both hash:ip and hash:net?
 iptables -t filter -A FILTER_IP_BLACKLIST -m set --match-set $BLACKLIST_IPSET src -j DROP   -m comment --comment "Drop blacklisted sources"
 iptables -t filter -A FILTER_IP_WHITELIST -m set --match-set $WHITELIST_IPSET src -j ACCEPT -m comment --comment "Accept whitelisted sources"
@@ -240,9 +240,9 @@ TCP_MULTIPORTS_BLOCKED="135,137,138,139"
 iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j doREJECT -m comment --comment "Reject vulnerable multiport TCP services"
 iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp                            -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j DROP     -m comment --comment "Drop vulnerable multiport TCP services"
 ### Filter new connections
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $LAN_NIC -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $WAN_NIC -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $TUN_NIC -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_SYSTEM_WIDE -i $LAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_SYSTEM_WIDE -i $WAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_SYSTEM_WIDE -i $TUN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
 ## Apply HOST specific policy
 ### Examples are described below
 ## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_LOCAL_POLICY
@@ -255,7 +255,7 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m commen
 # --- NAT TABLE ---  #
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
-iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_NIC -j SNAT --to-source 198.18.0.11 -m comment --comment "SNAT to 198.18.0.11"
+iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.11 -m comment --comment "SNAT to 198.18.0.11"
 
 
 
