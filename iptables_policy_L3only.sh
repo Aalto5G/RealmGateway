@@ -90,9 +90,14 @@ iptables -t raw -F PREROUTING
 iptables -t raw -F OUTPUT
 # Populate chain of RAW table
 ## Match interface to set conntrack zone
-iptables -t raw -A PREROUTING -i $LAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$LAN_L3] CT zone $CT_ZONE"
-iptables -t raw -A PREROUTING -i $WAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$WAN_L3] CT zone $CT_ZONE"
-iptables -t raw -A PREROUTING -i $TUN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$TUN_L3] CT zone $CT_ZONE"
+
+# NEWS: This is no longer valid because packets that are generated locally by the router are always matched in default CT_ZONE.
+#       Using different CTs may lead to INVALID state or UNSEEN / UNREPLIED responses in the conntrack.
+#       The use of CT zones is therefore recommended for bridge-filtering functionality, where only ACCEPT & DROP are executed.
+#iptables -t raw -A PREROUTING -i $LAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$LAN_L3] CT zone $CT_ZONE"
+#iptables -t raw -A PREROUTING -i $WAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$WAN_L3] CT zone $CT_ZONE"
+#iptables -t raw -A PREROUTING -i $TUN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$TUN_L3] CT zone $CT_ZONE"
+
 ## NOTRACK rest of traffic
 #iptables -t raw -A PREROUTING -j NOTRACK
 #iptables -t raw -A OUTPUT     -j NOTRACK
@@ -255,6 +260,7 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m commen
 # --- NAT TABLE ---  #
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
+iptables -t nat -F POSTROUTING
 iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.11 -m comment --comment "SNAT to 198.18.0.11"
 
 
