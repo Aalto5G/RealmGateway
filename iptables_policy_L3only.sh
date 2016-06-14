@@ -164,30 +164,26 @@ iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $
 iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
 iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
 iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $LAN_L3           -j MARK --set-mark $INPUT_LAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $WAN_L3           -j MARK --set-mark $INPUT_WAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $TUN_L3           -j MARK --set-mark $INPUT_TUN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $LAN_L3          -j MARK --set-mark $INPUT_LAN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $WAN_L3          -j MARK --set-mark $INPUT_WAN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_INPUT_MARK -i $TUN_L3          -j MARK --set-mark $INPUT_TUN       -m comment --comment "Mark INPUT"
 
 
 # --- FILTER TABLE ---  #
 
 # Definition of chains for FILTER FORWARD & INPUT table
-iptables -t filter -N FILTER_IP_SPOOFING
-iptables -t filter -F FILTER_IP_SPOOFING
-iptables -t filter -N FILTER_IP_BLACKLIST
-iptables -t filter -F FILTER_IP_BLACKLIST
-iptables -t filter -N FILTER_IP_WHITELIST
-iptables -t filter -F FILTER_IP_WHITELIST
-iptables -t filter -N FILTER_ESTABLISHED
-iptables -t filter -F FILTER_ESTABLISHED
-iptables -t filter -N FILTER_SYSTEM_WIDE
-iptables -t filter -F FILTER_SYSTEM_WIDE
+## Apply basic filtering policy in CES
+iptables -t filter -N FILTER_PREEMPTIVE
+iptables -t filter -F FILTER_PREEMPTIVE
+## Apply host-based policy
 iptables -t filter -N FILTER_HOST_POLICY
 iptables -t filter -F FILTER_HOST_POLICY
 iptables -t filter -N FILTER_HOST_POLICY_ACCEPT
 iptables -t filter -F FILTER_HOST_POLICY_ACCEPT
+## Apply local-based policy for accepting traffic
 iptables -t filter -N FILTER_LOCAL_POLICY
 iptables -t filter -F FILTER_LOCAL_POLICY
+
 # Create specific table for REJECT target
 iptables -t filter -N doREJECT
 iptables -t filter -F doREJECT
@@ -200,54 +196,58 @@ iptables -t filter -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 iptables -t filter -A INPUT -i lo -j ACCEPT
 iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
 iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
-## Add default filtering for CES
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_IP_BLACKLIST -m comment --comment "Drop blacklisted sources"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_IP_BLACKLIST -m comment --comment "Drop blacklisted sources"
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_IP_WHITELIST -m comment --comment "Accept whitelisted sources / sysadmin"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_IP_WHITELIST -m comment --comment "Accept whitelisted sources / sysadmin"
-## Accept established traffic only after initial filtering
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_ESTABLISHED -m comment --comment "Accept established traffic"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_ESTABLISHED -m comment --comment "Accept established traffic"
-## Continue filtering new connections
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_IP_SPOOFING -m comment --comment "Drop spoofed packets"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_IP_SPOOFING -m comment --comment "Drop spoofed packets"
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_SYSTEM_WIDE -m comment --comment "Apply system wide policy"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_SYSTEM_WIDE -m comment --comment "Apply system wide policy"
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Apply host specific policy"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Apply host specific policy"
+## Apply basic filtering policy in CES
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --comment "Continue in FILTER_PREEMPTIVE chain"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --comment "Continue in FILTER_PREEMPTIVE chain"
+
+## Apply host-based policy
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
+
 # There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_LOCAL_POLICY, not RETURNed here!
-## This stays here for debugging the rules, there should not be any match!
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Apply system wide policy"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Apply system wide policy"
+## Apply local-based policy for accepting traffic
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
+
 
 # Populate custom chains of FILTER tables
-## Accept established traffic after preemptive filtering
-iptables -t filter -A FILTER_ESTABLISHED -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "Accept established traffic"
-iptables -t filter -A FILTER_ESTABLISHED -m conntrack --ctstate INVALID             -j DROP   -m comment --comment "Drop invalid traffic"
+
+## Create ipset for blacklist sources - both hash:ip and hash:net?
+iptables -t filter -A FILTER_PREEMPTIVE -m set --match-set $BLACKLIST_IPSET src -j DROP   -m comment --comment "Drop blacklisted sources"
+
+## Create ipset for whitelist sources - both hash:ip and hash:net?
+iptables -t filter -A FILTER_PREEMPTIVE -m set --match-set $WHITELIST_IPSET src -j ACCEPT -m comment --comment "Accept whitelisted sources"
+
+## Filter fragmented packets
+iptables -t filter -A FILTER_PREEMPTIVE -f -j DROP -m comment --comment "Fragmented packets"
+
+## Accept established traffic after initial filtering
+iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "Accept established traffic"
+iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate INVALID             -j DROP   -m comment --comment "Drop invalid traffic"
 
 ## Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 ## http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
-iptables -t filter -A FILTER_IP_SPOOFING -i $LAN_L3 -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_L3] IP Spoofing"
-iptables -t filter -A FILTER_IP_SPOOFING -i $WAN_L3 -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_L3] IP Spoofing"
-iptables -t filter -A FILTER_IP_SPOOFING -i $TUN_L3 -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_L3] IP Spoofing"
-## Create ipset for blacklist/whitelist sources - both hash:ip and hash:net?
-iptables -t filter -A FILTER_IP_BLACKLIST -m set --match-set $BLACKLIST_IPSET src -j DROP   -m comment --comment "Drop blacklisted sources"
-iptables -t filter -A FILTER_IP_WHITELIST -m set --match-set $WHITELIST_IPSET src -j ACCEPT -m comment --comment "Accept whitelisted sources"
-## Apply system wide policy
-### Force TCP SYN checks for new connections
-iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp ! --syn -m conntrack --ctstate NEW -j DROP -m comment --comment "Invalid TCP SYN packet"
-### Force check of TCP flags
-iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp --tcp-flags ALL ALL  -j DROP -m comment --comment "Invalid TCP flags / Christmas in July"
-iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp --tcp-flags ALL NONE -j DROP -m comment --comment "Invalid TCP flags / Nothing to See Here"
+iptables -t filter -A FILTER_PREEMPTIVE -i $LAN_L3 -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_PREEMPTIVE -i $WAN_L3 -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_PREEMPTIVE -i $TUN_L3 -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_L3] IP Spoofing"
+
 ### Filter vulnerable TCP services
 ### http://howtonixnux.blogspot.fi/2008/03/iptables-using-multiport.html
 TCP_MULTIPORTS_BLOCKED="135,137,138,139"
-iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j doREJECT -m comment --comment "Reject vulnerable multiport TCP services"
-iptables -t filter -A FILTER_SYSTEM_WIDE -p tcp                            -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j DROP     -m comment --comment "Drop vulnerable multiport TCP services"
-### Filter new connections
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $LAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $WAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_SYSTEM_WIDE -i $TUN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j doREJECT -m comment --comment "Reject vulnerable multiport TCP services"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp                            -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j DROP     -m comment --comment "Drop vulnerable multiport TCP services"
+
+### Force TCP SYN checks for new connections
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp ! --syn -m conntrack --ctstate NEW  -j DROP -m comment --comment "Invalid TCP SYN packet"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL ALL                 -j DROP -m comment --comment "Invalid TCP flags / Christmas in July"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL NONE                -j DROP -m comment --comment "Invalid TCP flags / Nothing to See Here"
+
+### Set upper bound for potentially accepting new connections
+iptables -t filter -A FILTER_PREEMPTIVE -i $LAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -i $WAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -i $TUN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+
+
 ## Apply HOST specific policy
 ### Examples are described below
 ## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_LOCAL_POLICY
@@ -269,6 +269,8 @@ iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18
 # HOST_POLICY - Specific host policies (e.g. legacy / CES services)
 iptables -t filter -N HOST_192.168.0.101
 iptables -t filter -F HOST_192.168.0.101
+iptables -t filter -N HOST_192.168.0.101_ADMIN
+iptables -t filter -F HOST_192.168.0.101_ADMIN
 iptables -t filter -N HOST_192.168.0.101_LEGACY
 iptables -t filter -F HOST_192.168.0.101_LEGACY
 iptables -t filter -N HOST_192.168.0.101_CES
@@ -279,23 +281,33 @@ iptables -t filter -N HOST_192.168.0.101_CES_xyz
 iptables -t filter -F HOST_192.168.0.101_CES_xyz
 
 # Populate custom chain FILTER_HOST_POLICY of FILTER table - 2 entries per host / 1 entry per traffic direction
-iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_INGRESS  -d 192.168.0.101 -g HOST_192.168.0.101
-iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_EGRESS   -s 192.168.0.101 -g HOST_192.168.0.101
+iptables -t filter -F FILTER_HOST_POLICY
+#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_INGRESS  -d 192.168.0.101 -g HOST_192.168.0.101
+#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_EGRESS   -s 192.168.0.101 -g HOST_192.168.0.101
+## MARKS ARE GIVING ISSUES WHEN HOST-A PINGS CES 192.168.0.101 TO 192.168.0.1
+iptables -t filter -A FILTER_HOST_POLICY -d 192.168.0.101 -g HOST_192.168.0.101
+iptables -t filter -A FILTER_HOST_POLICY -s 192.168.0.101 -g HOST_192.168.0.101
 iptables -t filter -A FILTER_HOST_POLICY -j DROP
 
 
 # Define general host firewall policies
 ## First apply strict policies for all traffic then Legacy or CES
 iptables -t filter -F HOST_192.168.0.101
-#iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -j DROP
-#iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS -p udp --dport 53 -g FILTER_HOST_POLICY_ACCEPT
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -g FILTER_HOST_POLICY_ACCEPT
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS -p udp --dport 53 -j DROP
+iptables -t filter -A HOST_192.168.0.101 -j HOST_192.168.0.HOST_192.168.0.101_ADMIN -m comment --comment "First process ADMIN rules"
+
 iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS  ! -d $PROXY_NET -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
 iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_INGRESS ! -s $PROXY_NET -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
 iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS    -d $PROXY_NET -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
 iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_INGRESS   -s $PROXY_NET -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
 iptables -t filter -A HOST_192.168.0.101 -j DROP                                                                     -m comment --comment "Should not be here"
+
+# Define admin host rules
+iptables -t filter -F HOST_192.168.0.101_ADMIN
+#iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -j DROP
+#iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -g FILTER_HOST_POLICY_ACCEPT
+iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -g FILTER_HOST_POLICY_ACCEPT
+iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -j DROP
+
 
 # Define legacy host firewall policies
 iptables -t filter -F HOST_192.168.0.101_LEGACY
