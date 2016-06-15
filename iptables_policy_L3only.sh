@@ -37,16 +37,40 @@ SPOOF_TUN_IPSET="spoof_tun_ipset"
 CPOOL_IPSET="circularpool_ipset"
 BLACKLIST_IPSET="blacklist_ipset"
 WHITELIST_IPSET="whitelist_ipset"
-## Packet mark for traffic directionality
-FWD_LAN_INGRESS="0x0111"
-FWD_LAN_EGRESS="0x0112"
-INPUT_LAN="0x0211"
-INPUT_WAN="0x0221"
-INPUT_TUN="0x0231"
-MASK_INGRESS="0x0001/0x0001"
-MASK_EGRESS="0x0002/0x0002"
-MASK_FWD="0x0100/0x0100"
-MASK_INPUT="0x0200/0x0200"
+
+## Definition of specific packet MARK for traffic
+MARK_LOCAL_FROM_LAN="0xFF121212/0xFFFFFFFF"
+MARK_LOCAL_TO_LAN="0xFF211221/0xFFFFFFFF"
+MARK_LOCAL_FROM_WAN="0xFF021113/0xFFFFFFFF"
+MARK_LOCAL_TO_WAN="0xFF011131/0xFFFFFFFF"
+MARK_LOCAL_FROM_TUN="0xFF021114/0xFFFFFFFF"
+MARK_LOCAL_TO_TUN="0xFF011141/0xFFFFFFFF"
+MARK_LAN_TO_WAN="0xFF222232/0xFFFFFFFF"
+MARK_LAN_FROM_WAN="0xFF112223/0xFFFFFFFF"
+MARK_LAN_TO_TUN="0xFF222342/0xFFFFFFFF"
+MARK_LAN_FROM_TUN="0xFF112324/0xFFFFFFFF"
+## Definition of packet MASKS for traffic
+### Classified by traffic scope and direction
+MASK_LOCAL="0xFF001010/0xFF00F0F0"
+MASK_LOCAL_INGRESS="0xFF021010/0xFF0FF0F0"
+MASK_LOCAL_EGRESS="0xFF011001/0xFF0FF00F"
+MASK_HOST_INGRESS="0xFF000020/0xFF0000F0"
+MASK_HOST_EGRESS="0xFF000002/0xFF00000F"
+MASK_HOST_LEGACY="0xFF000200/0xFF000F00"
+MASK_HOST_LEGACY_INGRESS="0xFF000220/0xFF000FF0"
+MASK_HOST_LEGACY_EGRESS="0xFF000202/0xFF000F0F"
+MASK_HOST_CES="0xFF000300/0xFF000F00"
+MASK_HOST_CES_INGRESS="0xFF000320/0xFF000FF0"
+MASK_HOST_CES_EGRESS="0xFF000302/0xFF000F0F"
+### Classified by ingress or egress interface
+MASK_LAN_INGRESS="0xFF000002/0xFF00000F"
+MASK_WAN_INGRESS="0xFF000003/0xFF00000F"
+MASK_TUN_INGRESS="0xFF000004/0xFF00000F"
+MASK_LAN_EGRESS="0xFF000020/0xFF0000F0"
+MASK_WAN_EGRESS="0xFF000030/0xFF0000F0"
+MASK_TUN_EGRESS="0xFF000040/0xFF0000F0"
+
+
 
 #################################### EBTABLES #################################
 # Build ARP Responder with ebtables
@@ -153,20 +177,28 @@ iptables -t mangle -N MANGLE_FWD_MARK
 iptables -t mangle -F MANGLE_FWD_MARK
 iptables -t mangle -N MANGLE_INPUT_MARK
 iptables -t mangle -F MANGLE_INPUT_MARK
+iptables -t mangle -N MANGLE_OUTPUT_MARK
+iptables -t mangle -F MANGLE_OUTPUT_MARK
 # Flush FORWARD & INPUT chains of MANGLE table
 iptables -t mangle -F FORWARD
 iptables -t mangle -F INPUT
+iptables -t mangle -F OUTPUT
 # Populate chains of MANGLE tables
 iptables -t mangle -A FORWARD -i $PREFIX_L3 -j MANGLE_FWD_MARK
 iptables -t mangle -A INPUT   -i $PREFIX_L3 -j MANGLE_INPUT_MARK
+iptables -t mangle -A OUTPUT  -o $PREFIX_L3 -j MANGLE_OUTPUT_MARK
 # Populate custom chains of MANGLE PREROUTING table
-iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $FWD_LAN_INGRESS -m comment --comment "Mark INGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $FWD_LAN_EGRESS  -m comment --comment "Mark EGRESS"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $LAN_L3          -j MARK --set-mark $INPUT_LAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $WAN_L3          -j MARK --set-mark $INPUT_WAN       -m comment --comment "Mark INPUT"
-iptables -t mangle -A MANGLE_INPUT_MARK -i $TUN_L3          -j MARK --set-mark $INPUT_TUN       -m comment --comment "Mark INPUT"
+iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_WAN   -m comment --comment "Mark LAN_FROM_WAN"
+iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_TUN   -m comment --comment "Mark LAN_FROM_TUN"
+iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $MARK_LAN_TO_WAN     -m comment --comment "Mark LAN_TO_WAN"
+iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $MARK_LAN_TO_TUN     -m comment --comment "Mark LAN_TO_TUN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $LAN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_LAN -m comment --comment "Mark LOCAL_FROM_LAN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $WAN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_WAN -m comment --comment "Mark LOCAL_FROM_WAN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $TUN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_TUN -m comment --comment "Mark LOCAL_FROM_TUN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $LAN_L3         -j MARK --set-mark $MARK_LOCAL_TO_LAN   -m comment --comment "Mark LOCAL_TO_LAN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $WAN_L3         -j MARK --set-mark $MARK_LOCAL_TO_WAN   -m comment --comment "Mark LOCAL_TO_WAN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $TUN_L3         -j MARK --set-mark $MARK_LOCAL_TO_TUN   -m comment --comment "Mark LOCAL_TO_TUN"
+
 
 
 # --- FILTER TABLE ---  #
@@ -209,6 +241,9 @@ iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --c
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
 iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
 
+# Should we apply OUTPUT filtering for CES locally initiated connections?
+## We are already MARKing packets in MANGLE.OUTPUT
+iptables -t filter -A OUTPUT -j ACCEPT
 
 # Populate custom chains of FILTER tables
 
@@ -227,9 +262,9 @@ iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate INVALID          
 
 ## Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 ## http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
-iptables -t filter -A FILTER_PREEMPTIVE -i $LAN_L3 -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_L3] IP Spoofing"
-iptables -t filter -A FILTER_PREEMPTIVE -i $WAN_L3 -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_L3] IP Spoofing"
-iptables -t filter -A FILTER_PREEMPTIVE -i $TUN_L3 -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_L3] IP Spoofing"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m set --match-set $SPOOF_LAN_IPSET src -j DROP -m comment --comment "[$LAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m set --match-set $SPOOF_WAN_IPSET src -j DROP -m comment --comment "[$WAN_L3] IP Spoofing"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m set --match-set $SPOOF_TUN_IPSET src -j DROP -m comment --comment "[$TUN_L3] IP Spoofing"
 
 ### Filter vulnerable TCP services
 ### http://howtonixnux.blogspot.fi/2008/03/iptables-using-multiport.html
@@ -243,9 +278,9 @@ iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL ALL              
 iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL NONE                -j DROP -m comment --comment "Invalid TCP flags / Nothing to See Here"
 
 ### Set upper bound for potentially accepting new connections
-iptables -t filter -A FILTER_PREEMPTIVE -i $LAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -i $WAN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -i $TUN_L3 -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
 
 
 ## Apply HOST specific policy
@@ -282,60 +317,53 @@ iptables -t filter -F HOST_192.168.0.101_CES_xyz
 
 # Populate custom chain FILTER_HOST_POLICY of FILTER table - 2 entries per host / 1 entry per traffic direction
 iptables -t filter -F FILTER_HOST_POLICY
-#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_INGRESS  -d 192.168.0.101 -g HOST_192.168.0.101
-#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_EGRESS   -s 192.168.0.101 -g HOST_192.168.0.101
-## MARKS ARE GIVING ISSUES WHEN HOST-A PINGS CES 192.168.0.101 TO 192.168.0.1
-iptables -t filter -A FILTER_HOST_POLICY -d 192.168.0.101 -g HOST_192.168.0.101
-iptables -t filter -A FILTER_HOST_POLICY -s 192.168.0.101 -g HOST_192.168.0.101
+iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_INGRESS -d 192.168.0.101 -g HOST_192.168.0.101
+iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_EGRESS  -s 192.168.0.101 -g HOST_192.168.0.101
 iptables -t filter -A FILTER_HOST_POLICY -j DROP
 
 
 # Define general host firewall policies
 ## First apply strict policies for all traffic then Legacy or CES
 iptables -t filter -F HOST_192.168.0.101
-iptables -t filter -A HOST_192.168.0.101 -j HOST_192.168.0.HOST_192.168.0.101_ADMIN -m comment --comment "First process ADMIN rules"
-
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS  ! -d $PROXY_NET -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_INGRESS ! -s $PROXY_NET -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_EGRESS    -d $PROXY_NET -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_INGRESS   -s $PROXY_NET -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
+iptables -t filter -A HOST_192.168.0.101                                              -j HOST_192.168.0.101_ADMIN    -m comment --comment "Always apply Admin chain"
+iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_HOST_LEGACY             -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
+iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_HOST_CES                -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
 iptables -t filter -A HOST_192.168.0.101 -j DROP                                                                     -m comment --comment "Should not be here"
 
 # Define admin host rules
 iptables -t filter -F HOST_192.168.0.101_ADMIN
-#iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -j DROP
-#iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -g FILTER_HOST_POLICY_ACCEPT
-iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -g FILTER_HOST_POLICY_ACCEPT
-iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_EGRESS -p udp --dport 53 -j DROP
+iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_HOST_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -g FILTER_HOST_POLICY_ACCEPT
+iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_HOST_EGRESS -p udp --dport 53 -j DROP
 
 
 # Define legacy host firewall policies
 iptables -t filter -F HOST_192.168.0.101_LEGACY
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_INGRESS -p tcp --dport 22    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_INGRESS                      -j DROP                      -m comment --comment "Ingress: DROP"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_EGRESS  -p tcp --dport 12345 -j DROP                      -m comment --comment "Egress: DROP"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_EGRESS                       -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -j DROP                                           -m comment --comment "Should not be here"
+iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_INGRESS -p tcp --dport 22    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
+iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_INGRESS                      -j DROP                      -m comment --comment "Ingress: DROP"
+iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_EGRESS  -p tcp --dport 12345 -j DROP                      -m comment --comment "Egress: DROP"
+iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_EGRESS                       -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
+iptables -t filter -A HOST_192.168.0.101_LEGACY -j DROP                                                                             -m comment --comment "Should not be here"
 
 # Define CES connections policies
-iptables -t filter -A HOST_192.168.0.101_CES -m mark --mark $MASK_EGRESS  -d 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -m mark --mark $MASK_INGRESS -s 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -m mark --mark $MASK_EGRESS  -d 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -m mark --mark $MASK_INGRESS -s 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -j DROP                                                                   -m comment --comment "Should not be here"
+iptables -t filter -F HOST_192.168.0.101_CES
+iptables -t filter -A HOST_192.168.0.101_CES -d 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
+iptables -t filter -A HOST_192.168.0.101_CES -s 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
+iptables -t filter -A HOST_192.168.0.101_CES -d 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
+iptables -t filter -A HOST_192.168.0.101_CES -s 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
+iptables -t filter -A HOST_192.168.0.101_CES -j doREJECT                                  -m comment --comment "Block unknown proxy traffic"
 
 # Define CES service host firewall policies
 ### Example of SSH-only service chain established via CETP connection
 iptables -t filter -F HOST_192.168.0.101_CES_SSH
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_INGRESS -p tcp --dport 22 -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_EGRESS                    -j DROP                      -m comment --comment "Egress: Default DROP"
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -j DROP                                                                     -m comment --comment "Should not be here"
+iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_HOST_INGRESS -p tcp --dport 22 -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
+iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_HOST_EGRESS                    -j DROP                      -m comment --comment "Egress: Default DROP"
+iptables -t filter -A HOST_192.168.0.101_CES_SSH -j DROP                                                                          -m comment --comment "Should not be here"
 
 ### Example of outgoing-only service chain established via CETP connection
 iptables -t filter -F HOST_192.168.0.101_CES_xyz
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_INGRESS                   -j DROP                      -m comment --comment "Ingress: Default DROP"
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_EGRESS                    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -j DROP                                                                     -m comment --comment "Should not be here"
+iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_HOST_INGRESS                   -j DROP                      -m comment --comment "Ingress: Default DROP"
+iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_HOST_EGRESS                    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
+iptables -t filter -A HOST_192.168.0.101_CES_xyz -j DROP                                                                          -m comment --comment "Should not be here"
 
 
 
@@ -366,16 +394,16 @@ iptables -t filter -A FILTER_LOCAL_POLICY                                     -j
 
 # Set policy for DHCP traffic
 ## Add rate limitations ?
-iptables -t filter -A CES_DHCP -m mark --mark $INPUT_LAN  -p udp --sport 68 --dport 67 -j ACCEPT -m comment --comment "Accept DHCP"
-iptables -t filter -A CES_DHCP -m mark --mark $MASK_INPUT -p udp            --dport 67 -j DROP   -m comment --comment "Drop"
+iptables -t filter -A CES_DHCP -m mark --mark $MASK_LAN_INGRESS   -p udp --sport 68 --dport 67 -j ACCEPT -m comment --comment "Accept DHCP"
+iptables -t filter -A CES_DHCP -m mark --mark $MASK_LOCAL_INGRESS -p udp            --dport 67 -j DROP   -m comment --comment "Drop"
 # Set policy for HTTP(S) traffic
 ## Add rate limitations ?
-iptables -t filter -A CES_HTTP -m mark --mark $INPUT_WAN  -p tcp --syn -m multiport --dports 80,443 -m conntrack --ctstate NEW -j ACCEPT -m comment --comment "Accept HTTP(S) @WAN"
-iptables -t filter -A CES_HTTP -m mark --mark $MASK_INPUT -p tcp       -m multiport --dports 80,443                            -j DROP   -m comment --comment "Drop"
+iptables -t filter -A CES_HTTP -m mark --mark $MASK_WAN_INGRESS   -p tcp --syn -m multiport --dports 80,443 -m conntrack --ctstate NEW -j ACCEPT -m comment --comment "Accept HTTP(S) @WAN"
+iptables -t filter -A CES_HTTP -m mark --mark $MASK_LOCAL_INGRESS -p tcp       -m multiport --dports 80,443                            -j DROP   -m comment --comment "Drop"
 # Set policy for DNS traffic
-iptables -t filter -A CES_DNS -m mark --mark $INPUT_WAN -p udp --dport 53 -j CES_DNS_WAN -m comment --comment "Continue in DNS WAN chain"
-iptables -t filter -A CES_DNS -m mark --mark $INPUT_LAN -p udp --dport 53 -j CES_DNS_LAN -m comment --comment "Continue in DNS LAN chain"
-iptables -t filter -A CES_DNS -m mark --mark $INPUT_TUN -p udp --dport 53 -j CES_DNS_TUN -m comment --comment "Continue in DNS TUN chain"
+iptables -t filter -A CES_DNS -m mark --mark $MASK_WAN_INGRESS -p udp --dport 53 -j CES_DNS_WAN -m comment --comment "Continue in DNS WAN chain"
+iptables -t filter -A CES_DNS -m mark --mark $MASK_LAN_INGRESS -p udp --dport 53 -j CES_DNS_LAN -m comment --comment "Continue in DNS LAN chain"
+iptables -t filter -A CES_DNS -m mark --mark $MASK_TUN_INGRESS -p udp --dport 53 -j CES_DNS_TUN -m comment --comment "Continue in DNS TUN chain"
 
 
 # Specific chains for CES_DNS_WAN
@@ -446,3 +474,4 @@ iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT                                  
 
 # Populate custom chain CES_DNS_TUN of FILTER table
 iptables -t filter -A CES_DNS_TUN                                                                       -j DROP                     -m comment --comment "Drop DNS @TUN"
+
