@@ -1,6 +1,4 @@
 #!/bin/bash
-#Cleanup virtual networking scenario for 2 CES nodes
-OLDIFS=$IFS
 
 if [[ $UID != 0 ]]; then
     echo "Please run this script with sudo:"
@@ -8,97 +6,112 @@ if [[ $UID != 0 ]]; then
     exit 1
 fi
 
-#Name of the OVS bridges
-OVS_BR1="br-cesa"
-OVS_BR2="br-cesb"
+###############################################################################
+# Remove supporting infrastructure for CES-A & CES-B
+###############################################################################
 
-#Name of the OVS interfaces
-OVS_BR1_LAN="cesa-lan"
-OVS_BR1_WAN="cesa-wan"
-OVS_BR1_VTEP="cesa-vtep"
+# [CES-A]
+## LAN side
+ip link set dev qbi-lana     down
+ip link set dev qve-phy-lana down
+ip link set dev qvi-phy-lana down
+ip link del qve-phy-lana
+brctl delbr qbi-lana
 
-OVS_BR2_LAN="cesb-lan"
-OVS_BR2_WAN="cesb-wan"
-OVS_BR2_VTEP="cesb-vtep"
+## WAN side
+ip link set dev qbi-wan      down
+ip link set dev qve-phy-wana down
+ip link set dev qvi-phy-wana down
+ip link del qve-phy-wana
+brctl delbr qbi-wan
 
-OVS_BR1_PROXYNETWORK="172.16.0.0/24"
-OVS_BR2_PROXYNETWORK="172.16.1.0/24"
+## TUN side
+ip link set dev qve-phy-tuna down
+ip link set dev qvi-phy-tuna down
+ip link del qve-phy-tuna
+ovs-vsctl --if-exists del-br qbi-tuna
 
-#Create Linux bridges for attaching veth interfaces
-BR_LANA="br-lana"
-BR_LANB="br-lanb"
-BR_WAN="br-wan"
+# [CES-B]
+## LAN side
+ip link set dev qbi-lanb     down
+ip link set dev qve-phy-lanb down
+ip link set dev qvi-phy-lanb down
+ip link del qve-phy-lanb
+brctl delbr qbi-lanb
 
-#Define veth patch for connecting OVS bridges with Linux bridges
-##LAN
-PATCH0_BR1_LAN="int-cesa-lan"
-PATCH1_BR1_LAN="int-lan-cesa"
-PATCH0_BR2_LAN="int-cesb-lan"
-PATCH1_BR2_LAN="int-lan-cesb"
-##WAN
-PATCH0_BR1_WAN="int-cesa-wan"
-PATCH1_BR1_WAN="int-wan-cesa"
-PATCH0_BR2_WAN="int-cesb-wan"
-PATCH1_BR2_WAN="int-wan-cesb"
+## WAN side
+ip link set dev qbi-wan      down
+ip link set dev qve-phy-wanb down
+ip link set dev qvi-phy-wanb down
+ip link del qve-phy-wanb
+brctl delbr qbi-wan
 
-
-#Definition of network namespaces
-NS_LAN_A="nslana"
-NS_LAN_B="nslanb"
-NS_WAN="nswan"
-#Definition of MTU in namespaces
-MTU_NS_LAN_A="1400"
-MTU_NS_LAN_B="1400"
-MTU_NS_WAN="1500"
-
-#Definition of veth patch for connecting namespaces with Linux bridges
-##LAN
-PATCH0_HOST1="int-lan-host1"
-PATCH1_HOST1="lan0"
-PATCH0_HOST2="int-lan-host2"
-PATCH1_HOST2="lan0"
-##WAN
-PATCH0_HOST3="int-wan-host3"
-PATCH1_HOST3="wan0"
+## TUN side
+ip link set dev qve-phy-tunb down
+ip link set dev qvi-phy-tunb down
+ip link del qve-phy-tunb
+ovs-vsctl --if-exists del-br qbi-tunb
 
 
-#Delete OVS bridges
-for i in $OVS_BR1 $OVS_BR2; do
-    ovs-vsctl --if-exists del-br $i
-done
+###############################################################################
+# Remove CES-A configuration
+###############################################################################
 
-#Define array for iterations
-array=( $PATCH0_BR1_LAN $PATCH0_BR1_WAN $PATCH0_BR2_LAN $PATCH0_BR2_WAN
-        $PATCH0_HOST1 $PATCH0_HOST2 $PATCH0_HOST3
-        )
+## LAN side
+ip link set dev qbf-lana    down
+ip link set dev qve-l3-lana down
+ip link set dev l3-lana     down
+ip link del qve-l3-lana
+brctl delbr qbf-lana
 
-echo ""
-echo "Deleting patch interfaces..."
+## WAN side
+ip link set dev qbf-wana     down
+ip link set dev qve-l3-wana  down
+ip link set dev l3-wana      down
+ip link del qve-l3-wana 
+brctl delbr qbf-wana
 
-for i in "${array[@]}"; do IFS=","; set $i
-    ### Deleve veth pairs
-    ip link del $1 > /dev/null 2> /dev/null
-done
-IFS=$OLDIFS
+## TUN side
+ip link set dev qbf-tuna     down
+ip link set dev qve-l3-tuna  down
+ip link set dev l3-tuna      down
+ip link del qve-l3-tuna
+brctl delbr qbf-tuna
 
-echo ""
-#read -rsp $'Press any key to continue...\n' -n1 key
-echo "Deleting the Linux bridges..."
+###############################################################################
+# Remove CES-B configuration
+###############################################################################
 
-for i in $BR_LANA $BR_LANB $BR_WAN; do
-    ##Remove Linux bridges
-    ip link set dev $i down > /dev/null 2> /dev/null
-    brctl delbr $i > /dev/null 2> /dev/null
-done
+## LAN side
+ip link set dev qbf-lanb     down
+ip link set dev qve-l3-lanb  down
+ip link set dev l3-lanb      down
+ip link del qve-l3-lanb
+brctl delbr qbf-lanb
 
-echo ""
-#read -rsp $'Press any key to continue...\n' -n1 key
-echo "Deleting network namespaces..."
+## WAN side
+ip link set dev qbf-wanb     down
+ip link set dev qve-l3-wanb  down
+ip link set dev l3-wanb      down
+ip link del qve-l3-wanb 
+brctl delbr qbf-wanb
 
-for i in $NS_LAN_A $NS_LAN_B $NS_WAN; do
-    ##Remove namespaces
+## TUN side
+ip link set dev qbf-tunb     down
+ip link set dev qve-l3-tunb  down
+ip link set dev l3-tunb      down
+ip link del qve-l3-tunb
+brctl delbr qbf-tunb
+
+
+###############################################################################
+# Remove network namespace configuration
+###############################################################################
+
+#Create the default namespace
+ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
+
+for i in nslana nslanb nswan; do
+    ##Remove and create new namespaces
     ip netns del $i > /dev/null 2> /dev/null
 done
-
-exit 1
-
