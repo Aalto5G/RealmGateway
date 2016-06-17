@@ -20,7 +20,7 @@ TUN_L3="l3-tuna"
 PREFIX_L3="l3-+"
 ## Networks
 LAN_NET="192.168.0.0/24"
-CPOOL_NET="198.18.0.21/32 198.18.0.22/32 198.18.0.23/32"
+CPOOL_NET="198.18.0.12/32 198.18.0.13/32 198.18.0.14/32"
 CPOOL_MAC="00:00:00:00:01:bb"
 PROXY_NET="172.16.0.0/24"
 SPOOF_LAN_NET="0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 224.0.0.0/3"
@@ -73,12 +73,14 @@ MASK_TUN_EGRESS="0xFF000040/0xFF0000F0"
 
 
 #################################### EBTABLES #################################
+# This is not done when creating the underlying architecture
+
 # Build ARP Responder with ebtables
-ebtables -t nat -F
-for ip in $CPOOL_NET
-do
-    ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac $CPOOL_MAC --arpreply-target ACCEPT
-done
+#ebtables -t nat -F
+#for ip in $CPOOL_NET
+#do
+#    ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac $CPOOL_MAC --arpreply-target ACCEPT
+#done
 
 
 #################################### IPTABLES #################################
@@ -296,7 +298,7 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m commen
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
 iptables -t nat -F POSTROUTING
-iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.11 -m comment --comment "SNAT to 198.18.0.11"
+iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.12-198.18.0.14 -m comment --comment "SNAT to 198.18.0.[12,13,14]"
 
 
 
