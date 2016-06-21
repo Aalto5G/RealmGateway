@@ -1,0 +1,17 @@
+$ORIGIN .
+$TTL 10	; 10 seconds
+rgw			IN SOA	ns.rgw. admin.rgw. (
+				2016062111 ; serial
+				10800      ; refresh (3 hours)
+				3600       ; retry (1 hour)
+				604800     ; expire (1 week)
+				3600       ; minimum (1 hour)
+				)
+			NS	ns.rgw.
+$ORIGIN rgw.
+$TTL 15	; 15 seconds
+devel			A	192.168.0.100
+			DHCID	( AAABOEfUCkYXCWuFvCOmvWmCJr9GMEt8dnBHUYiQ0fuA
+				ugQ= ) ; 48704 65 32
+$TTL 10	; 10 seconds
+ns			A	198.18.0.11
