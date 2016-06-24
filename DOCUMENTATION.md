@@ -330,3 +330,13 @@ http://people.netfilter.org/hawk/presentations/devconf2014/iptables-ddos-mitigat
 https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY
 
  
+
+# Filter new incoming DNS responses without previous ctstate
+iptables -A INPUT  -p udp --dport 53 -m u32 --u32 "28&0x0000F800=0x8000" -m conntrack --ctstate NEW -j DROP -m comment --comment "DNS Response"
+
+# Filter incoming DNS recursive queries from Internet
+iptables -A INPUT  -p udp --dport 53 -m u32 --u32 "28&0x0000FF00=0x0100" -j DROP -m comment --comment "DNS Recursive Query" 
+
+# Filter incoming DNS queries from Internet for other domains not in RGW
+sudo iptables -I OUTPUT -m string --algo bm --hex-string "|04|test|03|com|00|" -j DROP -m comment --comment "FQDN endswith test.com"
+
