@@ -447,8 +447,13 @@ iptables -t filter -A CES_DNS_WAN                                              -
 iptables -t filter -A CES_DNS_WAN                                              -j DROP                     -m comment --comment "Should not be here"
 
 ## Drop blacklisted IP addresses or matching domains
-iptables -t filter -A CES_DNS_WAN_BLACKLIST -m set --match-set $DNS_BLACKLIST_IPSET src                 -j DROP -m comment --comment "Drop blacklist DNS source"
-iptables -t filter -A CES_DNS_WAN_BLACKLIST -m string --algo bm ! --hex-string "|0B|mysoarecord|03|ces" -j DROP -m comment --comment "Drop not SOA record"
+iptables -t filter -A CES_DNS_WAN_BLACKLIST -m set --match-set $DNS_BLACKLIST_IPSET src                     -j DROP -m comment --comment "Drop blacklist DNS source"
+iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000F800=0x8000" -m conntrack --ctstate NEW  -j DROP -m comment --comment "DNS unexpected response"
+iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000FF00=0x0100"                             -j DROP -m comment --comment "DNS recursive query"
+
+## Drop blacklisted IP addresses or matching domains
+iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm ! --hex-string "|0B|mysoarecord|03|ces|00|" -j DROP -m comment --comment "Drop !SOA record"
+
 ## Accept whitelisted servers up to threshold else goto wellknown greylist chain
 iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto 10/sec --hashlimit-burst 10 --hashlimit-name wan_dns_wl   --hashlimit-mode srcip -j ACCEPT -m comment --comment "SLA Whitelist"
 iptables -t filter -A CES_DNS_WAN_WHITELIST                                                             -g CES_DNS_WAN_WKGREYLIST -m comment --comment "Continue as WK-Greylist"
@@ -468,7 +473,7 @@ iptables -t filter -A CES_DNS_LAN                                               
 iptables -t filter -A CES_DNS_LAN                                                                       -j CES_DNS_LAN_GLOBAL_LIMIT -m comment --comment "Apply global limitation"
 iptables -t filter -A CES_DNS_LAN                                                                       -j DROP                     -m comment --comment "Should not be here"
 ## Drop blacklisted IP addresses or matching domains
-iptables -t filter -A CES_DNS_LAN_BLACKLIST -m string --algo bm ! --hex-string "|07|youtube|03|com"     -j DROP -m comment --comment "Drop not SOA record"
+iptables -t filter -A CES_DNS_LAN_BLACKLIST -m string --algo bm ! --hex-string "|07|youtube|03|com|00|" -j DROP -m comment --comment "Drop not SOA record"
 ## Apply global limit to WK-Greylist and Greylist
 iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT  -m hashlimit --hashlimit-upto 25/sec --hashlimit-burst 25 --hashlimit-name lan_dns  -j ACCEPT -m comment --comment "Accept LAN traffic"
 iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT                                                                                      -j DROP   -m comment --comment "Drop excess"
