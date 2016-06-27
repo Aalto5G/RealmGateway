@@ -211,7 +211,7 @@ class _AddressPoolUnit(object):
 
     def allocate_random(self):
         try:
-            n = random.randint(0, len(self._available))
+            n = random.randint(0, len(self._available) - 1)
             addr = self._available.pop(n)
             self._allocated.append(addr)
             return addr
