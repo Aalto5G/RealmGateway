@@ -1,6 +1,7 @@
 import dns
 import dns.message
 import dns.zone
+import dns.rcode
 
 from dns.exception import DNSException
 from dns.rdataclass import *

@@ -1,14 +1,7 @@
-#!/usr/bin/python3.5
-
 import asyncio
 import logging
-import signal
-import socket
-import sys
-import time
-import traceback
 
-from dnsutils import *
+from customdns.dnsutils import *
 
 LOGLEVELDNS = logging.DEBUG
 
@@ -31,6 +24,10 @@ class DDNSServer(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self._transport = transport
 
+    def error_received(self, exc):
+        addr = transport.get_extra_info('sockname')
+        self._logger.warning('Error received @{0}:{1} {2}'.format(addr[0], addr[1], exc))
+        
     def datagram_received(self, data, addr):
         self._logger.debug('Received data from {0}:{1} ({2} bytes) "{3}"'.format(addr[0], addr[1], len(data), data))
         try:

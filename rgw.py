@@ -13,7 +13,13 @@ import sys
 import traceback
 import yaml
 
-import ddns
+from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
+from host import HostTable, HostEntry
+from connection import ConnectionTable
+
+import customdns
+from customdns.ddns import DDNSServer
+from customdns.dnsproxy import DNSProxy
 
 from utils import is_ipv4, is_ipv6, trace
 
@@ -71,7 +77,7 @@ class RealmGateway(object):
         self._init_pools()
 
         # Initialize DNS
-        #self._init_dns()
+        self._init_dns()
 
         # Initialize Data Repository
         #self._init_datarepository()
@@ -86,24 +92,30 @@ class RealmGateway(object):
 
     def _init_hosttable(self):
         # Create container of Hosts
-        self._hostcontainer = pool.PoolContainer()
+        self._hosttable = HostTable()
+    
+    def _init_connectiontable(self):
+        # Create container of Connections
+        self._hosttable = ConnectionTable()
 
     def _init_pools(self):
         # Create container of Address Pools
-        self._poolcontainer = pool.PoolContainer()
+        self._pooltable = PoolContainer()
 
         # Create specific Name Pools
         for k,v in self._config['NETWORK']['namepool'].items():
-            ap = pool.NamePool(k)
+            ap = NamePool(k)
             self._logger.warning('Created Name Pool - "{}"'.format(k))
-            self._poolcontainer.add(ap)
+            self._pooltable.add(ap)
 
         # Create specific Address Pools
         for k,v in self._config['NETWORK']['addresspool'].items():
             if k == 'circularpool':
-                ap = pool.AddressPoolShared(k)
+                ap = AddressPoolShared(k)
+            elif k == 'servicepool':
+                ap = AddressPoolShared(k)
             elif k == 'proxypool':
-                ap = pool.AddressPoolUser(k)
+                ap = AddressPoolUser(k)
             else:
                 self._logger.warning('AddressPool {} not supported'.format(k))
                 continue
@@ -112,7 +124,7 @@ class RealmGateway(object):
             for net in v:
                 self._logger.warning('Adding resources to pool "{}": {}'.format(k, net))
                 ap.add_to_pool(net)
-            self._poolcontainer.add(ap)
+            self._pooltable.add(ap)
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
@@ -122,38 +134,41 @@ class RealmGateway(object):
         for name in self._config['DNS']['soa']:
             self._logger.warning('Registering DNS SOA {}'.format(name))
             self.dns.dns_register_soa(name)
-        soas = self.dns.dns_get_soa()
+        soa_list = self.dns.dns_get_soa()
 
+        # Register DNS resolver
+        addr = self._config['DNS']['resolver']['ip'], self._config['DNS']['resolver']['port']
+        self.dns.dns_register_resolver(addr)
+        
         # Initiate specific DNS servers
 
         ## DDNS Server for DHCP Server
         addr = self._config['DNS']['ddns']['ip'], self._config['DNS']['ddns']['port']
         self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        factory = ddns.DDNSServer(cb_default = self.dns.ddns_process)
-        self.dns.register_object('DDNS_Server_Local', factory)
-        #factory = ddns.DDNSServer(cb_add = self.dns.ddns_register_user, cb_delete = self.dns.ddns_deregister_user)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
+        factory1 = DDNSServer(cb_default = self.dns.ddns_process)
+        self.dns.register_object('DDNS_Server_Local', factory1)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory1, local_addr=addr))
 
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
-        self._logger.warning('Creating DNS Proxy LAN {} @{}:{}'.format(addr[0],addr[1]))
-        factory = ddns.DNSProxy(soas, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
-        self.dns.register_object('DNS_Proxy_LAN', factory)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
+        self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
+        factory2 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
+        self.dns.register_object('DNS_Proxy_LAN', factory2)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory2, local_addr=addr))
         
         ## DNS Proxy for Local
         addr = self._config['DNS']['proxylocal']['ip'], self._config['DNS']['proxylocal']['port']
-        self._logger.warning('Creating DNS Proxy Local {} @{}:{}'.format(addr[0],addr[1]))
-        factory = ddns.DNSProxy(soas, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
-        self.dns.register_object('DNS_Proxy_Local', factory)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
+        self._logger.warning('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
+        factory3 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
+        self.dns.register_object('DNS_Proxy_Local', factory3)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory3, local_addr=addr))
         
         ## DNS Server for WAN
         addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
-        self._logger.warning('Creating DNS Server WAN {} @{}:{}'.format(addr[0],addr[1]))
-        factory = ddns.DNSServer(soas, cb_soa = self.dns.dns_process_rgw_wan_soa, cb_nosoa = self.dns.dns_process_rgw_wan_nosoa)
-        self.dns.register_object('DNS_Server_WAN', factory)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory, local_addr=addr))
+        self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
+        factory4 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_wan_soa, cb_nosoa = self.dns.dns_process_rgw_wan_nosoa)
+        self.dns.register_object('DNS_Server_WAN', factory4)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory4, local_addr=addr))
         
         
     def _init_datarepository(self):
@@ -183,10 +198,9 @@ class RealmGateway(object):
         self._logger.critical('Got signal %s: exit' % signame)
         try:
             #TODO: Close all sockets?
-            for k,v in self._dns['node'].items():
-                addr = self._dns['addr'][k]
-                self._logger.warning('Terminating DNS Server {} @{}:{}'.format(k, addr[0],addr[1]))
-                v.connection_lost(None)
+            for obj in self.dns.get_object(None):
+                self._logger.debug('Closing socket {}'.format(obj))
+                obj.connection_lost(None)
         except:
             trace()
         finally:
@@ -217,7 +231,7 @@ class RealmGateway(object):
 
         try:
             self._logger.warning('Policy matched! Create a connection')
-            ap = self._poolcontainer.get('proxypool')
+            ap = self._pooltable.get('proxypool')
             ipaddr = ap.allocate(src_host)
 
             d = {'src':'192.168.0.50','psrc':'172.16.0.0',
@@ -386,7 +400,7 @@ class RealmGateway(object):
         zone = self._dns['zone']
         mydns.add_node(zone, name, rdtype, ipaddr)
         # Initialize address pool for user
-        ap = self._poolcontainer.get('proxypool')
+        ap = self._pooltable.get('proxypool')
         ap.create_pool(ipaddr)
         # Download user data
         pass
@@ -399,7 +413,7 @@ class RealmGateway(object):
         # Delete all active connections
         pass
         # Destroy address pool for user
-        ap = self._poolcontainer.get('proxypool')
+        ap = self._pooltable.get('proxypool')
         ap.destroy_pool(ipaddr)
 
 

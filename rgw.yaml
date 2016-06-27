@@ -20,8 +20,8 @@ DNS:
         ip: 198.18.0.11
         port: 53
     resolver:
-        ip: 127.0.0.1
-        port: 65053
+        ip: 8.8.8.8
+        port: 53
     timeouts:
         naptr:
             - 0.010

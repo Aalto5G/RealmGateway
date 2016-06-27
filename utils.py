@@ -1,4 +1,6 @@
 import socket
+import sys
+import traceback
 
 def trace():
     print('Exception in user code:')
