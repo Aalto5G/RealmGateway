@@ -1,0 +1,56 @@
+# CES Configuration Parameters
+
+DEFAULT:
+    name: rgw
+
+DNS:
+    soa:
+        - rgw.
+        - 0.168.192.in-addr.arpa.
+    ddns:
+        ip: 127.0.0.2
+        port: 53
+    proxylan:
+        ip: 192.168.0.1
+        port: 53
+    proxylocal:
+        ip: 127.0.0.1
+        port: 53
+    server:
+        ip: 198.18.0.11
+        port: 53
+    resolver:
+        ip: 127.0.0.1
+        port: 65053
+    timeouts:
+        naptr:
+            - 0.010
+            - 0.100
+            - 0.200
+        a:
+            - 0.010
+            - 0.100
+            - 0.200
+        aaaa:
+            - 0.010
+            - 0.100
+            - 0.200
+        any:
+            - 0
+
+NETWORK:
+    namepool:
+        servicedomain:
+            - www
+            - sip
+    addresspool:
+        servicepool:
+            - 198.18.0.11/32
+        circularpool:
+            - 198.18.0.12/32
+            - 198.18.0.13/32
+            - 198.18.0.14/32
+
+DATAREPOSITORY:
+    userdata: hosts.yaml
+    policydata: policy.yaml
