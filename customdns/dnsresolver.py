@@ -55,18 +55,14 @@ class DNSResolver(asyncio.DatagramProtocol):
         self._set_timeout()
 
     def datagram_received(self, data, addr):
-        self._logger.debug(
-            'Received data from {0}:{1} ({2} bytes) "{3}"'.format(addr[0], addr[1], len(data), data))
+        self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
 
         if self._peername != addr:
-            self._logger.error(
-                'Unexpected source! {0}:{1} instead of {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
+            self._logger.error('Unexpected source! {0}:{1} != {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
         try:
             response = dns.message.from_wire(data)
         except Exception as e:
-            self._logger.error(
-                'Failed to create DNS message from wire: {0}:{1} ({2} bytes) "{3}"'.format(
-                    addr[0], addr[1], len(data), data))
+            self._logger.error('Failed to parse! {} {}"'.format(debug_data_addr(data, addr), e))
             return
 
         if not sanitize_response(self._query, response):
@@ -94,8 +90,7 @@ class DNSResolver(asyncio.DatagramProtocol):
 
     def error_received(self, exc):
         # The remote end has closed the connection - ICMP Port unreachable
-        self._logger.warning('Socket failed: {0}:{1} / {2}'.format(
-            self._peername[0], self._peername[1], exc))
+        self._logger.warning('Socket failed: {0}:{1} / {2}'.format(self._peername[0], self._peername[1], exc))
         # Cancel timer
         self._cancel_timeout()
         # Terminate connection

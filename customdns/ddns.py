@@ -29,7 +29,7 @@ class DDNSProxy(asyncio.DatagramProtocol):
     def error_received(self, exc):
         addr = transport.get_extra_info('sockname')
         self._logger.error('Error received @{}:{} {}'.format(addr[0], addr[1], exc))
-        
+
     def datagram_received(self, data, addr):
         self._logger.warning('Received data from {}"'.format(debug_data_addr(data, addr)))
         try:
@@ -41,7 +41,7 @@ class DDNSProxy(asyncio.DatagramProtocol):
             # Process message locally
             query = dns.message.from_wire(data)
         except Exception as e:
-            self._logger.error('Failed to parse! {}"'.format(debug_data_addr(data, addr)))
+            self._logger.error('Failed to parse! {} {}"'.format(debug_data_addr(data, addr), e))
             return
         try:
             self.process_message(query, addr)
@@ -52,7 +52,7 @@ class DDNSProxy(asyncio.DatagramProtocol):
     def process_message(self, query, addr):
         """ Process a DNS message received by the DNS Server """
         self._logger.debug('Process message {}"'.format(debug_msg(query)))
-        
+
         # Sanitize incoming query
         if not sanitize_query(query):
             self._send_error(query, addr, dns.rcode.FORMERR)
@@ -117,6 +117,6 @@ class DDNSProxy(asyncio.DatagramProtocol):
         response = dns.message.make_response(query, recursion_available=True)
         response.set_rcode(rcode)
         self._send_msg(response, addr)
-    
-    
-    
+
+
+
