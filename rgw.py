@@ -18,7 +18,7 @@ from host import HostTable, HostEntry
 from connection import ConnectionTable
 
 import customdns
-from customdns.ddns import DDNSServer
+from customdns.ddns import DDNSProxy
 from customdns.dnsproxy import DNSProxy
 
 from utils import is_ipv4, is_ipv6, trace
@@ -143,12 +143,14 @@ class RealmGateway(object):
         # Initiate specific DNS servers
 
         ## DDNS Server for DHCP Server
-        addr = self._config['DNS']['ddns']['ip'], self._config['DNS']['ddns']['port']
+        addr = self._config['DNS']['ddnsproxy']['ip'], self._config['DNS']['ddnsproxy']['port']
+        ddnsserver_addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
         self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        factory1 = DDNSServer(cb_default = self.dns.ddns_process)
+        factory1 = DDNSProxy(dns_addr = ddnsserver_addr, cb_default = self.dns.ddns_process)
         self.dns.register_object('DDNS_Server_Local', factory1)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory1, local_addr=addr))
-
+        '''
+        # This is only required for CES - RGW does not perform DNS QUERY MANGLING!
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
         self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
@@ -162,7 +164,7 @@ class RealmGateway(object):
         factory3 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
         self.dns.register_object('DNS_Proxy_Local', factory3)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory3, local_addr=addr))
-        
+        '''
         ## DNS Server for WAN
         addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
         self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))

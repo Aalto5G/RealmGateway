@@ -7,20 +7,23 @@ DNS:
     soa:
         - rgw.
         - 0.168.192.in-addr.arpa.
-    ddns:
+    ddnsproxy:
         ip: 127.0.0.2
         port: 53
-    proxylan:
-        ip: 192.168.0.1
-        port: 53
-    proxylocal:
+    ddnsserver:
         ip: 127.0.0.1
         port: 53
+#    proxylan:
+#        ip: 192.168.0.1
+#        port: 53000
+#    proxylocal:
+#        ip: 127.0.0.1
+#        port: 53000
     server:
         ip: 198.18.0.11
         port: 53
     resolver:
-        ip: 8.8.8.8
+        ip: 127.0.0.1
         port: 53
     timeouts:
         naptr:

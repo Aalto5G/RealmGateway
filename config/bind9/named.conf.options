@@ -14,7 +14,7 @@ acl acl_wan {
 acl acl_listen_ipv4 {
 	127.0.0.1;
 	192.168.0.1;
-	198.18.0.11;
+//	198.18.0.10;
 };
 
 options {
@@ -23,8 +23,9 @@ options {
 	allow-transfer { none; };
 	dnssec-validation auto;
 	listen-on-v6 { none; };
-	listen-on { acl_listen_ipv4; };
-//	max-ncache-ttl 0;
+	listen-on port 53 { acl_listen_ipv4; };
+//	listen-on port 53 { 127.0.0.2; };
+	minimal-responses yes;
 };
 
 
@@ -72,21 +73,23 @@ view "view_lan" {
 	};
 };
 
+//DISABLE VIEW FOR WAN - NORECURSE QUERIES CANNOT BE FORWARDED
 //Create view for public resolutions, e.g. Circular Pool
-view "view_wan" {
-	match-clients { acl_wan; };
-	recursion yes;
-	allow-recursion { acl_wan; };
-	zone "rgw" IN {
-		type forward;
-		forward only;
-		forwarders { 127.0.0.1 port 53054; };
-	};
-	// This guarantees SERVFAIL response
-	// We could potentially block incoming queries not matching SOA with iptables
-	zone "." IN {
-		type forward;
-		forward only;
-		forwarders { 127.0.0.255; };
-	};
-};
+//view "view_wan" {
+//	match-clients { acl_wan; };
+//	recursion yes;
+//	allow-recursion { acl_wan; };
+//	zone "rgw" IN {
+//		type forward;
+//		forward only;
+//		forwarders { 127.0.0.1 port 53054; };
+//	};
+//	// This guarantees SERVFAIL response
+//	// We could potentially block incoming queries not matching SOA with iptables
+//	zone "." IN {
+//		type forward;
+//		forward only;
+//		forwarders { 127.0.0.255; };
+//	};
+//};
+//

@@ -60,8 +60,8 @@ class DNSCallbacks(object):
 
     def ddns_register_user(self, name, rdtype, ipaddr):
         # TO BE COMPLETED
+        self._logger.warning('Register new user "{}" @{}'.format(name, ipaddr))
         '''
-        self._logger.warning('Register new user {} @{}'.format(name, ipaddr))
         # Add node to the DNS Zone
         zone = self._dns['zone']
         mydns.add_node(zone, name, rdtype, ipaddr)
@@ -74,8 +74,8 @@ class DNSCallbacks(object):
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
         # TO BE COMPLETED
+        self._logger.warning('Deregister user "{}" @{}'.format(name, ipaddr))
         '''
-        self._logger.warning('Deregister user {} @{}'.format(name, ipaddr))
         # Delete node from the DNS Zone
         zone = self._dns['zone']
         mydns.delete_node(zone, name)
@@ -91,31 +91,20 @@ class DNSCallbacks(object):
         """ Process DDNS query from DHCP server """
         self._logger.debug('process_update')
         try:
-            rr_a = None
             #Filter hostname and operation
             for rr in query.authority:
                 #Filter out non A record types
-                if rr.rdtype == dns.rdatatype.A:
-                    rr_a = rr
-                    break
-
-            if not rr_a:
-                # isc-dhcp-server uses additional TXT records -> don't process
-                self._logger.debug('Failed to find an A record')
-                return
-
-            name_str = rr_a.name.to_text()
-            if rr_a.ttl:
-                self.ddns_register_user(name_str, rr_a.rdtype, rr_a[0].address)
-            else:
-                self.ddns_deregister_user(name_str, rr_a.rdtype, rr_a[0].address)
+                if rr.rdtype == dns.rdatatype.A and rr.ttl != 0:
+                    self.ddns_register_user(rr.name.to_text(), rr.rdtype, rr[0].address)
+                elif rr.rdtype == dns.rdatatype.A and rr.ttl == 0:
+                    self.ddns_deregister_user(rr.name.to_text(), rr.rdtype, rr[0].address)
 
             # Send generic DDNS Response NOERROR
-            response = dnsutils.make_response_rcode(query, RetCodes.DNS_NOERROR)
+            response = dnsutils.make_response_rcode(query)
             self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
-            cback(query, response, addr)
+            cback(query, addr, response)
         except Exception as e:
-            self._logger.error('Failed to process UPDATE DNS message')
+            self._logger.error('Failed to process UPDATE DNS message {}'.format(e))
 
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
@@ -129,8 +118,7 @@ class DNSCallbacks(object):
         # Forward or continue to DNS resolver
         self._logger.warning('dns_process_rgw_lan_nosoa')
         q = query.question[0]
-        key = (query.id, q.name, q.rdtype)
-        self._logger.warning('Resolve query {0} {1}/{2} from {3}:{4}'.format(query.id, q.name.to_text(), dns.rdatatype.to_text(q.rdtype), addr[0], addr[1]))
+        key = (query.id, q.name, q.rdtype, addr)
 
         if key not in self.activequeries:
             # Create new resolution
@@ -139,13 +127,18 @@ class DNSCallbacks(object):
                     query.id, q.name.to_text(), dns.rdatatype.to_text(
                         q.rdtype), addr[0], addr[1]))
             # Create factory
-            resolver = DNSResolver(query, addr, cback, timeouts=[0])
-            self.activequeries[key] = (resolver, query)
+            cb_f = self._do_callback
+            resolver = DNSResolver(query, addr, cb_f, timeouts=None) #Passive resolution
+            self.activequeries[key] = (resolver, cback)
             raddr = self.dns_get_resolver()
             self.loop.create_task(self.loop.create_datagram_endpoint(lambda: resolver, remote_addr=raddr))
         else:
             # Continue ongoing resolution
-            (resolver, query) = self.activequeries[key]
+            self._logger.warning(
+                'Continue query resolution {0} {1}/{2} from {3}:{4}'.format(
+                    query.id, q.name.to_text(), dns.rdatatype.to_text(
+                        q.rdtype), addr[0], addr[1]))
+            (resolver, cback) = self.activequeries[key]
             resolver.process_query(query, addr)
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
@@ -183,3 +176,21 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name not in a SOA zone """
         fqdn = query.question[0].name.to_text()
         pass
+
+    def _do_callback(self, query, addr, response=None):
+        try:
+            q = query.question[0]
+            key = (query.id, q.name, q.rdtype, addr)
+            (resolver, cback) = self.activequeries.pop(key)
+        except KeyError:
+            self._logger.warning(
+                'Query has already been processed {0} {1}/{2} from {3}:{4}'.format(
+                    query.id, q.name, dns.rdatatype.to_text(q.rdtype),
+                    addr[0], addr[1]))
+            return
+
+        if response is None:
+            self._logger.warning('??? This seems a good place to create negative caching ???')
+
+        # Callback to send response to host
+        cback(query, addr, response)
