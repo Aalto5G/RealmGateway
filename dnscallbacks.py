@@ -108,13 +108,14 @@ class DNSCallbacks(object):
 
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
-        self._logger.warning('dns_process_rgw_lan_soa')
-        fqdn = query.question[0].name.to_text()
-        # Resolve locally
+        # This function is not performed by BIND and its local zone
         pass
 
     def dns_process_rgw_lan_nosoa(self, query, addr, cback):
+        # This function is not performed by BIND and its forwarder configuration
+        pass
         """ Process DNS query from private network of a name not in a SOA zone """
+        '''
         # Forward or continue to DNS resolver
         self._logger.warning('dns_process_rgw_lan_nosoa')
         q = query.question[0]
@@ -140,6 +141,7 @@ class DNSCallbacks(object):
                         q.rdtype), addr[0], addr[1]))
             (resolver, cback) = self.activequeries[key]
             resolver.process_query(query, addr)
+        '''
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
