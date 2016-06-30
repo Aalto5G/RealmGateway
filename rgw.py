@@ -66,10 +66,10 @@ class RealmGateway(object):
 
         # Initialize Host table
         self._init_hosttable()
-        
+
         # Initialize Connection table
         self._init_connectiontable()
-        
+
         # Initialize Network
         self._init_network()
 
@@ -93,7 +93,7 @@ class RealmGateway(object):
     def _init_hosttable(self):
         # Create container of Hosts
         self._hosttable = HostTable()
-    
+
     def _init_connectiontable(self):
         # Create container of Connections
         self._hosttable = ConnectionTable()
@@ -129,7 +129,7 @@ class RealmGateway(object):
     def _init_dns(self):
         # Create object for storing all DNS-related information
         self.dns = dnscallbacks.DNSCallbacks(cachetable=None,hosttable=None,datarepository=None)
-        
+
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
             self._logger.warning('Registering DNS SOA {}'.format(name))
@@ -139,40 +139,41 @@ class RealmGateway(object):
         # Register DNS resolver
         addr = self._config['DNS']['resolver']['ip'], self._config['DNS']['resolver']['port']
         self.dns.dns_register_resolver(addr)
-        
+
         # Initiate specific DNS servers
 
         ## DDNS Server for DHCP Server
         addr = self._config['DNS']['ddnsproxy']['ip'], self._config['DNS']['ddnsproxy']['port']
         ddnsserver_addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
         self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        factory1 = DDNSProxy(dns_addr = ddnsserver_addr, cb_default = self.dns.ddns_process)
-        self.dns.register_object('DDNS_Server_Local', factory1)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory1, local_addr=addr))
+        obj_ddns = DDNSProxy(dns_addr = ddnsserver_addr, cb_default = self.dns.ddns_process)
+        self.dns.register_object('DDNS_Server_Local', obj_ddns)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
+
+        ## DNS Server for WAN
+        addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
+        self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
+        obj_serverwan = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_wan_soa, cb_nosoa = self.dns.dns_process_rgw_wan_nosoa)
+        self.dns.register_object('DNS_Server_WAN', obj_serverwan)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_serverwan, local_addr=addr))
+
         '''
         # This is only required for CES - RGW does not perform DNS QUERY MANGLING!
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
         self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
-        factory2 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
-        self.dns.register_object('DNS_Proxy_LAN', factory2)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory2, local_addr=addr))
-        
+        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
+        self.dns.register_object('DNS_Proxy_LAN', obj_proxylan)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylan, local_addr=addr))
+
         ## DNS Proxy for Local
         addr = self._config['DNS']['proxylocal']['ip'], self._config['DNS']['proxylocal']['port']
         self._logger.warning('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
-        factory3 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
-        self.dns.register_object('DNS_Proxy_Local', factory3)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory3, local_addr=addr))
+        obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_lan_soa, cb_nosoa = self.dns.dns_process_rgw_lan_nosoa)
+        self.dns.register_object('DNS_Proxy_Local', obj_proxylocal)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
         '''
-        ## DNS Server for WAN
-        addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
-        self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
-        factory4 = DNSProxy(soa_list = soa_list, cb_soa = self.dns.dns_process_rgw_wan_soa, cb_nosoa = self.dns.dns_process_rgw_wan_nosoa)
-        self.dns.register_object('DNS_Server_WAN', factory4)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: factory4, local_addr=addr))
-        
-        
+
     def _init_datarepository(self):
         self._logger.warning('Initializing data repository')
         self._udr = self._config['DATAREPOSITORY']
