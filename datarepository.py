@@ -5,6 +5,8 @@ import pprint
 
 LOGLEVELDATAREPOSITORY = logging.WARNING
 
+SUBSCRIBER_ID='SUBSCRIBER_ID'
+SUBSCRIBER_SERVICES='SUBSCRIBER_SERVICES'
 
 class DataRepository(object):
     def __init__(self, name='DataRepository', **kwargs):
@@ -23,7 +25,7 @@ class DataRepository(object):
 
     def _get_subscriber_data(self, subscriber_id):
         data_all = yaml.load(open(self.subscriberdata,'r'))
-        data = data_all['SUBSCRIBER_ID']
+        data = data_all[SUBSCRIBER_ID]
         if not subscriber_id:
             return data
         return data[subscriber_id]
@@ -31,13 +33,13 @@ class DataRepository(object):
     def _get_subscriber_services(self, service_id = None):
         subscriberdata_d = yaml.load(open(self.servicedata,'r'))
         if service_id:
-            return subscriberdata_d['SUBSCRIBER_SERVICES'][service_id]
+            return subscriberdata_d[SUBSCRIBER_SERVICES][service_id]
         else:
-            return subscriberdata_d['SUBSCRIBER_SERVICES']
+            return subscriberdata_d[SUBSCRIBER_SERVICES]
 
     def _get_subscriber_service(self, subscriber_id, service_id):
         data_all = yaml.load(open(self.servicedata,'r'))
-        data = data_all['SUBSCRIBER_SERVICES']
+        data = data_all[SUBSCRIBER_SERVICES]
         if not subscriber_id and not service_id:
             # Return all data
             return data
@@ -56,7 +58,7 @@ class DataRepository(object):
             return data[service_id][subscriber_id]
 
 if __name__ == "__main__":
-    file = 'hosts_rgw.yaml'
+    file = 'datarepository.yaml'
     repo = DataRepository(subscriberdata=file, servicedata=file, policydata=file)
     print('\nGet all subscriber_data')
     pprint.pprint(repo.get_subscriber_data(None))
