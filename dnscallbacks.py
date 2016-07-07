@@ -16,6 +16,8 @@ from dns.exception import DNSException
 from dns.rdataclass import *
 from dns.rdatatype import *
 
+from host import HostEntry
+
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
@@ -61,16 +63,11 @@ class DNSCallbacks(object):
     def ddns_register_user(self, name, rdtype, ipaddr):
         # TO BE COMPLETED
         self._logger.warning('Register new user "{}" @{}'.format(name, ipaddr))
-        '''
-        # Add node to the DNS Zone
-        zone = self._dns['zone']
-        mydns.add_node(zone, name, rdtype, ipaddr)
-        # Initialize address pool for user
-        ap = self._poolcontainer.get('proxypool')
-        ap.create_pool(ipaddr)
         # Download user data
-        '''
-        pass
+        user_services = self.datarepository.get_subscriber_service(name, None)
+        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services}
+        host = HostEntry(name=name, **user_data)
+        self.hosttable.add(host)
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
         # TO BE COMPLETED

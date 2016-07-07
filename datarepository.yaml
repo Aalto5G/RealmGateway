@@ -1,7 +1,7 @@
 SUBSCRIBER_ID:
     foo100.rgw.: {fqdn: 'foo100.rgw.', ipv4: '192.168.0.100', msisdn: '0000000101' }
     foo101.rgw.: {fqdn: 'foo101.rgw.', ipv4: '192.168.0.101', msisdn: '0000000102' }
-    foo102.rgw.: {fqdn: 'foo102.rgw.', ipv4: '192.168.0.102', msisdn: '0000000103' }
+#    foo102.rgw.: {fqdn: 'foo102.rgw.', ipv4: '192.168.0.102', msisdn: '0000000103' }
 
 SUBSCRIBER_SERVICES:
     SFQDN:

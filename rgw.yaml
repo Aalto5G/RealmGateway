@@ -24,7 +24,7 @@ DNS:
         port: 53
     resolver:
         ip: 127.0.0.1
-        port: 53
+        port: 5354
     timeouts:
         naptr:
             - 0.010
@@ -55,5 +55,6 @@ NETWORK:
             - 198.18.0.14/32
 
 DATAREPOSITORY:
-    userdata: hosts.yaml
-    policydata: policy.yaml
+    subscriberdata: datarepository.yaml
+    servicedata: datarepository.yaml
+    policydata: datarepository.yaml

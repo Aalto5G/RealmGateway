@@ -12,7 +12,9 @@ import signal
 import sys
 import traceback
 import yaml
+import pprint
 
+from datarepository import DataRepository
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
 from host import HostTable, HostEntry
 from connection import ConnectionTable
@@ -63,6 +65,9 @@ class RealmGateway(object):
 
         # Read configuration
         self._config = self._load_configuration('rgw.yaml')
+        
+        # Initialize Data Repository
+        self._init_datarepository()
 
         # Initialize Host table
         self._init_hosttable()
@@ -78,9 +83,10 @@ class RealmGateway(object):
 
         # Initialize DNS
         self._init_dns()
-
-        # Initialize Data Repository
-        #self._init_datarepository()
+        
+        # Initialize configured subscriber data
+        self._init_subscriberdata()
+        
 
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -89,7 +95,16 @@ class RealmGateway(object):
     def _load_configuration(self, filename):
         config = yaml.load(open(filename,'r'))
         return config
-
+    
+    def _init_datarepository(self):
+        # Initialize Data Repository
+        self._logger.warning('Initializing data repository')
+        subscriberdata = self._config['DATAREPOSITORY']['subscriberdata']
+        servicedata = self._config['DATAREPOSITORY']['servicedata']
+        policydata = self._config['DATAREPOSITORY']['policydata']
+        self._datarepository = DataRepository(subscriberdata=subscriberdata,servicedata=servicedata,policydata=policydata)
+        pprint.pprint(self._datarepository.get_subscriber_data(None))
+        
     def _init_hosttable(self):
         # Create container of Hosts
         self._hosttable = HostTable()
@@ -128,7 +143,7 @@ class RealmGateway(object):
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
-        self.dns = dnscallbacks.DNSCallbacks(cachetable=None,hosttable=None,datarepository=None)
+        self.dns = dnscallbacks.DNSCallbacks(cachetable=None, hosttable=self._hosttable, datarepository=self._datarepository)
 
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
@@ -174,19 +189,12 @@ class RealmGateway(object):
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
         '''
 
-    def _init_datarepository(self):
-        self._logger.warning('Initializing data repository')
-        self._udr = self._config['DATAREPOSITORY']
-        self._init_userdata(self._udr['userdata'])
-
-    def _init_userdata(self, filename):
-        self._logger.warning('Initializing user data')
-
-        data = self._load_configuration(filename)
-        for k, v in data['HOSTS'].items():
-            self._logger.warning('Registering host {}'.format(k))
-            ipaddr = data['HOSTS'][k]['ipv4']
-            self.register_user(k, 1, ipaddr)
+    def _init_subscriberdata(self):
+        self._logger.warning('Initializing subscriber data')
+        for fqdn, data in self._datarepository.get_subscriber_data(None).items():
+            ipaddr = data['ipv4']
+            self._logger.warning('Registering subscriber {} @{}'.format(fqdn, ipaddr))
+            self.dns.ddns_register_user(fqdn, 1, ipaddr)
 
     def _init_network(self):
         kwargs = self._config['NETWORK']
