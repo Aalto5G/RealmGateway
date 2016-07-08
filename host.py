@@ -1,6 +1,7 @@
 import container3
 import logging
 import utils
+import pprint
 
 LOGLEVELHOSTTABLE = logging.WARNING
 LOGLEVELHOSTENTRY = logging.WARNING
@@ -71,8 +72,16 @@ class HostEntry(container3.ContainerNode):
             protocol = data.setdefault('protocol', None)
             return (port, protocol)
 
+    def show(self):
+        # Pretty(ier) print of the host information
+        print('##### Host #####')
+        print('> FQDN: {}'.format(self.fqdn))
+        print('> IPv4: {}'.format(self.ipv4))
+        print('> Services: {}'.format(self.services))
+        print('################')
+
     def __repr__(self):
-        return '{} {}'.format(self.ipv4, self.fqdn)
+        return '{} @ {}'.format(self.fqdn, self.ipv4)
 
 if __name__ == "__main__":
     table = HostTable()
@@ -100,3 +109,4 @@ if __name__ == "__main__":
     print(table)
     print(h3.get_service_fqdn_mapping('host102.rgw.'))
     print(h3.get_service_fqdn_mapping('telnet.host102.rgw.'))
+    h3.show()
