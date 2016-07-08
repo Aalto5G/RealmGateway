@@ -18,6 +18,7 @@ from dns.rdatatype import *
 
 from host import HostEntry
 
+from connection import ConnectionEntryRGW
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
@@ -61,28 +62,17 @@ class DNSCallbacks(object):
         return self.resolver_list[n]
 
     def ddns_register_user(self, name, rdtype, ipaddr):
-        # TO BE COMPLETED
-        self._logger.warning('Register new user "{}" @{}'.format(name, ipaddr))
+        self._logger.warning('Register new user {} @ {}'.format(name, ipaddr))
         # Download user data
         user_services = self.datarepository.get_subscriber_service(name, None)
-        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services}
+        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services[name]}
         host = HostEntry(name=name, **user_data)
         self.hosttable.add(host)
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
-        # TO BE COMPLETED
-        self._logger.warning('Deregister user "{}" @{}'.format(name, ipaddr))
-        '''
-        # Delete node from the DNS Zone
-        zone = self._dns['zone']
-        mydns.delete_node(zone, name)
-        # Delete all active connections
-        pass
-        # Destroy address pool for user
-        ap = self._poolcontainer.get('proxypool')
-        ap.destroy_pool(ipaddr)
-        '''
-        pass
+        self._logger.warning('Deregister user {} @ {}'.format(name, ipaddr))
+        host = self.hosttable.lookup(name)
+        self.hosttable.remove(host)
 
     def ddns_process(self, query, addr, cback):
         """ Process DDNS query from DHCP server """
@@ -154,8 +144,31 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name in a SOA zone """
         self._logger.warning('dns_process_rgw_wan_soa')
         fqdn = query.question[0].name.to_text()
+        rdtype = query.question[0].rdtype
+        print('Received query for {}'.format(fqdn))
+        host = self.hosttable.lookup(fqdn)
+        if host is None:
+            # Host not found! Answer NXDOMAIN
+            response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
+
         # Resolve locally
-        pass
+        elif rdtype == 1:
+            # Resolve A type - Circular Pool
+            (port, protocol) = host.get_service_fqdn_mapping(fqdn)
+            #d1 = {'public_ipv4':'1.2.3.4','dns_ipv4':'8.8.8.8','host_ipv4':'192.168.0.100','host_fqdn':'host100.rgw','timeout':2.0}
+            conn = ConnectionEntryRGW(public_ipv4='1.2.3.4', public_port=port, public_protocol=protocol,
+                                      dns_ipv4=addr[0], host_fqdn=fqdn, host_ipv4=host.ipv4, timeout=2.0)
+            print('Creating new connection')
+            print(conn)
+            #self.hosttable.add(conn)
+            response = dnsutils.make_response_answer_rr(query, fqdn, 1, '1.2.3.4', rdclass=1, ttl=0)
+        else:
+            # Answer with empty records for other types
+            response = dnsutils.make_response_rcode(query)
+
+        self._logger.debug('Sent DNS response to {}:{}'.format(addr[0],addr[1]))
+        cback(query, addr, response)
+
 
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
