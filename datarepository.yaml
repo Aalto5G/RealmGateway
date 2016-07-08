@@ -6,13 +6,13 @@ SUBSCRIBER_ID:
 SUBSCRIBER_SERVICES:
     SFQDN:
         foo100.rgw.:
-            - {fqdn: 'iperf.foo100.rgw.', port: 5001, proto: 6 }
-            - {fqdn: 'ssh.foo100.rgw.', port: 22, proto: 6 }
-            - {fqdn: 'www.foo100.rgw.', port: 80, proto: 6 }
+            - {fqdn: 'iperf.foo100.rgw.', port: 5001, protocol: 6 }
+            - {fqdn: 'ssh.foo100.rgw.', port: 22, protocol: 6 }
+            - {fqdn: 'www.foo100.rgw.', port: 80, protocol: 6 }
         foo101.rgw.:
-            - {fqdn: 'iperf.foo101.rgw.', port: 5001, proto: 6 }
-            - {fqdn: 'ssh.foo101.rgw.', port: 22, proto: 6 }
-            - {fqdn: 'www.foo101.rgw.', port: 80, proto: 6 }
+            - {fqdn: 'iperf.foo101.rgw.', port: 5001, protocol: 6 }
+            - {fqdn: 'ssh.foo101.rgw.', port: 22, protocol: 6 }
+            - {fqdn: 'www.foo101.rgw.', port: 80, protocol: 6 }
     FIREWALL:
         foo100.rgw.:
             - {'priority': 1, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}

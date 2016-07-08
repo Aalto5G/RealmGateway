@@ -62,21 +62,30 @@ class HostEntry(container3.ContainerNode):
         if service_id in self.services:
             return self.services[service_id]
 
+    def get_service_fqdn_mapping(self, fqdn):
+        # Return mapping for an FQDN of the user (port, protocol)
+        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
+            if data['fqdn'] != fqdn:
+                continue
+            port = data.setdefault('port', None)
+            protocol = data.setdefault('protocol', None)
+            return (port, protocol)
+
     def __repr__(self):
         return '{} {}'.format(self.ipv4, self.fqdn)
 
 if __name__ == "__main__":
     table = HostTable()
-    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw'}
+    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw.'}
     h1 = HostEntry(name='host100', **d1)
-    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw'}
+    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw.'}
     h2 = HostEntry(name='host101', **d2)
     table.add(h1)
     table.add(h2)
-    h1.add_service(KEY_SFQDN, {'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'proto': 6 })
-    h1.add_service(KEY_SFQDN, {'fqdn': 'ssh.foo100.rgw.', 'port': 22, 'proto': 6 })
+    h1.add_service(KEY_SFQDN, {'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6 })
+    h1.add_service(KEY_SFQDN, {'fqdn': 'ssh.foo100.rgw.', 'port': 22, 'protocol': 6 })
     table.updatekeys(h1)
-    d3 = {'ipv4':'192.168.0.102','fqdn':'host102.rgw', 'services':{'SFQDN':[{'fqdn': 'telnet.host102.rgw.', 'port': 23, 'proto': 6 }]}}
+    d3 = {'ipv4':'192.168.0.102','fqdn':'host102.rgw.', 'services':{'SFQDN':[{'fqdn': 'telnet.host102.rgw.', 'port': 23, 'protocol': 6 }]}}
     h3 = HostEntry(name='host102', **d3)
     table.add(h3)
     print('h1.services')
@@ -89,3 +98,5 @@ if __name__ == "__main__":
     print(h3.lookupkeys())
     print('table')
     print(table)
+    print(h3.get_service_fqdn_mapping('host102.rgw.'))
+    print(h3.get_service_fqdn_mapping('telnet.host102.rgw.'))
