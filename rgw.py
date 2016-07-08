@@ -4,7 +4,6 @@ import asyncio
 import pool
 import configparser
 import dns
-import dnscallbacks
 import network
 import mydns
 import logging
@@ -18,6 +17,7 @@ from datarepository import DataRepository
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
 from host import HostTable, HostEntry
 from connection import ConnectionTable
+from callbacks import DNSCallbacks
 
 import customdns
 from customdns.ddns import DDNSProxy
@@ -103,7 +103,6 @@ class RealmGateway(object):
         servicedata = self._config['DATAREPOSITORY']['servicedata']
         policydata = self._config['DATAREPOSITORY']['policydata']
         self._datarepository = DataRepository(subscriberdata=subscriberdata,servicedata=servicedata,policydata=policydata)
-        pprint.pprint(self._datarepository.get_subscriber_data(None))
         
     def _init_hosttable(self):
         # Create container of Hosts
@@ -143,7 +142,7 @@ class RealmGateway(object):
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
-        self.dns = dnscallbacks.DNSCallbacks(cachetable=None, hosttable=self._hosttable, datarepository=self._datarepository)
+        self.dns = DNSCallbacks(cachetable=None, hosttable=self._hosttable, datarepository=self._datarepository)
 
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
