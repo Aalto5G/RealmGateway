@@ -18,9 +18,20 @@ class DataRepository(object):
         utils.set_attributes(self, **kwargs)
 
     def get_subscriber_data(self, subscriber_id):
+        ''' Return a dictionary where
+        key = FQDN of the subscriber
+        value = Dictionary with the subscriber data
+        {'foo100.rgw.': {'fqdn': 'foo100.rgw.', 'ipv4': '192.168.0.100', 'msisdn': '0000000101'}}
+        '''
         return self._get_subscriber_data(subscriber_id)
 
     def get_subscriber_service(self, subscriber_id, service_id):
+        ''' Return a dictionary where
+        keys = FQDN of the subscribers
+        value = Dictionary with the subscriber data and registered services
+        {'foo100.rgw.': {'CIRCULARPOOL': [{'max': 3}],
+                         'FIREWALL': [{'action': 'ACCEPT', ...}]}}
+        '''
         return self._get_subscriber_service(subscriber_id, service_id)
 
     def _get_subscriber_data(self, subscriber_id):
@@ -30,32 +41,37 @@ class DataRepository(object):
             return data
         return data[subscriber_id]
 
-    def _get_subscriber_services(self, service_id = None):
-        subscriberdata_d = yaml.load(open(self.servicedata,'r'))
-        if service_id:
-            return subscriberdata_d[SUBSCRIBER_SERVICES][service_id]
-        else:
-            return subscriberdata_d[SUBSCRIBER_SERVICES]
-
     def _get_subscriber_service(self, subscriber_id, service_id):
         data_all = yaml.load(open(self.servicedata,'r'))
         data = data_all[SUBSCRIBER_SERVICES]
-        if not subscriber_id and not service_id:
-            # Return all data
-            return data
-        elif not subscriber_id and service_id:
-            # Return service_id for all subscribers
-            return data[service_id]
-        elif not service_id and subscriber_id:
-            # Return all services for subscriber_id
-            userdata = {}
-            for k,v in data.items():
-                # Copy key/value to dictionary
-                userdata[k] = v[subscriber_id]
-            return userdata
-        elif service_id and subscriber_id:
-            # Return service_id for subscriber_id
-            return data[service_id][subscriber_id]
+        userdata = {}
+        
+        if subscriber_id is not None:
+            # Get data for subscriber_id
+            userdata[subscriber_id] = {}
+            if service_id is not None:
+                # Return specific service_id for subscriber_id
+                userdata[subscriber_id][service_id] = data[service_id][subscriber_id]
+            else:
+                # Iterate all services for subscriber_id                  
+                for k,v in data.items():
+                    if subscriber_id not in v:
+                        continue
+                    userdata[subscriber_id][k] = v[subscriber_id]
+        elif subscriber_id is None:
+            # Not supported - return empty dictionary
+            if service_id is not None:
+                # Get data for specific service_id
+                for k,v in data[service_id].items():
+                    userdata[k] = {service_id: v}
+            else:
+                # Get data for all services
+                for k,v in data.items():
+                    for _k,_v in v.items():
+                        userdata.setdefault(_k, {})
+                        userdata[_k][k] = _v
+        return userdata
+        
 
 if __name__ == "__main__":
     file = 'datarepository.yaml'
@@ -72,3 +88,5 @@ if __name__ == "__main__":
     pprint.pprint(repo.get_subscriber_service('foo100.rgw.','FIREWALL'))
     print('\nGet subscriber_service(foo100.rgw., None)')
     pprint.pprint(repo.get_subscriber_service('foo100.rgw.',None))
+    print('\nGet subscriber_service(None, CIRCULARPOOL)')
+    pprint.pprint(repo.get_subscriber_service(None,'CIRCULARPOOL'))
