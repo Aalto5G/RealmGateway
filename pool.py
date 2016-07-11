@@ -47,7 +47,7 @@ class NamePool(container3.ContainerNode):
 
     def lookupkeys(self):
         """ Return the lookup keys of the node """
-        return ((self._key, False),)
+        return ((self._key, True),)
 
 class AddressPoolShared(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='AddressPoolShared'):
@@ -60,7 +60,7 @@ class AddressPoolShared(container3.ContainerNode):
 
     def lookupkeys(self):
         """ Return the lookup keys of the node """
-        return ((self._key, False),)
+        return ((self._key, True),)
 
     def add_to_pool(self, addrmask):
         return self._pool.add_to_pool(addrmask)
@@ -108,7 +108,7 @@ class AddressPoolUser(container3.ContainerNode):
 
     def lookupkeys(self):
         """ Return the lookup keys of the node """
-        return ((self._key, False),)
+        return ((self._key, True),)
 
     def add_to_pool(self, addrmask):
         self._addrpool.append(addrmask)

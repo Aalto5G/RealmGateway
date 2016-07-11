@@ -87,6 +87,15 @@ class RealmGateway(object):
         # Initialize configured subscriber data
         self._init_subscriberdata()
         
+        # Do debugging
+        '''
+        print('\nHostTable')
+        print(self._hosttable)
+        print('\nPoolTable')
+        print(self._pooltable)
+        print('\nConnectionTable')
+        print(self._connectiontable)
+        '''
 
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -110,7 +119,7 @@ class RealmGateway(object):
 
     def _init_connectiontable(self):
         # Create container of Connections
-        self._hosttable = ConnectionTable()
+        self._connectiontable = ConnectionTable()
 
     def _init_pools(self):
         # Create container of Address Pools
@@ -142,7 +151,7 @@ class RealmGateway(object):
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
-        self.dns = DNSCallbacks(cachetable=None, hosttable=self._hosttable, datarepository=self._datarepository)
+        self.dns = DNSCallbacks(cachetable=None, hosttable=self._hosttable, datarepository=self._datarepository, pooltable=self._pooltable, connectiontable=self._connectiontable)
 
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
