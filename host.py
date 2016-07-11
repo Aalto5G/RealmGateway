@@ -26,10 +26,10 @@ class HostEntry(container3.ContainerNode):
         utils.set_default_attributes(self, attrlist, None)
         utils.set_attributes(self, **kwargs)
         # Register basic host service
-        self.add_service(KEY_FQDN, {'fqdn': self.fqdn})
+        self.add_service(KEY_FQDN, {'fqdn': self.fqdn, 'port': None, 'protocol': None})
         '''
         Example of SFQDN service definition
-        'SFQDN': [{'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'proto': 6}]
+        'SFQDN': [{'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6}]
         '''
 
     def lookupkeys(self):
@@ -37,12 +37,10 @@ class HostEntry(container3.ContainerNode):
         # Create list of keys
         keys = []
         # Add ipv4 key entry
-        keys.append((self.ipv4, False))
+        host_key = (self.ipv4, True)
         # Add SFQDN key(s)
-        for data in self.services[KEY_FQDN]:
-            keys.append((data['fqdn'], False))
-        for data in self.services[KEY_SFQDN]:
-            keys.append((data['fqdn'], False))
+        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
+            keys.append((data['fqdn'], True))
         # Register FQDN/SFQDN index keys
         #keys.append((KEY_FQDN, True))
         #keys.append((KEY_SFQDN, True))
@@ -65,12 +63,19 @@ class HostEntry(container3.ContainerNode):
 
     def get_service_fqdn_mapping(self, fqdn):
         # Return mapping for an FQDN of the user (port, protocol)
+        # Value is returned as a tuple
         for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
             if data['fqdn'] != fqdn:
                 continue
-            port = data.setdefault('port', None)
-            protocol = data.setdefault('protocol', None)
-            return (port, protocol)
+            return (data['port'], data['protocol'])
+
+    def get_service_data_mapping(self, fqdn):
+        # Return given data mapping for an FQDN of the user
+        # Value is returned as a dictionary
+        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
+            if data['fqdn'] != fqdn:
+                continue
+            return data
 
     def show(self):
         # Pretty(ier) print of the host information
@@ -109,4 +114,5 @@ if __name__ == "__main__":
     print(table)
     print(h3.get_service_fqdn_mapping('host102.rgw.'))
     print(h3.get_service_fqdn_mapping('telnet.host102.rgw.'))
+    print(h3.get_service_data_mapping('telnet.host102.rgw.'))
     h3.show()
