@@ -3,6 +3,8 @@ import logging
 import utils
 import time
 
+#TODO: Check if all keys of ConnectionEntryRGW are needed
+
 LOGLEVELCONNECTIONTABLE = logging.WARNING
 LOGLEVELCONNECTIONENTRY = logging.WARNING
 
@@ -64,6 +66,9 @@ class ConnectionEntryRGW(container3.ContainerNode):
         utils.set_default_attributes(self, attrlist, None)
         utils.set_attributes(self, **kwargs)
         self.timestamp_zero = time.time()
+        ## Override timeout ##
+        #self.timeout = 600.0
+        ######################
         self.timestamp_eol = self.timestamp_zero + self.timeout
         self._build_lookupkeys()
 
@@ -90,9 +95,9 @@ class ConnectionEntryRGW(container3.ContainerNode):
         return time.time() > self.timestamp_eol
 
     def __repr__(self):
-        return '{}:{} -> {}:{} {} ({}/{})'.format(self.public_ipv4, self.public_port, self.host_ipv4,
-                                                  self.public_port, self.public_protocol,
-                                                  self.dns_server_ipv4, self.dns_client_ipv4)
+        return '{}:{} [{}]<- {}:{} [{}] ({}/{})'.format(self.host_ipv4, self.public_port, self.public_protocol,
+                                                        self.public_ipv4, self.public_port, self.public_protocol,
+                                                        self.dns_server_ipv4, self.dns_client_ipv4)
 
 if __name__ == "__main__":
     table = ConnectionTable()
