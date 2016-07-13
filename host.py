@@ -6,45 +6,58 @@ import pprint
 LOGLEVELHOSTTABLE = logging.WARNING
 LOGLEVELHOSTENTRY = logging.WARNING
 
-KEY_FQDN = 'FQDN'
-KEY_SFQDN = 'SFQDN'
-KEY_CIRCULARPOOL = 'CIRCULARPOOL'
-KEY_FIREWALL = 'FIREWALL'
+KEY_HOST = 0
+KEY_HOST_FQDN = 1
+KEY_HOST_IPV4 = 2
+KEY_HOST_SERVICE = 3
+KEY_SERVICE_SFQDN = 'SFQDN'
+KEY_SERVICE_CIRCULARPOOL = 'CIRCULARPOOL'
+KEY_SERVICE_FIREWALL = 'FIREWALL'
 
 class HostTable(container3.Container):
     def __init__(self, name='HostTable'):
         """ Initialize as a Container """
         super().__init__(name, LOGLEVELHOSTTABLE)
 
+    def show(self):
+        for node in self._list:
+            node.show()
+
 class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVELHOSTENTRY)
         # Initialize service dictionary
-        self.services = {KEY_FQDN: [], KEY_SFQDN: []}
+        self.services = {KEY_SERVICE_SFQDN: []}
         attrlist = ['ipv4','fqdn']
         utils.set_default_attributes(self, attrlist, None)
         utils.set_attributes(self, **kwargs)
-        # Register basic host service
-        self.add_service(KEY_FQDN, {'fqdn': self.fqdn, 'port': None, 'protocol': None})
-        '''
-        Example of SFQDN service definition
-        'SFQDN': [{'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6}]
-        '''
+        # Normalize SFQDN service definition
+        self._normalize_service_sfqdn()
 
     def lookupkeys(self):
         """ Return the lookup keys """
         # Create list of keys
         keys = []
+        # Add fqdn key entry
+        keys.append(((KEY_HOST_FQDN, self.fqdn), True))
         # Add ipv4 key entry
-        host_key = (self.ipv4, True)
+        keys.append(((KEY_HOST_IPV4, self.ipv4), True))
         # Add SFQDN key(s)
-        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
-            keys.append((data['fqdn'], True))
+        for data in self.services[KEY_SERVICE_SFQDN]:
+            keys.append(((KEY_HOST_SERVICE, data['fqdn']), True))
         # Register FQDN/SFQDN index keys
         #keys.append((KEY_FQDN, True))
         #keys.append((KEY_SFQDN, True))
         return keys
+
+    def get_service_sfqdn(self, fqdn):
+        # Return mapping for an SFQDN of the user
+        # Value is returned as a dictionary
+        for data in self.services[KEY_SERVICE_SFQDN]:
+            if data['fqdn'] != fqdn:
+                continue
+            return data
 
     def add_service(self, service_id, service_data):
         if service_id not in self.services:
@@ -52,6 +65,8 @@ class HostEntry(container3.ContainerNode):
             self.services[service_id] = []
         if service_data not in self.services[service_id]:
             self.services[service_id].append(service_data)
+        # Normalize SFQDN service definition
+        self._normalize_service_sfqdn()
 
     def remove_service(self, service_id, service_data):
         if service_id in self.services and service_data in self.services[service_id]:
@@ -61,21 +76,11 @@ class HostEntry(container3.ContainerNode):
         if service_id in self.services:
             return self.services[service_id]
 
-    def get_service_fqdn_mapping(self, fqdn):
-        # Return mapping for an FQDN of the user (port, protocol)
-        # Value is returned as a tuple
-        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
-            if data['fqdn'] != fqdn:
-                continue
-            return (data['port'], data['protocol'])
-
-    def get_service_data_mapping(self, fqdn):
-        # Return given data mapping for an FQDN of the user
-        # Value is returned as a dictionary
-        for data in self.services[KEY_FQDN] + self.services[KEY_SFQDN]:
-            if data['fqdn'] != fqdn:
-                continue
-            return data
+    def _normalize_service_sfqdn(self):
+        for data in self.services[KEY_SERVICE_SFQDN]:
+            port = data.setdefault('port', 0)
+            protocol = data.setdefault('protocol', 0)
+            data.setdefault('proxy_required', False)
 
     def show(self):
         # Pretty(ier) print of the host information
@@ -83,6 +88,7 @@ class HostEntry(container3.ContainerNode):
         print('> FQDN: {}'.format(self.fqdn))
         print('> IPv4: {}'.format(self.ipv4))
         print('> Services: {}'.format(self.services))
+        print('> Lookupkeys: {}'.format(self.lookupkeys()))
         print('################')
 
     def __repr__(self):
@@ -96,23 +102,26 @@ if __name__ == "__main__":
     h2 = HostEntry(name='host101', **d2)
     table.add(h1)
     table.add(h2)
-    h1.add_service(KEY_SFQDN, {'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6 })
-    h1.add_service(KEY_SFQDN, {'fqdn': 'ssh.foo100.rgw.', 'port': 22, 'protocol': 6 })
+    h1.add_service(KEY_SERVICE_SFQDN, {'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6 })
+    h1.add_service(KEY_SERVICE_SFQDN, {'fqdn': 'ssh.foo100.rgw.',   'port': 22,   'protocol': 6 })
     table.updatekeys(h1)
-    d3 = {'ipv4':'192.168.0.102','fqdn':'host102.rgw.', 'services':{'SFQDN':[{'fqdn': 'telnet.host102.rgw.', 'port': 23, 'protocol': 6 }]}}
-    h3 = HostEntry(name='host102', **d3)
-    table.add(h3)
+
     print('h1.services')
     print(h1.services)
     print('h1.lookupkeys')
     print(h1.lookupkeys())
+
+    d3 = {'ipv4':'192.168.0.102','fqdn':'host102.rgw.', 'services':{'SFQDN':[{'fqdn': 'host102.rgw.'},{'fqdn': 'telnet.host102.rgw.', 'port': 23, 'protocol': 6 }]}}
+    h3 = HostEntry(name='host102', **d3)
+    table.add(h3)
+
     print('h3.services')
     print(h3.services)
     print('h3.lookupkeys')
     print(h3.lookupkeys())
+
+    print(h3.get_service_sfqdn('host102.rgw.'))
+    print(h3.get_service_sfqdn('telnet.host102.rgw.'))
+
     print('table')
-    print(table)
-    print(h3.get_service_fqdn_mapping('host102.rgw.'))
-    print(h3.get_service_fqdn_mapping('telnet.host102.rgw.'))
-    print(h3.get_service_data_mapping('telnet.host102.rgw.'))
-    h3.show()
+    table.show()

@@ -6,13 +6,20 @@ SUBSCRIBER_ID:
 SUBSCRIBER_SERVICES:
     SFQDN:
         foo100.rgw.:
-            - {fqdn: 'iperf.foo100.rgw.', port: 5001, protocol: 6 }
-            - {fqdn: 'ssh.foo100.rgw.', port: 22, protocol: 6 }
-            - {fqdn: 'www.foo100.rgw.', port: 80, protocol: 6 }
+            - {fqdn: 'foo100.rgw.',                                   proxy_required: false}
+            - {fqdn: 'iperf.foo100.rgw.', protocol: 6,    port: 5001, proxy_required: false}
+            - {fqdn: 'ssh.foo100.rgw.'  , protocol: 6,    port: 22  , proxy_required: false}
+            - {fqdn: 'tcp.foo100.rgw.'  , protocol: 6,    port: 0   , proxy_required: false}
+            - {fqdn: 'udp.foo100.rgw.'  , protocol: 17,   port: 0   , proxy_required: false}
+            - {fqdn: 'p22.foo100.rgw.'  , protocol: 0,    port: 22  , proxy_required: false}
+            - {fqdn: 'www.foo100.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
+            - {fqdn: 'sip.foo100.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
         foo101.rgw.:
-            - {fqdn: 'iperf.foo101.rgw.', port: 5001, protocol: 6 }
-            - {fqdn: 'ssh.foo101.rgw.', port: 22, protocol: 6 }
-            - {fqdn: 'www.foo101.rgw.', port: 80, protocol: 6 }
+            - {fqdn: 'foo101.rgw.',                                   proxy_required: false}
+            - {fqdn: 'iperf.foo101.rgw.', protocol: 6,    port: 5001, proxy_required: false}
+            - {fqdn: 'ssh.foo101.rgw.'  , protocol: 6,    port: 22  , proxy_required: false}
+            - {fqdn: 'www.foo101.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
+            - {fqdn: 'sip.foo101.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
     FIREWALL:
         foo100.rgw.:
             - {'priority': 1, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}

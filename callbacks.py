@@ -16,6 +16,7 @@ from dns.exception import DNSException
 from dns.rdataclass import *
 from dns.rdatatype import *
 
+import host
 from host import HostEntry
 
 import connection
@@ -69,13 +70,13 @@ class DNSCallbacks(object):
         # Download user data
         user_services = self.datarepository.get_subscriber_service(name, None)
         user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services[name]}
-        host = HostEntry(name=name, **user_data)
-        self.hosttable.add(host)
+        host_obj = HostEntry(name=name, **user_data)
+        self.hosttable.add(host_obj)
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
         self._logger.warning('Deregister user {} @ {}'.format(name, ipaddr))
-        host = self.hosttable.lookup(name)
-        self.hosttable.remove(host)
+        host_obj = self.hosttable.lookup((host.KEY_HOST_FQDN, name))
+        self.hosttable.remove(host_obj)
 
     def ddns_process(self, query, addr, cback):
         """ Process DDNS query from DHCP server """
@@ -148,57 +149,60 @@ class DNSCallbacks(object):
         self._logger.warning('dns_process_rgw_wan_soa')
         fqdn = query.question[0].name.to_text()
         rdtype = query.question[0].rdtype
-        if not self.hosttable.has(fqdn):
+        if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
             response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
-
-        # Resolve locally
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
         elif rdtype == 1:
-            # Resolve A type - Circular Pool
-            response = self._dns_process_rgw_wan_soa_a(query, addr, cback)
-
+            # Resolve A type via Circular Pool
+            self._dns_process_rgw_wan_soa_a(query, addr, cback)
         else:
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
-
-        self._logger.debug('Sent DNS response to {}:{}'.format(addr[0],addr[1]))
-        cback(query, addr, response)
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
+        
 
     def _dns_process_rgw_wan_soa_a(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
         # TODO: Check allocation policy is not exceeded for neither CES and HOST
-
         self._logger.warning('_dns_process_rgw_wan_soa_a')
 
         # Get host object
         fqdn = query.question[0].name.to_text()
-        host = self.hosttable.lookup(fqdn)
+        host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         # Check for expired connections
         self.connectiontable.update_all_rgw()
         # Get host usage stats of the pool
-        host_conns = self.connectiontable.lookup((connection.KEY_RGW, host.ipv4), check_expire=False)
+        host_conns = self.connectiontable.lookup((connection.KEY_RGW, host_obj.ipv4), check_expire=False)
         #print('host_conns {}'.format(host_conns))
         # Get global usage stats of the pool
         pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
         #print('pool_size, pool_allocated, pool_available {}'.format((pool_size, pool_allocated, pool_available)))
         # Get data service from FQDN
-        fqdn_mapping = host.get_service_data_mapping(fqdn)
-        #print('Find best match for {}'.format(fqdn_mapping))
-
-        if (fqdn_mapping['port'], fqdn_mapping['protocol']) == (None, None):
-            allocated_ipv4 = self._create_connectionentryrgw_fqdn(query, addr, cback)
+        service_data = host_obj.get_service_sfqdn(fqdn)
+        
+        if service_data['proxy_required']:
+            self._logger.warning('Use servicepool address pool for {}'.format(fqdn))
+            ap_spool = self.pooltable.get('servicepool')
+            allocated_ipv4 = ap_spool.allocate()
+            ap_spool.release(allocated_ipv4)
         else:
-            allocated_ipv4 = self._create_connectionentryrgw_sfqdn(query, addr, cback)
+            self._logger.warning('Use circularpool address pool for {}'.format(fqdn))
+            allocated_ipv4 = self._create_connectionentryrgw(query, addr, cback)
 
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query
+            self._logger.warning('Failed to allocate an address - Drop DNS Query')
             return
 
         # Create DNS Response
         response = dnsutils.make_response_answer_rr(query, fqdn, 1, allocated_ipv4, rdclass=1, ttl=0)
-        return response
+        self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+        cback(query, addr, response)
 
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
@@ -215,89 +219,69 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name not in a SOA zone """
         fqdn = query.question[0].name.to_text()
         pass
-
-    def _create_connectionentryrgw_fqdn(self, query, addr, cback):
-        ''' Return the allocated IPv4 address '''
-        # Get host object
-        fqdn = query.question[0].name.to_text()
-        host = self.hosttable.lookup(fqdn)
-        # Get data service from FQDN
-        fqdn_mapping = host.get_service_data_mapping(fqdn)
-        # Get Circular Pool address pool
-        ap_cpool = self.pooltable.get('circularpool')
-        # Allocate IPv4 address from the pool
-        allocated_ipv4 = ap_cpool.allocate()
-        if allocated_ipv4 is None:
-            return None
-        # Create RealmGateway connection
-        conn = ConnectionEntryRGW(public_ipv4=allocated_ipv4, public_port=fqdn_mapping['port'], public_protocol=fqdn_mapping['protocol'],
-                                  dns_server_ipv4=addr[0], host_fqdn=fqdn, host_ipv4=host.ipv4, timeout=2.0)
-        # Create partial function for delete callback
-        conn.delete = partial(self._delete_connectionentryrgw_fqdn, conn)
-        # Add connection to table
-        self.connectiontable.add(conn)
-        return allocated_ipv4
-
-    def _create_connectionentryrgw_sfqdn(self, query, addr, cback):
-        ''' Return the allocated IPv4 address '''
-        # Get host object
-        fqdn = query.question[0].name.to_text()
-        host = self.hosttable.lookup(fqdn)
+    
+    def _create_connectionentryrgw(self, query, addr, cback):
+        """ Return the allocated IPv4 address """
         allocated_ipv4 = None
+        # Get host object
+        fqdn = query.question[0].name.to_text()
+        host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
         # Get data service from FQDN
-        fqdn_mapping = host.get_service_data_mapping(fqdn)
+        service_data = host_obj.get_service_sfqdn(fqdn)
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
-        # Get SFQDN RGW connections
-        sfqdn_key = (connection.KEY_RGW, connection.KEY_RGW_SFQDN)
-        if self.connectiontable.has(sfqdn_key):
-            sfqdn_conns = self.connectiontable.get(sfqdn_key)
-            ## Build a set with uniquely allocated public_ipv4 address
-            public_ipv4_set = set()
-            for conn in sfqdn_conns:
-                public_ipv4_set.add(conn.public_ipv4)
-            ## Iterate public_ipv4 set of addresses
-            for ipv4 in public_ipv4_set:
-                test_key = (connection.KEY_RGW, ipv4, fqdn_mapping['port'], fqdn_mapping['protocol'])
-                if not self.connectiontable.has(test_key):
-                    self._logger.debug('Address reuse available for {} {}'.format(fqdn, ipv4))
-                    allocated_ipv4 = ipv4
+        # Iterate all RealmGateway connections and try to reuse existing allocated IP addresses
+        for ipv4 in ap_cpool.get_allocated():
+            addrinuse = False
+            conns = self.connectiontable.get((connection.KEY_RGW, ipv4))
+            for conn in conns:
+                c_port, c_proto = conn.public_port, conn.public_protocol
+                d_port, d_proto = service_data['port'], service_data['protocol']
+                self._logger.warning('Evaluating {} vs {} @{}'.format((c_port, c_proto),(d_port, d_proto), ipv4))
+                # The following statements match when IP overloading cannot be performed
+                if c_port == 0 and c_proto == 0:
+                    self._logger.debug('0. Port & Procotol blocked')
+                    addrinuse = True
                     break
+                elif (c_port == d_port) and (c_proto == d_proto or c_proto == 0 or d_proto == 0):
+                    self._logger.debug('1. Port blocked')
+                    addrinuse = True
+                    break
+                elif (c_proto == d_proto) and (c_port == 0 or d_port == 0):
+                    self._logger.debug('2. Port blocked')
+                    addrinuse = True
+                    break
+
+            if not addrinuse:
+                allocated_ipv4 = ipv4
+                self._logger.warning('Overloading {} for {}!!'.format(ipv4, fqdn))
+                break
+        
         if allocated_ipv4 is None:
-            self._logger.warning('Address reuse not available for {}. Allocating new address from CircularPool'.format(fqdn))
+            self._logger.warning('Impossible to overload existing connections for {}. Allocate new address from CircularPool'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
         if allocated_ipv4 is None:
             return None
-
         # Create RealmGateway connection
-        conn = ConnectionEntryRGW(public_ipv4=allocated_ipv4, public_port=fqdn_mapping['port'], public_protocol=fqdn_mapping['protocol'],
-                                  dns_server_ipv4=addr[0], host_fqdn=fqdn, host_ipv4=host.ipv4, timeout=2.0)
+        new_conn = ConnectionEntryRGW(public_ipv4=allocated_ipv4, public_port=service_data['port'], public_protocol=service_data['protocol'],
+                                  dns_server_ipv4=addr[0], host_fqdn=fqdn, host_ipv4=host_obj.ipv4, timeout=2.0)
         # Monkey patch delete function
-        conn.delete = partial(self._delete_connectionentryrgw_sfqdn, conn)
+        #new_conn.delete = partial(self._delete_connectionentryrgw_sfqdn, new_conn)
+        new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
         # Add connection to table
-        self.connectiontable.add(conn)
+        self.connectiontable.add(new_conn)
         return allocated_ipv4
 
-    def _delete_connectionentryrgw_fqdn(self, conn):
-        print('_expired_connectionentryrgw_fqdn')
-        print(conn)
+    def _delete_connectionentryrgw(self, conn):
+        print('_delete_connectionentryrgw\n', conn)
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
-        ap_cpool.release(conn.public_ipv4)
-        self._logger.info('Released FQDN RGW address {}'.format(conn.public_ipv4))
-
-    def _delete_connectionentryrgw_sfqdn(self, conn):
-        print('_expired_connectionentryrgw_sfqdn')
-        print(conn)
-        # Get Circular Pool address pool
-        ap_cpool = self.pooltable.get('circularpool')
-        # Get SFQDN RGW connections
-        sfqdn_key = (connection.KEY_RGW, conn.public_ipv4)
-        if self.connectiontable.has(sfqdn_key):
-            self._logger.debug('Still in use SFQDN RGW address {}'.format(conn.public_ipv4))
+        # Get RealmGateway connections
+        if self.connectiontable.has((connection.KEY_RGW, conn.public_ipv4)):
+            self._logger.warning('Cannot release IP address to Circular Pool: {} still in use'.format(conn.public_ipv4))
             return
         ap_cpool.release(conn.public_ipv4)
-        self._logger.info('Released SFQDN RGW address {}'.format(conn.public_ipv4))
+        self._logger.warning('Released  IP address to Circular Pool: {}'.format(conn.public_ipv4))
 
     def _do_callback(self, query, addr, response=None):
         try:
