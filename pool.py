@@ -33,11 +33,11 @@ class NamePool(container3.ContainerNode):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVELPOOL)
         self._key = key
-        self._pool = []
+        self._pool = set()
 
     def add_to_pool(self, name):
         self._logger.debug('Add name {} to pool'.format(name))
-        self._pool.append(addr)
+        self._pool.add(addr)
 
     def get_pool(self):
         return list(self._pool)
@@ -162,7 +162,67 @@ class AddressPoolUser(container3.ContainerNode):
     def release(self, userid, addr):
         return self._pool[userid].release(addr)
 
-class _AddressPoolUnit(object):
+class _AddressPoolUnit_set(object):
+    def __init__(self, name='_AddressPoolUnit'):
+        """ Initialize the _AddressPoolUnit """
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(LOGLEVELPOOL)
+        self._pool = set()
+        self._allocated = set()
+        self._available = set()
+
+    def add_to_pool(self, addrmask):
+        self._logger.debug('Add network {} to pool'.format(addrmask))
+        for addr in _calculate_address_pool(addrmask):
+            if addr in self._pool:
+                continue
+            self._pool.add(addr)
+            self._available.add(addr)
+
+    def get_pool(self):
+        return list(self._pool)
+
+    def get_allocated(self):
+        return list(self._allocated)
+
+    def get_available(self):
+        return list(self._available)
+
+    def get_stats(self):
+        """ Return a tuple of (Total/Allocated/Available) """
+        return (len(self._pool), len(self._allocated), len(self._available))
+
+    def in_pool(self, addr):
+        return (addr in self._pool)
+
+    def in_allocated(self, addr):
+        return (addr in self._allocated)
+
+    def in_available(self, addr):
+        return (addr in self._available)
+
+    def allocate(self):
+        try:
+            addr = self._available.pop()
+            self._allocated.add(addr)
+            return addr
+        except:
+            return None
+
+    def allocate_random(self):
+        try:
+            #n = random.randint(0, len(self._available) - 1)
+            addr = self._available.pop()
+            self._allocated.add(addr)
+            return addr
+        except:
+            return None
+
+    def release(self, addr):
+        self._allocated.remove(addr)
+        self._available.add(addr)
+
+class _AddressPoolUnit_list(object):
     def __init__(self, name='_AddressPoolUnit'):
         """ Initialize the _AddressPoolUnit """
         self._logger = logging.getLogger(name)
@@ -219,6 +279,9 @@ class _AddressPoolUnit(object):
             return None
 
     def release(self, addr):
-        i = self._allocated.index(addr)
-        self._allocated.pop(i)
+        self._allocated.remove(addr)
         self._available.append(addr)
+
+# Define AddressPoolUnit in use
+#_AddressPoolUnit = _AddressPoolUnit_list
+_AddressPoolUnit = _AddressPoolUnit_set
