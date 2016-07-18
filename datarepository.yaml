@@ -12,6 +12,7 @@ SUBSCRIBER_SERVICES:
             - {fqdn: 'tcp.foo100.rgw.'  , protocol: 6,    port: 0   , proxy_required: false}
             - {fqdn: 'udp.foo100.rgw.'  , protocol: 17,   port: 0   , proxy_required: false}
             - {fqdn: 'p22.foo100.rgw.'  , protocol: 0,    port: 22  , proxy_required: false}
+            - {fqdn: 'vnc.foo100.rgw.'  , protocol: 6,    port: 5900, proxy_required: false}
             - {fqdn: 'www.foo100.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
             - {fqdn: 'sip.foo100.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
         foo101.rgw.:
@@ -23,15 +24,15 @@ SUBSCRIBER_SERVICES:
     FIREWALL:
         foo100.rgw.:
             - {'priority': 1, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}
-            - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 12345, 'action': 'DROP', 'comment':'custom'}
-            - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 12345, 'action': 'DROP', 'comment':'custom'}
+            - {'priority': 10, 'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 5900, 'action': 'DROP', 'comment':'Drop ingress VNC over UDP'}
+            - {'priority': 10, 'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 5900, 'action': 'DROP', 'comment':'Drop ingress VNC over TCP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 22, 'action': 'ACCEPT', 'comment':'Allow SSH'}
             - {'priority': 255, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
-            - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'DROP', 'comment':'DROP any'}
+            - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
         foo101.rgw.:
             - {'priority': 1,  'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}
             - {'priority': 255, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
-            - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
+            - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'DROP', 'comment':'DROP any'}
     CIRCULARPOOL:
         .rgw.:
             - {max: 5 }

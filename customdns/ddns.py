@@ -31,7 +31,7 @@ class DDNSProxy(asyncio.DatagramProtocol):
         self._logger.error('Error received @{}:{} {}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):
-        self._logger.warning('Received data from {}"'.format(debug_data_addr(data, addr)))
+        self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
         try:
             # Drop responses from DNS server
             if addr == self._dns_addr:

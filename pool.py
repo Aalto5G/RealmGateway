@@ -283,5 +283,5 @@ class _AddressPoolUnit_list(object):
         self._available.append(addr)
 
 # Define AddressPoolUnit in use
-#_AddressPoolUnit = _AddressPoolUnit_list
-_AddressPoolUnit = _AddressPoolUnit_set
+_AddressPoolUnit = _AddressPoolUnit_list
+#_AddressPoolUnit = _AddressPoolUnit_set

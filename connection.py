@@ -4,6 +4,7 @@ import utils
 import time
 
 #TODO: Check if all keys of ConnectionEntryRGW are needed
+#TODO: Create a higher level of abstraction in ConnectionEntryRGW to account also for remote side IP/port
 
 LOGLEVELCONNECTIONTABLE = logging.WARNING
 LOGLEVELCONNECTIONENTRY = logging.WARNING
@@ -67,7 +68,7 @@ class ConnectionEntryRGW(container3.ContainerNode):
         utils.set_attributes(self, **kwargs)
         self.timestamp_zero = time.time()
         ## Override timeout ##
-        #self.timeout = 600.0
+        self.timeout = 600.0
         ######################
         self.timestamp_eol = self.timestamp_zero + self.timeout
         self._build_lookupkeys()
@@ -75,15 +76,25 @@ class ConnectionEntryRGW(container3.ContainerNode):
     def _build_lookupkeys(self):
         """ Build the lookup keys """
         # Create specific key if the connection is allocated to an SFQDN domain
+        '''
+        # There are unused keys
         rgw_key = (KEY_RGW, False)
         s_fqdn_key = ((KEY_RGW, KEY_RGW_FQDN), False)
         if (self.public_port, self.public_protocol) != (None, None):
             s_fqdn_key = ((KEY_RGW, KEY_RGW_SFQDN), False)
         host_key = ((KEY_RGW, self.host_ipv4), False)
         public_ipv4_key = ((KEY_RGW, self.public_ipv4), False)
-        conn_key = ((KEY_RGW, self.public_ipv4, self.public_port, self.public_protocol), True)
+        ntuple_key = ((KEY_RGW, self.public_ipv4, self.public_port, self.public_protocol), True)
         # Create tuple with all calculated keys
-        self._built_lookupkeys = (rgw_key, s_fqdn_key, host_key, public_ipv4_key, conn_key)
+        self._built_lookupkeys = (rgw_key, s_fqdn_key, host_key, public_ipv4_key, ntuple_key)
+        '''
+        # Build minimum set of lookupkeys
+        basic_key   = (KEY_RGW, False)
+        host_key   = ((KEY_RGW, self.host_ipv4), False)
+        public_key = ((KEY_RGW, self.public_ipv4), False)
+        n3tuple_key = ((KEY_RGW, self.public_ipv4, self.public_port, self.public_protocol), True)
+        # Create tuple with all calculated keys
+        self._built_lookupkeys = (basic_key, host_key, public_key, n3tuple_key)
 
     def lookupkeys(self):
         """ Return the lookup keys """
@@ -108,8 +119,6 @@ if __name__ == "__main__":
     c2 = ConnectionEntryRGW(**d2)
     table.add(c1)
     table.add(c2)
-    
-    
     
     print('Connection c1 has expired?')
     print(c1.hasexpired())

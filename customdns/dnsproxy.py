@@ -21,7 +21,7 @@ class DNSProxy(asyncio.DatagramProtocol):
         self._logger.warning('Error received @{0}:{1} {2}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):
-        self._logger.warning('Data received from {}"'.format(debug_data_addr(data, addr)))
+        self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
 
         try:
             query = dns.message.from_wire(data)
