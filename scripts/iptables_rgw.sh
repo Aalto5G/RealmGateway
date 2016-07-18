@@ -164,9 +164,7 @@ iptables -t nat -F PREROUTING
 iptables -t nat -A PREROUTING -i $WAN_L3 -m mark ! --mark 0x00 -j NAT_PRE_CPOOL -m comment --comment "[CircularPool] Send to DNAT chain"
 ## Do DNAT towards private host @L3-WAN - Add 1 rule per private host
 iptables -t nat -A NAT_PRE_CPOOL -j LOG --log-level 7 --log-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
-iptables -t nat -A NAT_PRE_CPOOL -m mark --mark 0xC0A80065 -j DNAT --to-destination 192.168.0.101
-iptables -t nat -A NAT_PRE_CPOOL -m mark --mark 0xC0A80066 -j DNAT --to-destination 192.168.0.102
-iptables -t nat -A NAT_PRE_CPOOL -m mark --mark 0xC0A80067 -j DNAT --to-destination 192.168.0.103
+
 
 ## Trace traffic for debugging
 #iptables -t nat -I PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "NAT.PRE "
@@ -228,8 +226,8 @@ iptables -t filter -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
 # Populate chains of FILTER table
 ## Add default values for loopback and IPSec
 iptables -t filter -A INPUT -i lo -j ACCEPT
-iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
-iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
+#iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
+#iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
 ## Apply basic filtering policy in CES
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --comment "Continue in FILTER_PREEMPTIVE chain"
 iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --comment "Continue in FILTER_PREEMPTIVE chain"
@@ -240,8 +238,9 @@ iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --c
 
 # There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_LOCAL_POLICY, not RETURNed here!
 ## Apply local-based policy for accepting traffic
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
+### NB: The problem is that WAN_INCOMING traffic leaks from FILTER_HOST_POLICY because it does not match with a private host per se
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "We should not be here"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "We should not be here"
 
 # Should we apply OUTPUT filtering for CES locally initiated connections?
 ## We are already MARKing packets in MANGLE.OUTPUT
@@ -298,74 +297,14 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m commen
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
 iptables -t nat -F POSTROUTING
-iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.12-198.18.0.14 -m comment --comment "SNAT to 198.18.0.[12,13,14]"
+iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.12-198.18.0.14 --persistent -m comment --comment "SNAT to 198.18.0.[12,13,14]"
 
-
-
-# --- Examples of HOST POLICY in FILTER TABLE ---  #
-# HOST_POLICY - Specific host policies (e.g. legacy / CES services)
-iptables -t filter -N HOST_192.168.0.101
-iptables -t filter -F HOST_192.168.0.101
-iptables -t filter -N HOST_192.168.0.101_ADMIN
-iptables -t filter -F HOST_192.168.0.101_ADMIN
-iptables -t filter -N HOST_192.168.0.101_LEGACY
-iptables -t filter -F HOST_192.168.0.101_LEGACY
-iptables -t filter -N HOST_192.168.0.101_CES
-iptables -t filter -F HOST_192.168.0.101_CES
-iptables -t filter -N HOST_192.168.0.101_CES_SSH
-iptables -t filter -F HOST_192.168.0.101_CES_SSH
-iptables -t filter -N HOST_192.168.0.101_CES_xyz
-iptables -t filter -F HOST_192.168.0.101_CES_xyz
 
 # Populate custom chain FILTER_HOST_POLICY of FILTER table - 2 entries per host / 1 entry per traffic direction
-iptables -t filter -F FILTER_HOST_POLICY
-iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_INGRESS -d 192.168.0.101 -g HOST_192.168.0.101
-iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_EGRESS  -s 192.168.0.101 -g HOST_192.168.0.101
-iptables -t filter -A FILTER_HOST_POLICY -j DROP
-
-
-# Define general host firewall policies
-## First apply strict policies for all traffic then Legacy or CES
-iptables -t filter -F HOST_192.168.0.101
-iptables -t filter -A HOST_192.168.0.101                                              -j HOST_192.168.0.101_ADMIN    -m comment --comment "Always apply Admin chain"
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_HOST_LEGACY             -j HOST_192.168.0.101_LEGACY   -m comment --comment "To Legacy chain"
-iptables -t filter -A HOST_192.168.0.101 -m mark --mark $MASK_HOST_CES                -j HOST_192.168.0.101_CES      -m comment --comment "To CES chain"
-iptables -t filter -A HOST_192.168.0.101 -j DROP                                                                     -m comment --comment "Should not be here"
-
-# Define admin host rules
-iptables -t filter -F HOST_192.168.0.101_ADMIN
-iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_HOST_EGRESS -p udp --dport 53 -m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip -g FILTER_HOST_POLICY_ACCEPT
-iptables -t filter -A HOST_192.168.0.101_ADMIN -m mark --mark $MASK_HOST_EGRESS -p udp --dport 53 -j DROP
-
-
-# Define legacy host firewall policies
-iptables -t filter -F HOST_192.168.0.101_LEGACY
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_INGRESS -p tcp --dport 22    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_INGRESS                      -j DROP                      -m comment --comment "Ingress: DROP"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_EGRESS  -p tcp --dport 12345 -j DROP                      -m comment --comment "Egress: DROP"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -m mark --mark $MASK_HOST_EGRESS                       -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_LEGACY -j DROP                                                                             -m comment --comment "Should not be here"
-
-# Define CES connections policies
-iptables -t filter -F HOST_192.168.0.101_CES
-iptables -t filter -A HOST_192.168.0.101_CES -d 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -s 172.16.0.1 -j HOST_192.168.0.101_CES_SSH  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -d 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -s 172.16.0.2 -j HOST_192.168.0.101_CES_xyz  -m comment --comment "To CES SSH service chain"
-iptables -t filter -A HOST_192.168.0.101_CES -j doREJECT                                  -m comment --comment "Block unknown proxy traffic"
-
-# Define CES service host firewall policies
-### Example of SSH-only service chain established via CETP connection
-iptables -t filter -F HOST_192.168.0.101_CES_SSH
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_HOST_INGRESS -p tcp --dport 22 -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Ingress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -m mark --mark $MASK_HOST_EGRESS                    -j DROP                      -m comment --comment "Egress: Default DROP"
-iptables -t filter -A HOST_192.168.0.101_CES_SSH -j DROP                                                                          -m comment --comment "Should not be here"
-
-### Example of outgoing-only service chain established via CETP connection
-iptables -t filter -F HOST_192.168.0.101_CES_xyz
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_HOST_INGRESS                   -j DROP                      -m comment --comment "Ingress: Default DROP"
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -m mark --mark $MASK_HOST_EGRESS                    -g FILTER_HOST_POLICY_ACCEPT -m comment --comment "Egress: ACCEPT"
-iptables -t filter -A HOST_192.168.0.101_CES_xyz -j DROP                                                                          -m comment --comment "Should not be here"
+#iptables -t filter -F FILTER_HOST_POLICY
+#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_INGRESS -d 192.168.0.101 -g HOST_192.168.0.101
+#iptables -t filter -A FILTER_HOST_POLICY -m mark --mark $MASK_HOST_EGRESS  -s 192.168.0.101 -g HOST_192.168.0.101
+#iptables -t filter -A FILTER_HOST_POLICY -j DROP
 
 
 
