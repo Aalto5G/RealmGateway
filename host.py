@@ -27,11 +27,11 @@ class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVELHOSTENTRY)
-        # Initialize service dictionary
-        self.services = {KEY_SERVICE_SFQDN: []}
         attrlist = ['ipv4','fqdn']
         utils.set_default_attributes(self, attrlist, None)
         utils.set_attributes(self, **kwargs)
+        # Sanitize key in dictionary for lookupkeys()
+        self.services.setdefault(KEY_SERVICE_SFQDN, [])
         # Normalize SFQDN service definition
         self._normalize_service_sfqdn()
 
@@ -72,9 +72,13 @@ class HostEntry(container3.ContainerNode):
         if service_id in self.services and service_data in self.services[service_id]:
             self.services[service_id].remove(service_data)
 
-    def get_service(self, service_id):
+    def get_service(self, service_id, default = None):
         if service_id in self.services:
             return self.services[service_id]
+        return default
+
+    def has_service(self, service_id):
+        return service_id in self.services
 
     def _normalize_service_sfqdn(self):
         for data in self.services[KEY_SERVICE_SFQDN]:

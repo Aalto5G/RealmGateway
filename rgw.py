@@ -46,9 +46,6 @@ class RetCodes(object):
     DNS_NOTZONE  = 9    # Name not in zone
 
 
-
-
-
 class RealmGateway(object):
     def __init__(self, name='RealmGateway'):
         self._logger = logging.getLogger(name)
@@ -102,8 +99,7 @@ class RealmGateway(object):
             self._loop.add_signal_handler(getattr(signal, signame), self._signal_handler, signame)
 
     def _load_configuration(self, filename):
-        config = yaml.load(open(filename,'r'))
-        return config
+        return yaml.load(open(filename,'r'))
     
     def _init_datarepository(self):
         # Initialize Data Repository
@@ -207,9 +203,10 @@ class RealmGateway(object):
 
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
-        for fqdn, data in self._datarepository.get_subscriber_data(None).items():
-            ipaddr = data['ipv4']
-            self._logger.warning('Registering subscriber {} @{}'.format(fqdn, ipaddr))
+        for subscriber_id, subscriber_data in self._datarepository.get_subscriber_data(None).items():
+            ipaddr = subscriber_data['ipv4']
+            fqdn = subscriber_data['fqdn']
+            self._logger.info('Registering subscriber {} / {}@{}'.format(subscriber_id, fqdn, ipaddr))
             self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
 
     def _init_network(self):
@@ -233,8 +230,9 @@ class RealmGateway(object):
         try:
             #TODO: Close all sockets?
             for obj in self.dnscb.get_object(None):
-                self._logger.debug('Closing socket {}'.format(obj))
                 obj.connection_lost(None)
+            # Close NFQUEUE
+            self._network.ipt_deregister_nfqueue()
         except:
             trace()
         finally:

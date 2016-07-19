@@ -62,7 +62,7 @@ class Network(object):
     def ipt_add_user_fwrules(self, ipaddr, chain, fwrules):
         host_chain = 'HOST_{}_{}'.format(ipaddr, chain.upper())
         # Sort list by priority of the rules
-        sorted_fwrules = sorted(fwrules, key=lambda fwrule: fwrule['priority'])
+        sorted_fwrules = sorted(fwrules, key=lambda rule: rule['priority'])
         for rule in sorted_fwrules:
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             self._do_subprocess_call(xlat_rule)
@@ -102,13 +102,14 @@ class Network(object):
     
     def _add_basic_hostpolicy(self, ipaddr):
         # Define host tables
-        host_chain        = 'HOST_{}'.format(ipaddr)
-        host_chain_admin  = 'HOST_{}_ADMIN'.format(ipaddr)
-        host_chain_legacy = 'HOST_{}_LEGACY'.format(ipaddr)
-        host_chain_ces    = 'HOST_{}_CES'.format(ipaddr)
+        host_chain          = 'HOST_{}'.format(ipaddr)
+        host_chain_admin    = 'HOST_{}_ADMIN'.format(ipaddr)
+        host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
+        host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
+        host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
         
         # Create basic chains for host policy
-        for chain in [host_chain, host_chain_admin, host_chain_legacy, host_chain_ces]:
+        for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
             # Create & flush chain
             self._do_subprocess_call('iptables -t filter -N {}'.format(chain))
             self._do_subprocess_call('iptables -t filter -F {}'.format(chain))
@@ -128,6 +129,7 @@ class Network(object):
         mark_ces = self.iptables['pktmark']['MASK_HOST_CES']
         ## Add rules to iptables
         self._do_subprocess_call('iptables -t filter -A {}                   -j {}'.format(host_chain, host_chain_admin))
+        self._do_subprocess_call('iptables -t filter -A {}                   -j {}'.format(host_chain, host_chain_parental))
         self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_legacy, host_chain_legacy))
         self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_ces, host_chain_ces))
         self._do_subprocess_call('iptables -t filter -A {}                   -j DROP'.format(host_chain))
@@ -137,11 +139,12 @@ class Network(object):
         #self._do_subprocess_call('iptables -t filter -I {}                   -j {}'.format(host_chain, host_chain_accept))
     
     def _remove_basic_hostpolicy(self, ipaddr):
-        # Define host chains
-        host_chain        = 'HOST_{}'.format(ipaddr)
-        host_chain_admin  = 'HOST_{}_ADMIN'.format(ipaddr)
-        host_chain_legacy = 'HOST_{}_LEGACY'.format(ipaddr)
-        host_chain_ces    = 'HOST_{}_CES'.format(ipaddr)
+        # Define host tables
+        host_chain          = 'HOST_{}'.format(ipaddr)
+        host_chain_admin    = 'HOST_{}_ADMIN'.format(ipaddr)
+        host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
+        host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
+        host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
         
         # 1. Remove triggers in global host policy chain
         ## Get packet marks based on traffic direction
@@ -153,7 +156,7 @@ class Network(object):
         self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
         
         # 2. Remove host chains
-        for chain in [host_chain, host_chain_admin, host_chain_legacy, host_chain_ces]:
+        for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
             # Flush and remove chain
             self._do_subprocess_call('iptables -t filter -F {}'.format(chain))
             self._do_subprocess_call('iptables -t filter -X {}'.format(chain))
@@ -208,8 +211,13 @@ class Network(object):
         if 'comment' in rule:
             ret += ' -m comment --comment "{}" '.format(rule['comment'])
         # Additional features
-        if 'extra' in rule:
-            self._logger.info('Additional iptables rule features not supported yet: {}'.format(rule))
+        if 'metadata' in rule:
+            for k,v in rule['metadata'].items():
+                if k.startswith('ipt_'):
+                    ret += ' {}'.format(v)
+                else:
+                    self._logger.warning('Metadata {} not supported for rule {}'.format(k, rule))
+                    return ''
         return ret
     
     def _gen_pktmark_cpool(self, ipaddr):
@@ -218,7 +226,7 @@ class Network(object):
     
     def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
         try:
-            self.logger.debug('System call: ', command)
+            self._logger.debug('System call: {}'.format(command))
             if supress_stdout:
                 with open(os.devnull, 'w') as f:
                     subprocess.check_call(command, shell=True, stdout=f)

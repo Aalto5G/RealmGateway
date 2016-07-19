@@ -1,11 +1,13 @@
 SUBSCRIBER_ID:
     foo100.rgw.: {fqdn: 'foo100.rgw.', ipv4: '192.168.0.100', msisdn: '0000000101' }
     foo101.rgw.: {fqdn: 'foo101.rgw.', ipv4: '192.168.0.101', msisdn: '0000000102' }
-#    foo102.rgw.: {fqdn: 'foo102.rgw.', ipv4: '192.168.0.102', msisdn: '0000000103' }
 
 SUBSCRIBER_SERVICES:
-    SFQDN:
-        foo100.rgw.:
+    .rgw.:
+        CIRCULARPOOL:
+            - {max: 5 }
+    foo100.rgw.:
+        SFQDN:
             - {fqdn: 'foo100.rgw.',                                   proxy_required: false}
             - {fqdn: 'iperf.foo100.rgw.', protocol: 6,    port: 5001, proxy_required: false}
             - {fqdn: 'ssh.foo100.rgw.'  , protocol: 6,    port: 22  , proxy_required: false}
@@ -15,28 +17,31 @@ SUBSCRIBER_SERVICES:
             - {fqdn: 'vnc.foo100.rgw.'  , protocol: 6,    port: 5900, proxy_required: false}
             - {fqdn: 'www.foo100.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
             - {fqdn: 'sip.foo100.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
-        foo101.rgw.:
-            - {fqdn: 'foo101.rgw.',                                   proxy_required: false}
-            - {fqdn: 'iperf.foo101.rgw.', protocol: 6,    port: 5001, proxy_required: false}
-            - {fqdn: 'ssh.foo101.rgw.'  , protocol: 6,    port: 22  , proxy_required: false}
-            - {fqdn: 'www.foo101.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
-            - {fqdn: 'sip.foo101.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
-    FIREWALL:
-        foo100.rgw.:
-            - {'priority': 1, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}
+        FIREWALL_ADMIN:
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
+        FIREWALL_PARENTAL:
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'DROP', 'metadata': {'ipt_string': '-m string --algo bm ! --hex-string "|04|nsfw"'}, 'comment':'Forbidden DNS domain'}
+        FIREWALL_LEGACY:
             - {'priority': 10, 'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 5900, 'action': 'DROP', 'comment':'Drop ingress VNC over UDP'}
             - {'priority': 10, 'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 5900, 'action': 'DROP', 'comment':'Drop ingress VNC over TCP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 22, 'action': 'ACCEPT', 'comment':'Allow SSH'}
             - {'priority': 255, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
             - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
-        foo101.rgw.:
-            - {'priority': 1,  'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'extra': {'ratelimit': 3, 'rateburst': 5}, 'comment':'DNS_Limit'}
+        CIRCULARPOOL:
+            - {max: 3 }
+    foo101.rgw.:
+        SFQDN:
+            - {fqdn: 'foo101.rgw.',                                   proxy_required: false}
+            - {fqdn: 'iperf.foo101.rgw.', protocol: 6,    port: 5001, proxy_required: false}
+            - {fqdn: 'ssh.foo101.rgw.'  , protocol: 6,    port: 22  , proxy_required: false}
+            - {fqdn: 'www.foo101.rgw.'  , protocol: 6,    port: 80  , proxy_required: true }
+            - {fqdn: 'sip.foo101.rgw.'  , protocol: 17,   port: 5060, proxy_required: true }
+        FIREWALL_ADMIN:
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
+        FIREWALL_PARENTAL:
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'DROP', 'metadata': {'ipt_string': '-m string --algo bm ! --hex-string "|04|nsfw"'}, 'comment':'Forbidden DNS domain'}
+        FIREWALL_LEGACY:
             - {'priority': 255, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'ACCEPT', 'comment':'ACCEPT any'}
             - {'priority': 255, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 0,  'action': 'DROP', 'comment':'DROP any'}
-    CIRCULARPOOL:
-        .rgw.:
-            - {max: 5 }
-        foo100.rgw.:
-            - {max: 3 }
-        foo101.rgw.:
+        CIRCULARPOOL:
             - {max: 2 }

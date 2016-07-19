@@ -2,6 +2,7 @@ import asyncio
 import utils
 import logging
 import random
+import pprint
 
 import customdns
 from customdns import dnsutils
@@ -71,15 +72,18 @@ class DNSCallbacks(object):
         user_services = self.datarepository.get_subscriber_service(name, None)
         #DEBUG
         #print(user_services)
-        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services[name]}
+        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services}
         host_obj = HostEntry(name=name, **user_data)
         self.hosttable.add(host_obj)
         # Create network resources
-        raw_user_fwrules = self.datarepository.get_subscriber_service(name, 'FIREWALL')
-        user_fwrules = raw_user_fwrules[name]['FIREWALL']
         self.network.ipt_add_user(ipaddr)
-        self.network.ipt_add_user_fwrules(ipaddr, 'legacy', user_fwrules)
-
+        ## Add all firewall rules
+        admin_fw  = host_obj.get_service('FIREWALL_ADMIN', [])
+        parental_fw  = host_obj.get_service('FIREWALL_PARENTAL', [])
+        legacy_fw = host_obj.get_service('FIREWALL_LEGACY', [])
+        self.network.ipt_add_user_fwrules(ipaddr, 'admin', admin_fw)
+        self.network.ipt_add_user_fwrules(ipaddr, 'parental', parental_fw)
+        self.network.ipt_add_user_fwrules(ipaddr, 'legacy', legacy_fw)
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
         self._logger.warning('Deregister user {} @ {}'.format(name, ipaddr))
@@ -172,7 +176,7 @@ class DNSCallbacks(object):
             response = dnsutils.make_response_rcode(query)
             self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
-        
+
 
     def _dns_process_rgw_wan_soa_a(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
@@ -194,7 +198,7 @@ class DNSCallbacks(object):
         #print('pool_size, pool_allocated, pool_available {}'.format((pool_size, pool_allocated, pool_available)))
         # Get data service from FQDN
         service_data = host_obj.get_service_sfqdn(fqdn)
-        
+
         if service_data['proxy_required']:
             self._logger.debug('Use servicepool address pool for {}'.format(fqdn))
             ap_spool = self.pooltable.get('servicepool')
@@ -229,7 +233,7 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name not in a SOA zone """
         fqdn = query.question[0].name.to_text()
         pass
-    
+
     def _create_connectionentryrgw(self, query, addr, cback):
         """ Return the allocated IPv4 address """
         allocated_ipv4 = None
@@ -266,7 +270,7 @@ class DNSCallbacks(object):
                 allocated_ipv4 = ipv4
                 self._logger.warning('Overloading {} for {}!!'.format(ipv4, fqdn))
                 break
-        
+
         if allocated_ipv4 is None:
             self._logger.warning('Impossible to overload existing connections for {}. Allocate new address from CircularPool'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
@@ -308,13 +312,13 @@ class DNSCallbacks(object):
 
         # Callback to send response to host
         cback(query, addr, response)
-        
+
 class PacketCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('PacketCallbacks')
         self._logger.setLevel(logging.WARNING)
         utils.set_attributes(self, **kwargs)
-    
+
     def packet_in_circularpool(self, packet):
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
@@ -326,7 +330,7 @@ class PacketCallbacks(object):
             sport, dport = (packet_fields['sport'],packet_fields['dport'])
         else:
             sport, dport = ((packet_fields['type'],packet_fields['code']), (packet_fields['type'],packet_fields['code']))
-        
+
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
         key1 = (connection.KEY_RGW, dst)
@@ -334,9 +338,9 @@ class PacketCallbacks(object):
         key2 = (connection.KEY_RGW, src, dst, sport, dport, proto)
         # key3: Semi-full fledged 3-tuple
         key3 = (connection.KEY_RGW, dst, dport, proto)
-        # key4: Basic 3-tuple with wildcards 
+        # key4: Basic 3-tuple with wildcards
         key4 = (connection.KEY_RGW, dst, 0, 0)
-        
+
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
             self._logger.warning('No connection found for IP: {}'.format(dst))
@@ -349,17 +353,16 @@ class PacketCallbacks(object):
         elif self.connectiontable.has(key3):
             conn = self.connectiontable.get(key3)
             self._logger.warning('Connection found for 3-tuple: {}'.format(key3))
-        # Lookup connection in table with Basic 3-tuple with wildcards 
+        # Lookup connection in table with Basic 3-tuple with wildcards
         elif self.connectiontable.has(key4):
             conn = self.connectiontable.get(key4)
             self._logger.warning('Connection found for 1-tuple: {}'.format(key4))
         else:
             self._logger.warning('No connection found for packet: {}'.format(packet_fields))
             return
-        
+
         # DNAT to private host
         self.network.ipt_nfpacket_dnat(packet, conn.host_ipv4)
         # Delete connection and trigger IP address release
         self.connectiontable.remove(conn)
-        
-        
+
