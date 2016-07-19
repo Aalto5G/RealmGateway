@@ -367,7 +367,9 @@ iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000F800=0x8000" 
 
 ## Drop blacklisted IP addresses or matching domains
 #iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm ! --hex-string "|0B|mysoarecord|03|ces|00|" -j DROP -m comment --comment "Drop !SOA record"
-iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm ! --hex-string "|03|rgw|00|" -j DROP -m comment --comment "Drop !SOA record"
+iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm --hex-string "|03|rgw|00|" -j RETURN -m comment --comment "Accept SOA record"
+iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm --hex-string "|07|in-addr|04|arpa|00|" -j RETURN -m comment --comment "Accept SOA record"
+iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -j DROP -m comment --comment "Drop \!SOA allowed records"
 
 ## Accept whitelisted servers up to threshold else goto wellknown greylist chain
 iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto 10/sec --hashlimit-burst 10 --hashlimit-name wan_dns_wl   --hashlimit-mode srcip -j ACCEPT -m comment --comment "SLA Whitelist"
