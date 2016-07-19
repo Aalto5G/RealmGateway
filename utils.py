@@ -33,7 +33,7 @@ def parse_packet_custom(data):
     if proto == 1:
         ret['type'] = data[ihl]
         ret['code'] = data[ihl+1]
-    elif proto == 6 or proto == 17:
+    elif proto == 6 or proto == 17 or proto == 132:
         ret['sport'] = struct.unpack('!H', (data[ihl:ihl+2]))[0]
         ret['dport'] = struct.unpack('!H', (data[ihl+2:ihl+4]))[0]
     return ret
@@ -65,4 +65,6 @@ def set_attributes(obj, **kwargs):
 
 def set_default_attributes(obj, args, value=None):
     for arg in args:
+        if hasattr(obj, arg):
+            continue
         setattr(obj, arg, value)
