@@ -107,32 +107,6 @@ ipset create $WHITELIST_IPSET hash:ip
 ipset flush  $WHITELIST_IPSET
 
 
-# --- RAW TABLE ---  #
-
-# Note: Use conntrack zone $CT_ZONE for default connection track
-
-# Flush PREROUTING & OUTPUT chains of RAW table
-iptables -t raw -F PREROUTING
-iptables -t raw -F OUTPUT
-# Populate chain of RAW table
-## Match interface to set conntrack zone
-
-# NEWS: This is no longer valid because packets that are generated locally by the router are always matched in default CT_ZONE.
-#       Using different CTs may lead to INVALID state or UNSEEN / UNREPLIED responses in the conntrack.
-#       The use of CT zones is therefore recommended for bridge-filtering functionality, where only ACCEPT & DROP are executed.
-#iptables -t raw -A PREROUTING -i $LAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$LAN_L3] CT zone $CT_ZONE"
-#iptables -t raw -A PREROUTING -i $WAN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$WAN_L3] CT zone $CT_ZONE"
-#iptables -t raw -A PREROUTING -i $TUN_L3 -j CT --zone $CT_ZONE -m comment --comment "[$TUN_L3] CT zone $CT_ZONE"
-
-## NOTRACK rest of traffic
-#iptables -t raw -A PREROUTING -j NOTRACK
-#iptables -t raw -A OUTPUT     -j NOTRACK
-
-## Trace traffic for debugging
-#iptables -t raw -I PREROUTING -i "l3-+" -j TRACE
-#iptables -t raw -I PREROUTING -i "l3-+"  -j LOG --log-level 7 --log-prefix "RAW.PRE "
-
-
 # --- MANGLE TABLE ---  #
 
 # Definition of chains for MANGLE PREROUTING table
@@ -213,8 +187,8 @@ iptables -t filter -F FILTER_HOST_POLICY
 iptables -t filter -N FILTER_HOST_POLICY_ACCEPT
 iptables -t filter -F FILTER_HOST_POLICY_ACCEPT
 ## Apply local-based policy for accepting traffic
-iptables -t filter -N FILTER_LOCAL_POLICY
-iptables -t filter -F FILTER_LOCAL_POLICY
+iptables -t filter -N FILTER_SELF_POLICY
+iptables -t filter -F FILTER_SELF_POLICY
 
 # Create specific table for REJECT target
 iptables -t filter -N doREJECT
@@ -236,11 +210,11 @@ iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --co
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
 iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
 
-# There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_LOCAL_POLICY, not RETURNed here!
+# There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_SELF_POLICY, not RETURNed here!
 ## Apply local-based policy for accepting traffic
 ### NB: The problem is that WAN_INCOMING traffic leaks from FILTER_HOST_POLICY because it does not match with a private host per se
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "We should not be here"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "We should not be here"
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_SELF_POLICY -m comment --comment "We should not be here"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_SELF_POLICY -m comment --comment "We should not be here"
 
 # Should we apply OUTPUT filtering for CES locally initiated connections?
 ## We are already MARKing packets in MANGLE.OUTPUT
@@ -286,8 +260,8 @@ iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conn
 
 ## Apply HOST specific policy
 ### Examples are described below
-## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_LOCAL_POLICY
-iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m comment --comment "Accept target for FILTER_HOST_POLICY"
+## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_SELF_POLICY
+iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_SELF_POLICY -m comment --comment "Accept target for FILTER_HOST_POLICY"
 ## Apply CES local specific policy
 ### Examples are described below
 
@@ -327,11 +301,11 @@ iptables -t filter -F CES_DNS_LAN
 iptables -t filter -N CES_DNS_TUN
 iptables -t filter -F CES_DNS_TUN
 
-# Populate custom chain FILTER_LOCAL_POLICY of FILTER table
-iptables -t filter -A FILTER_LOCAL_POLICY -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY                                     -j ACCEPT   -m comment --comment "Accept"
+# Populate custom chain FILTER_SELF_POLICY of FILTER table
+iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
+iptables -t filter -A FILTER_SELF_POLICY                                     -j ACCEPT   -m comment --comment "Accept"
 
 # Set policy for DHCP traffic
 ## Add rate limitations ?
@@ -388,7 +362,8 @@ iptables -t filter -A CES_DNS_WAN                                              -
 ## Drop blacklisted IP addresses or matching domains
 iptables -t filter -A CES_DNS_WAN_BLACKLIST -m set --match-set $DNS_BLACKLIST_IPSET src                     -j DROP -m comment --comment "Drop blacklist DNS source"
 iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000F800=0x8000" -m conntrack --ctstate NEW  -j DROP -m comment --comment "DNS unexpected response"
-iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000FF00=0x0100"                             -j DROP -m comment --comment "DNS recursive query"
+#>> Disabled for testing
+#iptables -t filter -A CES_DNS_WAN_BLACKLIST -m u32 --u32 "28&0x0000FF00=0x0100"                             -j DROP -m comment --comment "DNS recursive query"
 
 ## Drop blacklisted IP addresses or matching domains
 #iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm ! --hex-string "|0B|mysoarecord|03|ces|00|" -j DROP -m comment --comment "Drop !SOA record"
@@ -417,7 +392,6 @@ iptables -t filter -A CES_DNS_LAN_BLACKLIST -m string --algo bm ! --hex-string "
 ## Apply global limit to WK-Greylist and Greylist
 iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT  -m hashlimit --hashlimit-upto 25/sec --hashlimit-burst 25 --hashlimit-name lan_dns  -j ACCEPT -m comment --comment "Accept LAN traffic"
 iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT                                                                                      -j DROP   -m comment --comment "Drop excess"
-
 
 # Populate custom chain CES_DNS_TUN of FILTER table
 iptables -t filter -A CES_DNS_TUN                                                                       -j DROP                     -m comment --comment "Drop DNS @TUN"

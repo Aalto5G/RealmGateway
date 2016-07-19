@@ -215,8 +215,8 @@ iptables -t filter -F FILTER_HOST_POLICY
 iptables -t filter -N FILTER_HOST_POLICY_ACCEPT
 iptables -t filter -F FILTER_HOST_POLICY_ACCEPT
 ## Apply local-based policy for accepting traffic
-iptables -t filter -N FILTER_LOCAL_POLICY
-iptables -t filter -F FILTER_LOCAL_POLICY
+iptables -t filter -N FILTER_SELF_POLICY
+iptables -t filter -F FILTER_SELF_POLICY
 
 # Create specific table for REJECT target
 iptables -t filter -N doREJECT
@@ -238,10 +238,10 @@ iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_PREEMPTIVE -m comment --co
 iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
 iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_HOST_POLICY -m comment --comment "Continue in host specific policy"
 
-# There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_LOCAL_POLICY, not RETURNed here!
+# There should be a call for accepted traffic from FILTER_HOST_POLICY_*** to FILTER_SELF_POLICY, not RETURNed here!
 ## Apply local-based policy for accepting traffic
-iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
-iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_LOCAL_POLICY -m comment --comment "Continue in system wide policy"
+iptables -t filter -A FORWARD -i $PREFIX_L3 -j FILTER_SELF_POLICY -m comment --comment "Continue in system wide policy"
+iptables -t filter -A INPUT   -i $PREFIX_L3 -j FILTER_SELF_POLICY -m comment --comment "Continue in system wide policy"
 
 # Should we apply OUTPUT filtering for CES locally initiated connections?
 ## We are already MARKing packets in MANGLE.OUTPUT
@@ -287,8 +287,8 @@ iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conn
 
 ## Apply HOST specific policy
 ### Examples are described below
-## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_LOCAL_POLICY
-iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_LOCAL_POLICY -m comment --comment "Accept target for FILTER_HOST_POLICY"
+## Define FILTER_HOST_POLICY_ACCEPT as an ACCEPT target abstraction from host perspective -> GoTo next table FILTER_SELF_POLICY
+iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_SELF_POLICY -m comment --comment "Accept target for FILTER_HOST_POLICY"
 ## Apply CES local specific policy
 ### Examples are described below
 
@@ -388,11 +388,11 @@ iptables -t filter -F CES_DNS_LAN
 iptables -t filter -N CES_DNS_TUN
 iptables -t filter -F CES_DNS_TUN
 
-# Populate custom chain FILTER_LOCAL_POLICY of FILTER table
-iptables -t filter -A FILTER_LOCAL_POLICY -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
-iptables -t filter -A FILTER_LOCAL_POLICY                                     -j ACCEPT   -m comment --comment "Accept"
+# Populate custom chain FILTER_SELF_POLICY of FILTER table
+iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
+iptables -t filter -A FILTER_SELF_POLICY                                     -j ACCEPT   -m comment --comment "Accept"
 
 # Set policy for DHCP traffic
 ## Add rate limitations ?

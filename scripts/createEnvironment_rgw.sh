@@ -83,12 +83,16 @@ iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o l3-wana -j SNAT --to-source 
 ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
 
 for i in nslana nsproxy nswan nswan2; do
-    ##Remove and create new namespaces
+    #Remove and create new namespaces
     ip netns del $i > /dev/null 2> /dev/null
     ip netns add $i
     #Configure the loopback interface in namespace
     ip netns exec $i ip address add 127.0.0.1/8 dev lo
     ip netns exec $i ip link set dev lo up
+    #Create new /etc mount point
+    mkdir -p  /etc/netns/$i
+    echo $i > /etc/netns/$i/hostname
+    touch     /etc/netns/$i/resolv.conf
 done
 
 ## Assign and configure namespace interface

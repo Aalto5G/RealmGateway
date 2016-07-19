@@ -70,10 +70,9 @@ ip link del qbi-lanb
 # Remove network namespace configuration
 ###############################################################################
 
-#Create the default namespace
-ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
-
-for i in nslana nslanb nsproxy nswan nswan2; do
-    ##Remove and create new namespaces
+for i in nslana nsproxy nswan nswan2; do
+    #Remove namespaces
     ip netns del $i > /dev/null 2> /dev/null
+    #Remove /etc mount point
+    rm -rf /etc/netns/$i
 done
