@@ -4,7 +4,7 @@ import time
 
 from customdns.dnsutils import *
 
-LOGLEVEL = logging.DEBUG
+LOGLEVEL = logging.INFO
 
 class DNSResolver(asyncio.DatagramProtocol):
     '''

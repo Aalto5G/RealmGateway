@@ -3,7 +3,7 @@ import logging
 
 from customdns.dnsutils import *
 
-LOGLEVELDNS = logging.DEBUG
+LOGLEVELDNS = logging.INFO
 
 class DDNSProxy(asyncio.DatagramProtocol):
     def __init__(self, dns_addr = None, cb_add=None, cb_delete=None, cb_default=None):
