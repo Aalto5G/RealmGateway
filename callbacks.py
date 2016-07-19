@@ -21,14 +21,17 @@ import host
 from host import HostEntry
 
 import connection
-from connection import ConnectionEntryRGW
+from connection import ConnectionLegacy
 
 from functools import partial
+
+
+LOGLEVELCALLBACK = logging.INFO
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
-        self._logger.setLevel(logging.INFO)
+        self._logger.setLevel(LOGLEVELCALLBACK)
         utils.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.state = {}
@@ -67,7 +70,7 @@ class DNSCallbacks(object):
         return self.resolver_list[n]
 
     def ddns_register_user(self, name, rdtype, ipaddr):
-        self._logger.warning('Register new user {} @ {}'.format(name, ipaddr))
+        self._logger.info('Register new user {} @ {}'.format(name, ipaddr))
         # Download user data
         user_services = self.datarepository.get_subscriber_service(name, None)
         #DEBUG
@@ -86,8 +89,11 @@ class DNSCallbacks(object):
         self.network.ipt_add_user_fwrules(ipaddr, 'legacy', legacy_fw)
 
     def ddns_deregister_user(self, name, rdtype, ipaddr):
-        self._logger.warning('Deregister user {} @ {}'.format(name, ipaddr))
-        host_obj = self.hosttable.lookup((host.KEY_HOST_FQDN, name))
+        self._logger.info('Deregister user {} @ {}'.format(name, ipaddr))
+        if not self.hosttable.has((host.KEY_HOST_FQDN, name)):
+            self._logger.warning('Failed to deregister: user {} not found'.format(name))
+            return
+        host_obj = self.hosttable.get((host.KEY_HOST_FQDN, name))
         self.hosttable.remove(host_obj)
         # Remove network resources
         self.network.ipt_remove_user(ipaddr)
@@ -174,7 +180,7 @@ class DNSCallbacks(object):
         else:
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
-            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
 
 
@@ -210,7 +216,7 @@ class DNSCallbacks(object):
 
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query
-            self._logger.info('Failed to allocate an address - Drop DNS Query')
+            self._logger.info('Failed to allocate an address for {}'.format(fqdn))
             return
 
         # Create DNS Response
@@ -221,6 +227,11 @@ class DNSCallbacks(object):
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
         self._logger.warning('dns_process_rgw_wan_nosoa')
+        # For testing purposes
+        # Answer with empty records for other types
+        #response = dnsutils.make_response_rcode(query)
+        #self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
+        #cback(query, addr, response)
         # Drop DNS Query
         return
 
@@ -249,9 +260,9 @@ class DNSCallbacks(object):
             addrinuse = False
             conns = self.connectiontable.get((connection.KEY_RGW, ipv4))
             for conn in conns:
-                c_port, c_proto = conn.public_port, conn.public_protocol
+                c_port, c_proto = conn.outbound_port, conn.protocol
                 d_port, d_proto = service_data['port'], service_data['protocol']
-                self._logger.warning('Comparing {} vs {} @{}'.format((c_port, c_proto),(d_port, d_proto), ipv4))
+                self._logger.debug('Comparing {} vs {} @{}'.format((c_port, c_proto),(d_port, d_proto), ipv4))
                 # The following statements match when IP overloading cannot be performed
                 if (c_port == 0 and c_proto == 0) or (d_port == 0 and d_proto == 0):
                     self._logger.debug('0. Port & Protocol blocked')
@@ -272,13 +283,18 @@ class DNSCallbacks(object):
                 break
 
         if allocated_ipv4 is None:
-            self._logger.warning('Impossible to overload existing connections for {}. Allocate new address from CircularPool'.format(fqdn))
+            self._logger.debug('Impossible to overload existing connections for {}. Allocate new address from CircularPool'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
         if allocated_ipv4 is None:
             return None
+        
+        self._logger.info('Allocated IP address from Circular Pool: {}'.format(allocated_ipv4))
+        
         # Create RealmGateway connection
-        new_conn = ConnectionEntryRGW(public_ipv4=allocated_ipv4, public_port=service_data['port'], public_protocol=service_data['protocol'],
-                                  dns_server_ipv4=addr[0], host_fqdn=fqdn, host_ipv4=host_obj.ipv4, timeout=2.0)
+        conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
+                      'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
+                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0] }
+        new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
         # Add connection to table
@@ -288,12 +304,13 @@ class DNSCallbacks(object):
     def _delete_connectionentryrgw(self, conn):
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
+        ipaddr = conn.outbound_ip
         # Get RealmGateway connections
-        if self.connectiontable.has((connection.KEY_RGW, conn.public_ipv4)):
-            self._logger.warning('Cannot release IP address to Circular Pool: {} still in use'.format(conn.public_ipv4))
+        if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
+            self._logger.warning('Cannot release IP address to Circular Pool: {} still in use'.format(ipaddr))
             return
-        ap_cpool.release(conn.public_ipv4)
-        self._logger.warning('Released IP address to Circular Pool: {}'.format(conn.public_ipv4))
+        ap_cpool.release(ipaddr)
+        self._logger.info('Released IP address to Circular Pool: {}'.format(ipaddr))
 
     def _do_callback(self, query, addr, response=None):
         try:
@@ -316,7 +333,7 @@ class DNSCallbacks(object):
 class PacketCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('PacketCallbacks')
-        self._logger.setLevel(logging.WARNING)
+        self._logger.setLevel(LOGLEVELCALLBACK)
         utils.set_attributes(self, **kwargs)
 
     def packet_in_circularpool(self, packet):
@@ -326,43 +343,43 @@ class PacketCallbacks(object):
         packet_fields = utils.parse_packet_custom(data)
         # Select appropriate values for building the keys
         src, dst, proto = packet_fields['src'], packet_fields['dst'], packet_fields['proto']
+        sport, dport =  (0,0)
         if 'dport' in packet_fields:
             sport, dport = (packet_fields['sport'],packet_fields['dport'])
-        else:
-            sport, dport = ((packet_fields['type'],packet_fields['code']), (packet_fields['type'],packet_fields['code']))
 
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
         key1 = (connection.KEY_RGW, dst)
         # key2: Full fledged 5-tuple
-        key2 = (connection.KEY_RGW, src, dst, sport, dport, proto)
+        key2 = (connection.KEY_RGW, dst, dport, src, sport, proto)
         # key3: Semi-full fledged 3-tuple
         key3 = (connection.KEY_RGW, dst, dport, proto)
         # key4: Basic 3-tuple with wildcards
         key4 = (connection.KEY_RGW, dst, 0, 0)
+        # key5: Basic 3-tuple with wildcards
+        key5 = (connection.KEY_RGW, dst, dport, 0)
+        # key6: Basic 3-tuple with wildcards
+        key6 = (connection.KEY_RGW, dst, 0, proto)
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.warning('No connection found for IP: {}'.format(dst))
+            self._logger.info('No connection found for IP: {}'.format(dst))
             return
-        # Lookup connection in table with Full fledged 5-tuple
-        elif self.connectiontable.has(key2):
-            conn = self.connectiontable.get(key2)
-            self._logger.warning('Connection found for 5-tuple: {}'.format(key2))
-        # Lookup connection in table with Semi-full fledged 3-tuple
-        elif self.connectiontable.has(key3):
-            conn = self.connectiontable.get(key3)
-            self._logger.warning('Connection found for 3-tuple: {}'.format(key3))
-        # Lookup connection in table with Basic 3-tuple with wildcards
-        elif self.connectiontable.has(key4):
-            conn = self.connectiontable.get(key4)
-            self._logger.warning('Connection found for 1-tuple: {}'.format(key4))
-        else:
+
+        # Lookup connection in table with rest of the keys
+        conn = None
+        for key in [key2, key3, key4, key5, key6]:
+            if self.connectiontable.has(key):
+                self._logger.info('Connection found for n-tuple*: {}'.format(key))
+                conn = self.connectiontable.get(key)
+                break
+
+        if conn is None:
             self._logger.warning('No connection found for packet: {}'.format(packet_fields))
             return
 
         # DNAT to private host
-        self.network.ipt_nfpacket_dnat(packet, conn.host_ipv4)
+        self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
         # Delete connection and trigger IP address release
         self.connectiontable.remove(conn)
 

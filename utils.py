@@ -31,8 +31,8 @@ def parse_packet_custom(data):
     proto = data[9]
     ihl = (data[0] & 0x0F) * 4  #ihl comes in 32 bit words (32/8)
     if proto == 1:
-        ret['type'] = data[ihl]
-        ret['code'] = data[ihl+1]
+        ret['icmp-type'] = data[ihl]
+        ret['icmp-code'] = data[ihl+1]
     elif proto == 6 or proto == 17 or proto == 132:
         ret['sport'] = struct.unpack('!H', (data[ihl:ihl+2]))[0]
         ret['dport'] = struct.unpack('!H', (data[ihl+2:ihl+4]))[0]

@@ -5,6 +5,7 @@ import logging
 import socket
 import subprocess
 import struct
+import os
 
 import utils
 import container3
@@ -31,6 +32,7 @@ class Network(object):
         self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
         self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
         '''
+        #This is for CES
         self._loop = loop
         self._ports = {}
         
@@ -161,8 +163,6 @@ class Network(object):
             self._do_subprocess_call('iptables -t filter -F {}'.format(chain))
             self._do_subprocess_call('iptables -t filter -X {}'.format(chain))
     
-    
-            
     def _ipt_xlat_rule(self, chain, rule):
         ret = ''
         # Append to chain
@@ -219,7 +219,7 @@ class Network(object):
                     self._logger.warning('Metadata {} not supported for rule {}'.format(k, rule))
                     return ''
         return ret
-    
+
     def _gen_pktmark_cpool(self, ipaddr):
         """ Return the integer representation of an IPv4 address """
         return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
@@ -229,13 +229,16 @@ class Network(object):
             self._logger.debug('System call: {}'.format(command))
             if supress_stdout:
                 with open(os.devnull, 'w') as f:
-                    subprocess.check_call(command, shell=True, stdout=f)
+                    subprocess.check_call(command, shell=True, stdout=f, stderr=f)
             else:
                 subprocess.check_call(command, shell=True)
         except Exception as e:
             if raise_exc:
                 raise e
-        
+    
+    '''
+    # This is for CES 
+    
     def create_tunnel(self):
         pass
     
@@ -307,41 +310,4 @@ class Network(object):
         response = yield from session.delete(url, data=data)
         yield from response.release()
         return response
-    
-
-class ConnectionContainer(container3.Container):
-    
-    def __init__(self, name='ConnectionContainer'):
-        """ Initialize the ConnectionContainer as a Container """
-        super().__init__(name, LOGLEVELCONNECTION)
-
-class ConnectionCESLocal(container3.ContainerNode):
-    def __init__(self, name='ConnectionCESLocal', **kwargs):
-        """ Initialize the ConnectionCESLocal as a ContainerNode """
-        super().__init__(name, LOGLEVELCONNECTION)
-        # Set parameters
-        for k,v in kwargs.items():
-            print('setattr({},{})'.format(k, v))
-            setattr(self, k, v)
-        
-        '''
-        # IP addresses
-        src, psrc, dst, pdst
-        # FW Rules are a combination of (direction, rules) for both hosts
-        TBD
-        '''
-    
-    def lookupkeys(self):
-        """ Return the lookup keys of the node """
-        return (((self.src, self.psrc), False),
-                ((self.dst, self.pdst), False))
-        
-
-class ConnectionCESPublic(container3.ContainerNode):
-    def __init__(self, name='ConnectionCESPublic', **kwargs):
-        """ Initialize the ConnectionCESPublic as a ContainerNode """
-        super().__init__(name, LOGLEVELCONNECTION)
-    
-    def lookupkeys(self):
-        """ Return the lookup keys of the node """
-        return ((self._key, False),)
+    '''

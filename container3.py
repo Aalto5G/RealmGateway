@@ -4,8 +4,6 @@
 
 # This module defines a generic Container class and ContainerNode unit
 
-#TODO: Replace %s with python3 style {}.format
-
 import logging
 
 LOGLEVELCONTAINER = logging.INFO
