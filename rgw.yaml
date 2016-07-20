@@ -7,6 +7,7 @@ DNS:
     soa:
         - rgw.
         - 0.168.192.in-addr.arpa.
+        - 0.18.198.in-addr.arpa.
     ddnsproxy:
         ip: 127.0.0.2
         port: 53
@@ -60,7 +61,7 @@ NETWORK:
         hostpolicy:
             chain: FILTER_HOST_POLICY
             accept: FILTER_HOST_POLICY_ACCEPT
-        pktmark: 
+        pktmark:
             ## Definition of specific packet MARK for traffic
             MARK_LOCAL_FROM_LAN: 0xFF121212/0xFFFFFFFF
             MARK_LOCAL_TO_LAN: 0xFF211221/0xFFFFFFFF
