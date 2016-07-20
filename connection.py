@@ -34,6 +34,12 @@ class ConnectionTable(container3.Container):
             self._update_set(conn_set)
         return conn_set
 
+    def stats(self, key):
+        data = self.lookup(key, update=False, check_expire=False)
+        if data is None:
+            return 0
+        return len(data)
+
 
 class ConnectionLegacy(container3.ContainerNode):
     TIMEOUT = 2.0
@@ -77,7 +83,7 @@ class ConnectionLegacy(container3.ContainerNode):
         # Take creation timestamp
         self.timestamp_zero = time.time()
         ## Override timeout ##
-        #self.timeout = 600.0
+        self.timeout = 600.0
         ######################
         self.timestamp_eol = self.timestamp_zero + self.timeout
         self._build_lookupkeys()
@@ -95,7 +101,6 @@ class ConnectionLegacy(container3.ContainerNode):
         self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip, self.outbound_port, self.protocol), True))
         # 5-tuple full-fledged based indexing
         self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True))
-
 
     def lookupkeys(self):
         """ Return the lookup keys """
