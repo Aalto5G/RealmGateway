@@ -80,6 +80,8 @@ class Container(object):
         @return: The node node or KeyError if not found
         """
         node = self._dict[key]
+        if not isinstance(node, ContainerNode):
+            return node
         if update:
             node.update()
         return node
