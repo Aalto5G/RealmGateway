@@ -1,9 +1,10 @@
 SUBSCRIBER_ID:
+    .:           {fqdn: '.',           ipv4: '000.000.0.000', msisdn: '0000000000' }
     foo100.rgw.: {fqdn: 'foo100.rgw.', ipv4: '192.168.0.100', msisdn: '0000000100' }
     foo101.rgw.: {fqdn: 'foo101.rgw.', ipv4: '192.168.0.101', msisdn: '0000000101' }
 
 SUBSCRIBER_SERVICES:
-    .rgw.:
+    .:
         CIRCULARPOOL:
             - {max: 5 }
         FIREWALL_EXAMPLE:
@@ -14,6 +15,7 @@ SUBSCRIBER_SERVICES:
             - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 1, 'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow all incoming ICMP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 132, 'action': 'DROP', 'comment':'Deny outgoing SCTP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6, 'destination-port': 22, 'action': 'DROP', 'comment':'Deny outgoing SSH'}
+
     foo100.rgw.:
         CIRCULARPOOL:
             - {max: 3 }
