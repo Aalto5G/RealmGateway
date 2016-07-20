@@ -35,32 +35,32 @@ class Network(object):
         #This is for CES
         self._loop = loop
         self._ports = {}
-        
+
         self._ports['lan']  = kwargs['lan']
         self._ports['wan']  = kwargs['wan']
         self._ports['vtep'] = kwargs['vtep']
-        
+
         self._sdn = kwargs['sdn']
-        
+
         # Create Session with keepalive to reduce request time
         self._session = aiohttp.ClientSession(loop=loop)
         '''
-    
+
     def ipt_flush_chain(self, table, chain):
         self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
-        
+
     def ipt_add_user(self, ipaddr):
         # Add user to Circular Pool ipt_chain
         self._add_circularpool(ipaddr)
         # Add user's firewall rules and register in global host policy chain
         self._add_basic_hostpolicy(ipaddr)
-    
+
     def ipt_remove_user(self, ipaddr):
         # Remove user from Circular Pool ipt_chain
         self._remove_circularpool(ipaddr)
         # Remove user's firewall rules and deregister in global host policy chain
         self._remove_basic_hostpolicy(ipaddr)
-    
+
     def ipt_add_user_fwrules(self, ipaddr, chain, fwrules):
         host_chain = 'HOST_{}_{}'.format(ipaddr, chain.upper())
         # Sort list by priority of the rules
@@ -68,20 +68,20 @@ class Network(object):
         for rule in sorted_fwrules:
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             self._do_subprocess_call(xlat_rule)
-            
+
     def ipt_register_nfqueue(self, queue, cb):
         assert (self._nfqueue is None)
         self._nfqueue = AsyncNFQueue(queue, cb)
-    
+
     def ipt_deregister_nfqueue(self):
         assert (self._nfqueue is not None)
         self._nfqueue.terminate()
-    
+
     def ipt_nfpacket_dnat(self, packet, ipaddr):
         mark = self._pktmark_cpool[ipaddr]
         packet.set_mark(mark)
         packet.accept()
-    
+
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
@@ -94,14 +94,14 @@ class Network(object):
         # Add rule to iptables
         chain = self.iptables['circularpool']['chain']
         self._do_subprocess_call('iptables -t nat -I {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
-        
+
     def _remove_circularpool(self, ipaddr):
         # Remove mark from dictionary
         mark = self._pktmark_cpool.pop(ipaddr)
         # Remove rule from iptables
         chain = self.iptables['circularpool']['chain']
         self._do_subprocess_call('iptables -t nat -D {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
-    
+
     def _add_basic_hostpolicy(self, ipaddr):
         # Define host tables
         host_chain          = 'HOST_{}'.format(ipaddr)
@@ -109,13 +109,11 @@ class Network(object):
         host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
         host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
         host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
-        
+
         # Create basic chains for host policy
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
-            # Create & flush chain
-            self._do_subprocess_call('iptables -t filter -N {}'.format(chain))
-            self._do_subprocess_call('iptables -t filter -F {}'.format(chain))
-        
+            self._ipt_create_chain('filter', chain)
+
         # 1. Register triggers in global host policy chain
         ## Get packet marks based on traffic direction
         mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
@@ -124,7 +122,7 @@ class Network(object):
         chain = self.iptables['hostpolicy']['chain']
         self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
         self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
-        
+
         # 2. Register triggers in host chain
         ## Get packet marks based on traffic direction
         mark_legacy = self.iptables['pktmark']['MASK_HOST_LEGACY']
@@ -135,11 +133,8 @@ class Network(object):
         self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_legacy, host_chain_legacy))
         self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_ces, host_chain_ces))
         self._do_subprocess_call('iptables -t filter -A {}                   -j DROP'.format(host_chain))
-        
-        # HACK / DEBUG
-        #host_chain_accept = self.iptables['hostpolicy']['accept']
-        #self._do_subprocess_call('iptables -t filter -I {}                   -j {}'.format(host_chain, host_chain_accept))
-    
+
+
     def _remove_basic_hostpolicy(self, ipaddr):
         # Define host tables
         host_chain          = 'HOST_{}'.format(ipaddr)
@@ -147,7 +142,7 @@ class Network(object):
         host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
         host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
         host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
-        
+
         # 1. Remove triggers in global host policy chain
         ## Get packet marks based on traffic direction
         mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
@@ -156,13 +151,19 @@ class Network(object):
         chain = self.iptables['hostpolicy']['chain']
         self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
         self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
-        
+
         # 2. Remove host chains
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
-            # Flush and remove chain
-            self._do_subprocess_call('iptables -t filter -F {}'.format(chain))
-            self._do_subprocess_call('iptables -t filter -X {}'.format(chain))
-    
+            self._ipt_remove_chain('filter', chain)
+
+    def _ipt_create_chain(self, table, chain):
+        self._do_subprocess_call('iptables -t {} -N {}'.format(table, chain))
+        self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
+
+    def _ipt_remove_chain(self, table, chain):
+        self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
+        self._do_subprocess_call('iptables -t {} -X {}'.format(table, chain))
+
     def _ipt_xlat_rule(self, chain, rule):
         ret = ''
         # Append to chain
@@ -177,7 +178,7 @@ class Network(object):
         else:
             self.logger.error('Unknown direction: {}'.format(rule['direction']))
             return
-        
+
         # IP addresses
         if 'destination-ip' in rule:
             ret += ' -d {}'.format(rule['destination-ip'])
@@ -220,10 +221,26 @@ class Network(object):
                     return ''
         return ret
 
+    def _ipt_chain_trigger(self, table, chain, action, mark, source, destination, jump_table, goto_table):
+        #TOBEUSED
+        ret = ''
+        ret += 'iptables -t {} -{} {}'.format(table, action, chain)
+        if mark:
+            ret += ' -m mark --mark {}'.format(mark)
+        if source:
+            ret += ' -s {}'.format(source)
+        if destination:
+            ret += ' -d {}'.format(destination)
+        if jump_table:
+            ret += ' -j {}'.format(jump_table)
+        if goto_table:
+            ret += ' -g {}'.format(goto_table)
+        return ret
+
     def _gen_pktmark_cpool(self, ipaddr):
         """ Return the integer representation of an IPv4 address """
         return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
-    
+
     def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
         try:
             self._logger.debug('System call: {}'.format(command))
@@ -235,35 +252,35 @@ class Network(object):
         except Exception as e:
             if raise_exc:
                 raise e
-    
+
     '''
-    # This is for CES 
-    
+    # This is for CES
+
     def create_tunnel(self):
         pass
-    
+
     def delete_tunnel(self):
         pass
-    
+
     def create_connection(self, connection):
-        
+
         if isinstance(connection, ConnectionCESLocal):
             msgs = self._flow_add_local(connection)
-            
+
             for m in msgs:
                 print('Sending...\n',m)
                 self._loop.create_task(self._sdn_api_post(self._session, self._sdn['add'], m))
-                        
-    
+
+
     def delete_connection(self, connection):
         pass
-    
+
     def _flow_add_local(self, conn):
         #TODO: Add timeouts
-        
+
         mac_src = '00:00:00:00:00:00'
         mac_dst = self._ports['vtep']['mac']
-        
+
         msg1 = {}
         msg1['dpid'] = 1
         msg1['table_id'] = 1
@@ -277,7 +294,7 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_dst},
                            {'type':'OUTPUT', 'port':4294967288}
                            ]
-        
+
         msg2 = {}
         msg2['dpid'] = 1
         msg2['table_id'] = 1
@@ -290,23 +307,23 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_dst},
                            {'type':'OUTPUT', 'port':4294967288}
                            ]
-        
+
         return [json.dumps(msg1), json.dumps(msg2)]
-        
+
     @asyncio.coroutine
-    def _sdn_api_get(self, session, url, data): 
+    def _sdn_api_get(self, session, url, data):
         response = yield from session.get(url, data=data)
         yield from response.release()
         return response
-    
+
     @asyncio.coroutine
-    def _sdn_api_post(self, session, url, data): 
+    def _sdn_api_post(self, session, url, data):
         response = yield from session.post(url, data=data)
         yield from response.release()
         return response
-    
+
     @asyncio.coroutine
-    def _sdn_api_delete(self, session, url, data): 
+    def _sdn_api_delete(self, session, url, data):
         response = yield from session.delete(url, data=data)
         yield from response.release()
         return response
