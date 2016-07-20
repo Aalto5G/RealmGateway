@@ -3,6 +3,7 @@ import utils
 import logging
 import random
 import pprint
+from functools import partial
 
 import customdns
 from customdns import dnsutils
@@ -22,9 +23,6 @@ from host import HostEntry
 
 import connection
 from connection import ConnectionLegacy
-
-from functools import partial
-
 
 LOGLEVELCALLBACK = logging.INFO
 
@@ -69,14 +67,14 @@ class DNSCallbacks(object):
             n = random.randint(0, len(self.resolver_list) - 1)
         return self.resolver_list[n]
 
-    def ddns_register_user(self, name, rdtype, ipaddr):
-        self._logger.info('Register new user {} @ {}'.format(name, ipaddr))
+    def ddns_register_user(self, fqdn, rdtype, ipaddr):
+        self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
-        user_services = self.datarepository.get_subscriber_service(name, None)
+        user_services = self.datarepository.get_subscriber_service(fqdn, None)
         #DEBUG
         #print(user_services)
-        user_data = {'ipv4':ipaddr, 'fqdn': name, 'services': user_services}
-        host_obj = HostEntry(name=name, **user_data)
+        user_data = {'ipv4':ipaddr, 'fqdn': fqdn, 'services': user_services}
+        host_obj = HostEntry(name=fqdn, **user_data)
         self.hosttable.add(host_obj)
         # Create network resources
         self.network.ipt_add_user(ipaddr)
@@ -88,12 +86,12 @@ class DNSCallbacks(object):
         self.network.ipt_add_user_fwrules(ipaddr, 'parental', parental_fw)
         self.network.ipt_add_user_fwrules(ipaddr, 'legacy', legacy_fw)
 
-    def ddns_deregister_user(self, name, rdtype, ipaddr):
-        self._logger.info('Deregister user {} @ {}'.format(name, ipaddr))
-        if not self.hosttable.has((host.KEY_HOST_FQDN, name)):
-            self._logger.warning('Failed to deregister: user {} not found'.format(name))
+    def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
+        self._logger.info('Deregister user {} @ {}'.format(fqdn, ipaddr))
+        if not self.hosttable.has((host.KEY_HOST_FQDN, fqdn)):
+            self._logger.warning('Failed to deregister: user {} not found'.format(fqdn))
             return
-        host_obj = self.hosttable.get((host.KEY_HOST_FQDN, name))
+        host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
         self.hosttable.remove(host_obj)
         # Remove network resources
         self.network.ipt_remove_user(ipaddr)
@@ -188,29 +186,19 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name in a SOA zone """
         # TODO: Check allocation policy is not exceeded for neither CES and HOST
         self._logger.debug('_dns_process_rgw_wan_soa_a')
+        allocated_ipv4 = None
 
         # Get host object
         fqdn = query.question[0].name.to_text()
-        host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
-        # Get Circular Pool address pool
-        ap_cpool = self.pooltable.get('circularpool')
-        # Check for expired connections
-        self.connectiontable.update_all_rgw()
-        # Get host usage stats of the pool
-        host_conns = self.connectiontable.lookup((connection.KEY_RGW, host_obj.ipv4), check_expire=False)
-        #print('host_conns {}'.format(host_conns))
-        # Get global usage stats of the pool
-        pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
-        #print('pool_size, pool_allocated, pool_available {}'.format((pool_size, pool_allocated, pool_available)))
+        host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
         # Get data service from FQDN
         service_data = host_obj.get_service_sfqdn(fqdn)
-
         if service_data['proxy_required']:
             self._logger.debug('Use servicepool address pool for {}'.format(fqdn))
             ap_spool = self.pooltable.get('servicepool')
             allocated_ipv4 = ap_spool.allocate()
             ap_spool.release(allocated_ipv4)
-        else:
+        elif self._check_policyrgw(fqdn, addr[0], None):
             self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
             allocated_ipv4 = self._create_connectionentryrgw(query, addr, cback)
 
@@ -245,6 +233,31 @@ class DNSCallbacks(object):
         fqdn = query.question[0].name.to_text()
         pass
 
+    def _check_policyrgw(self, fqdn, dns_server_ip, dns_client_ip):
+        # Get RGW and host objects
+        rgw_obj = self.hosttable.get((host.KEY_HOST_FQDN, '.'))
+        host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
+        # Update table and remove for expired connections
+        self.connectiontable.update_all_rgw()
+        # Get Circular Pool address pool stats
+        ap_cpool = self.pooltable.get('circularpool')
+        pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
+        # Get host usage stats of the pool - lookup because there could be none
+        rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
+        host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.ipv4))
+        # Get CircularPool policies for RGW and host
+        rgw_policy  = rgw_obj.get_service('CIRCULARPOOL')[0]
+        host_policy = host_obj.get_service('CIRCULARPOOL')[0]
+
+        if rgw_conns >= rgw_policy['max']:
+            self._logger.warning('RealmGateway global policy exceeded: {}'.format(rgw_policy['max']))
+            return False
+        if host_conns >= host_policy['max']:
+            self._logger.warning('RealmGateway host policy exceeded: {}'.format(host_policy['max']))
+            return False
+        # No policy has been exceeded
+        return True
+
     def _create_connectionentryrgw(self, query, addr, cback):
         """ Return the allocated IPv4 address """
         allocated_ipv4 = None
@@ -255,13 +268,42 @@ class DNSCallbacks(object):
         service_data = host_obj.get_service_sfqdn(fqdn)
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
+        # Check if existing connections can be overloaded
+        allocated_ipv4 = self._overload_connectionentryrgw(service_data['port'], service_data['protocol'])
+
+        if allocated_ipv4:
+            self._logger.warning('Overloading {} for {}!!'.format(allocated_ipv4, fqdn))
+        else:
+            self._logger.debug('Cannot overload address for {}. Allocate new address from CircularPool'.format(fqdn))
+            allocated_ipv4 = ap_cpool.allocate()
+
+        if allocated_ipv4 is None:
+            # The pool is depleted
+            return None
+
+        self._logger.info('Allocated IP address from Circular Pool: {}'.format(allocated_ipv4))
+        # Create RealmGateway connection
+        conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
+                      'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
+                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0] }
+        new_conn = ConnectionLegacy(**conn_param)
+        # Monkey patch delete function
+        new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
+        # Add connection to table
+        self.connectiontable.add(new_conn)
+        return allocated_ipv4
+
+    def _overload_connectionentryrgw(self, port, protocol):
+        """ Returns the IPv4 address to overload or None """
+        # Get Circular Pool address pool
+        ap_cpool = self.pooltable.get('circularpool')
         # Iterate all RealmGateway connections and try to reuse existing allocated IP addresses
         for ipv4 in ap_cpool.get_allocated():
             addrinuse = False
             conns = self.connectiontable.get((connection.KEY_RGW, ipv4))
             for conn in conns:
                 c_port, c_proto = conn.outbound_port, conn.protocol
-                d_port, d_proto = service_data['port'], service_data['protocol']
+                d_port, d_proto = port, protocol
                 self._logger.debug('Comparing {} vs {} @{}'.format((c_port, c_proto),(d_port, d_proto), ipv4))
                 # The following statements match when IP overloading cannot be performed
                 if (c_port == 0 and c_proto == 0) or (d_port == 0 and d_proto == 0):
@@ -278,28 +320,7 @@ class DNSCallbacks(object):
                     break
 
             if not addrinuse:
-                allocated_ipv4 = ipv4
-                self._logger.warning('Overloading {} for {}!!'.format(ipv4, fqdn))
-                break
-
-        if allocated_ipv4 is None:
-            self._logger.debug('Impossible to overload existing connections for {}. Allocate new address from CircularPool'.format(fqdn))
-            allocated_ipv4 = ap_cpool.allocate()
-        if allocated_ipv4 is None:
-            return None
-        
-        self._logger.info('Allocated IP address from Circular Pool: {}'.format(allocated_ipv4))
-        
-        # Create RealmGateway connection
-        conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
-                      'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
-                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0] }
-        new_conn = ConnectionLegacy(**conn_param)
-        # Monkey patch delete function
-        new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
-        # Add connection to table
-        self.connectiontable.add(new_conn)
-        return allocated_ipv4
+                return ipv4
 
     def _delete_connectionentryrgw(self, conn):
         # Get Circular Pool address pool
