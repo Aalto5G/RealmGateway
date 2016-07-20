@@ -8,10 +8,10 @@ from dns.rdataclass import *
 from dns.rdatatype import *
 
 def debug_data(data):
-        return('({} bytes) "{}"'.format(len(data), data))
+    return('({} bytes) "{}"'.format(len(data), data))
 
 def debug_data_addr(data, addr):
-        return('{}:{} ({} bytes) "{}"'.format(addr[0], addr[1], len(data), data))
+    return('{}:{} ({} bytes) "{}"'.format(addr[0], addr[1], len(data), data))
 
 def debug_msg(dnsmsg):
     q = dnsmsg.question[0]
@@ -46,6 +46,17 @@ def sanitize_response(query, response):
         return False
     return True
 
+def make_response_rcode(query, rcode = dns.rcode.NOERROR):
+    response = dns.message.make_response(query, recursion_available=True)
+    response.set_rcode(rcode)
+    return response
+
+def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
+    response = dns.message.make_response(query, recursion_available=True)
+    response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
+    return response
+
+'''
 def _get_dummy(zone):
     return '{}.{}'.format('__secret', zone.origin.to_text())
 
@@ -86,13 +97,4 @@ def delete_node(zone, name):
     except Exception as e:
         print('Failed to delete node {}: {}'.format(name, e))
 
-
-def make_response_rcode(query, rcode = dns.rcode.NOERROR):
-    response = dns.message.make_response(query, recursion_available=True)
-    response.set_rcode(rcode)
-    return response
-
-def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
-    response = dns.message.make_response(query, recursion_available=True)
-    response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
-    return response
+'''

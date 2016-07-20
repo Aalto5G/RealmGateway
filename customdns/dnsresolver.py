@@ -59,11 +59,8 @@ class DNSResolver(asyncio.DatagramProtocol):
 
         if self._peername != addr:
             self._logger.error('Unexpected source! {0}:{1} != {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
-        try:
-            response = dns.message.from_wire(data)
-        except Exception as e:
-            self._logger.error('Failed to parse! {} {}"'.format(debug_data_addr(data, addr), e))
-            return
+
+        response = dns.message.from_wire(data)
 
         if not sanitize_response(self._query, response):
             # Sanitize incoming response and don't stop timer

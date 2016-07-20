@@ -1,6 +1,5 @@
 import asyncio
 import logging
-
 from customdns.dnsutils import *
 
 LOGLEVEL = logging.INFO
@@ -22,18 +21,13 @@ class DNSProxy(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
-
-        try:
-            query = dns.message.from_wire(data)
-            fqdn = query.question[0].name.to_text()
-            cb_f = self.callback_send
-            if self._name_in_soa(fqdn):
-                self.cb_soa(query, addr, cb_f)
-            else:
-                self.cb_nosoa(query, addr, cb_f)
-        except Exception as e:
-            self._logger.error('Failed to process! {} {}"'.format(debug_msg_addr(query, addr), e))
-            return
+        query = dns.message.from_wire(data)
+        fqdn = query.question[0].name.to_text()
+        cb_f = self.callback_send
+        if self._name_in_soa(fqdn):
+            self.cb_soa(query, addr, cb_f)
+        else:
+            self.cb_nosoa(query, addr, cb_f)
 
     def callback_send(self, query, addr, response=None):
         if response is None:

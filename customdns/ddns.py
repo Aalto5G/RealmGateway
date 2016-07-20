@@ -32,22 +32,14 @@ class DDNSProxy(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
-        try:
-            # Drop responses from DNS server
-            if addr == self._dns_addr:
-                return
-            # Send proxied message to DNS server
-            self._transport.sendto(data, self._dns_addr)
-            # Process message locally
-            query = dns.message.from_wire(data)
-        except Exception as e:
-            self._logger.error('Failed to parse! {} {}"'.format(debug_data_addr(data, addr), e))
+        # Drop responses from DNS server
+        if addr == self._dns_addr:
             return
-        try:
-            self.process_message(query, addr)
-        except Exception as e:
-            self._logger.error('Failed to process! {} {}"'.format(debug_msg_addr(query, addr), e))
-            return
+        # Send proxied message to DNS server
+        self._transport.sendto(data, self._dns_addr)
+        # Process message locally
+        query = dns.message.from_wire(data)
+        self.process_message(query, addr)
 
     def process_message(self, query, addr):
         """ Process a DNS message received by the DNS Server """
@@ -73,33 +65,29 @@ class DDNSProxy(asyncio.DatagramProtocol):
 
     def _do_process_default(self, query, addr, cback):
         """ Generate NoError DNS response """
-        try:
-            rr_a = None
-            #Filter hostname and operation
-            for rr in query.authority:
-                #Filter out non A record types
-                if rr.rdtype == dns.rdatatype.A:
-                    rr_a = rr
-                    break
+        rr_a = None
+        #Filter hostname and operation
+        for rr in query.authority:
+            #Filter out non A record types
+            if rr.rdtype == dns.rdatatype.A:
+                rr_a = rr
+                break
 
-            if not rr_a:
-                # isc-dhcp-server uses additional TXT records -> don't process
-                self._logger.warning('Not "A" record found')
-                return
+        if not rr_a:
+            # isc-dhcp-server uses additional TXT records -> don't process
+            self._logger.warning('Not "A" record found')
+            return
 
-            name_str = rr_a.name.to_text()
-            if rr_a.ttl:
-                self._do_add(name_str, rr_a.rdtype, rr_a[0].address)
-            else:
-                self._do_delete(name_str, rr_a.rdtype, rr_a[0].address)
+        name_str = rr_a.name.to_text()
+        if rr_a.ttl:
+            self._do_add(name_str, rr_a.rdtype, rr_a[0].address)
+        else:
+            self._do_delete(name_str, rr_a.rdtype, rr_a[0].address)
 
-        except Exception as e:
-            self._logger.warning('Failed to process DNS UPDATE message {}'.format(e))
-        finally:
-            # Send generic DDNS Response NOERROR
-            response = make_response_rcode(query)
-            self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
-            cback(query, response, addr)
+        # Send generic DDNS Response NOERROR
+        response = make_response_rcode(query)
+        self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
+        cback(query, response, addr)
 
     def callback_sendto(self, query, addr, response=None):
         """ Send response to host """
