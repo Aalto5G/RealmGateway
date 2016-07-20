@@ -185,6 +185,8 @@ ip netns exec nsproxy sysctl -w net.ipv4.conf.all.send_redirects=0
 ip netns exec nsproxy sysctl -w net.ipv4.conf.default.send_redirects=0
 ip netns exec nsproxy sysctl -w net.ipv4.conf.lo.send_redirects=0
 ip netns exec nsproxy sysctl -w net.ipv4.conf.wan0.send_redirects=0
+# Enable arp_proxy on wan0 interface to answer ARP for known routes (RealmGateway)
+sysctl -w net.ipv4.conf.wan0.proxy_arp=1
 
 ip netns exec nsproxy iptables -t raw    -F
 ip netns exec nsproxy iptables -t raw    -A PREROUTING -i wan0 -p tcp -m tcp --syn -j CT --notrack                                                    
@@ -193,7 +195,8 @@ ip netns exec nsproxy iptables -t filter -A FORWARD -i wan0 -p tcp -m tcp -d 198
 ip netns exec nsproxy iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
 
 # Create different ARP responder based on incoming interface for Realm Gateway IP addresses
-for ip in "198.18.0.11" "198.18.0.12" "198.18.0.13" "198.18.0.14"
-do
-    ebtables -t nat -A PREROUTING  --logical-in qbi-wan -i wan0_phy -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac 00:00:c6:12:00:0a
-done
+#for ip in "198.18.0.11" "198.18.0.12" "198.18.0.13" "198.18.0.14"
+#do
+#    ebtables -t nat -A PREROUTING  --logical-in qbi-wan -i wan0_phy -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac 00:00:c6:12:00:0a
+#done
+# TOCHECK: farpd - ARP reply daemon - http://manpages.ubuntu.com/manpages/xenial/man8/farpd.8.html
