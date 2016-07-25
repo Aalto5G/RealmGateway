@@ -1,0 +1,167 @@
+###############################################################################
+### DNS Server - BIND 
+###############################################################################
+
+1. Install BIND DNS server in Ubuntu
+BIND_PACKAGES="bind9 bind9utils"
+apt-get install $BIND_PACKAGES
+
+1.1. Configure BIND to listen only in IPv4 Addresses
+filename: /etc/default/bind9
+OPTIONS="-4 -u bind"
+
+1.2. Create test zone file and populate the NS record
+filename: master.zone
+cat > ./master.zone << EOF
+$TTL 10 
+rgw. IN SOA ns.rgw. admin.rgw.( 
+            2016062101 ; Serial 
+            3h ; Refresh after 3 hours 
+            1h ; Retry after 1 hour 
+            1w ; Expire after 1 week 
+            1h ; Negative caching TTL of 1 hour 
+            ) 
+; Name servers 
+rgw.        IN      NS      ns.rgw. 
+; Addresses for the hosts 
+ns.rgw.     IN      A       198.18.0.11 
+EOF
+
+1.3 Restart BIND
+service bind9 restart
+
+
+###############################################################################
+### DHCP Server - ISC DHCP Server
+###############################################################################
+
+2. Install DHCP server in Ubuntu
+DHCP_PACKAGES="isc-dhcp-server"
+apt-get install $DHCP_PACKAGES
+
+2.1. Configure ISC DHCP Server to listen on an interface
+filename: /etc/default/isc-dhcp-server
+INTERFACES="my-interface" 
+
+2.2. Create network configuration
+filename: /etc/dhcp/dhcpd.conf
+cat > /etc/dhcp/dhcpd.conf << EOF
+# If this DHCP server is the official DHCP server for the local
+# network, the authoritative directive should be uncommented.
+
+authoritative;
+ddns-domainname "rgw";
+ddns-update-style interim;
+ddns-updates on;
+allow client-updates;
+
+# Use this to send dhcp log messages to a different log file (you
+# also have to hack syslog.conf to complete the redirection).
+log-facility local7;
+
+# Realm Gateway LAN configuration
+subnet 192.168.0.0 netmask 255.255.255.0 {
+    range 192.168.0.100 192.168.0.200;
+    option domain-name-servers 192.168.0.1;
+    option domain-name "rgw";
+    option routers 192.168.0.1;
+    option broadcast-address 192.168.0.255;
+    default-lease-time 20;
+    max-lease-time 30;
+    option interface-mtu 1500;
+    zone rgw {
+        primary 127.0.0.1;
+    }
+    zone 168.192.in-addr.arpa {
+        primary 127.0.0.1;
+    }
+}
+EOF
+
+
+
+###############################################################################
+### WWW Proxy Server - Nginx
+###############################################################################
+
+3. Install Nginx in Ubuntu
+WWW_PACKAGES="nginx-core"
+#WWW_PACKAGES="nginx-full" #Fallback package
+apt-get install $WWW_PACKAGES
+
+
+3.1. Create self signed certificate for reverse HTTPS proxy
+https://www.digitalocean.com/community/tutorials/how-to-create-an-ssl-certificate-on-nginx-for-ubuntu-14-04
+sudo mkdir /etc/nginx/ssl
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt
+
+3.2. Configure default-site for reverse HTTP(S) proxying
+cat > /etc/nginx/sites-available/default << EOF
+server {
+     # Listen on ports 80 and 443
+     listen 198.18.0.11:80;
+     listen 198.18.0.11:443 ssl;
+     
+     # Set the server name matching the SSL certificate
+     #server_name  _;
+     server_name  *.rgw;
+
+     # Log file
+     access_log  /var/log/nginx/proxy.access.log;
+
+     # Enable SSL
+     ssl_certificate           /etc/nginx/ssl/nginx.crt;
+     ssl_certificate_key       /etc/nginx/ssl/nginx.key;
+     ssl_session_timeout       5m;
+     ssl_protocols             TLSv1.2 TLSv1.1 TLSv1;
+     ssl_ciphers               ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv3:+EXP;
+     ssl_prefer_server_ciphers on;
+ 
+     # Specify location and use localhost for DNS resolutions
+     location / {
+          resolver             127.0.0.1;
+          proxy_pass           $scheme://$host$uri;
+          proxy_redirect       off;
+          proxy_set_header     Host $host;
+          proxy_set_header     X-Real-IP $remote_addr;
+          proxy_set_header     X-Forwarded-For $proxy_add_x_forwarded_for;
+     }
+
+     error_page   500 502 503 504  /50x.html;
+     location = /50x.html {
+          root   /var/www/nginx-default;
+     }
+}
+EOF
+
+
+
+###############################################################################
+### TCP SYN Proxy - Iptables
+###############################################################################
+
+4. Verify SYNPROXY is available in the iptables package
+iptables -j SYNPROXY --help
+
+SYNPROXY target options:
+  --sack-perm                        Set SACK_PERM
+  --timestamp                        Set TIMESTAMP
+  --wscale value                     Set window scaling factor
+  --mss value                        Set MSS value
+  --ecn                              Set ECN
+
+4.1 Configure sysctl
+# Setting up TCP SYNPROXY in NS-PROXY - ipt_SYNPROXY
+# https://r00t-services.net/knowledgebase/14/Homemade-DDoS-Protection-Using-IPTables-SYNPROXY.html
+sysctl -w net.ipv4.tcp_syncookies=1 # This is not available in the network namespace
+sysctl -w net.ipv4.tcp_timestamps=1 # This is not available in the network namespace
+sysctl -w net.netfilter.nf_conntrack_tcp_loose=0
+# Disable sending ICMP redirects
+sysctl -w net.ipv4.conf.all.send_redirects=0
+sysctl -w net.ipv4.conf.default.send_redirects=0
+sysctl -w net.ipv4.conf.lo.send_redirects=0
+sysctl -w net.ipv4.conf.wan0.send_redirects=0
+# Configure iptables for SYNPROXY
+iptables -t raw    -A PREROUTING -i wan0 -p tcp -m tcp --syn -j CT --notrack
+iptables -t filter -A FORWARD -i wan0 -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
