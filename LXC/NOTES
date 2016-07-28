@@ -1,0 +1,232 @@
+###############################################################################
+### A bite of Ubuntu and LXC Containers
+###############################################################################
+
+# Install OpenvSwitch packages in HOST (for kernel modules)
+apt-get install openvswitch-switch openvswitch-ipsec
+
+# Load kernel modules in HOST
+modprobe af_key ah4 ipcomp esp xfrm4 xfrm_tunnel tunnel
+
+# Create container base
+## List of packages to be installed
+PACKAGE_LIST="sudo,iptables,conntrack,openssh-server,nano,tmux,python3,python3-pip,iperf,htop,ftp,vsftpd,curl,wget,ethtool,tcpdump,traceroute,hping3,lksctp-tools,psmisc,bind9,bind9utils,isc-dhcp-server,nginx-core,openvswitch-switch,openvswitch-ipsec"
+## SSH key filename to be added
+SSH_AUTH="/home/llorenj1/.ssh/llorenj1.pub"
+## Create Ubuntu container
+lxc-create -t ubuntu -n ctbase -- --user ubuntu --password ubuntu --release xenial --arch amd64 --packages $PACKAGE_LIST --auth-key $SSH_AUTH
+
+## Remove network settings from ctbase config and /etc/network/interfaces
+sed -ie '/lxc.network/ { 
+ $!N
+ d
+ }' /var/lib/lxc/ctbase/config
+sed -ie '/# Network configuration/ { 
+ $!N
+ d
+ }' /var/lib/lxc/ctbase/config
+
+## Start container
+lxc-start -n ctbase
+
+### Set minimal network configuration
+cat interfaces.default | lxc-attach -n ctbase -- /bin/sh -c "/bin/cat > /etc/network/interfaces"
+
+### Disable services in ctbase
+DISABLED_SERVICES="bind9 isc-dhcp-server openvswitch-switch openvswitch-ipsec racoon"
+for i in $DISABLED_SERVICES
+do
+	echo "Stopping service $i ..."
+	lxc-attach -n ctbase -- systemctl stop $i > /dev/null 2> /dev/null
+	sleep 1
+	echo "Disabling service $i ..."
+	lxc-attach -n ctbase -- systemctl disable $i > /dev/null 2> /dev/null
+	sleep 1
+done
+
+## Stop container
+lxc-stop -n ctbase
+
+
+## Create supporting network bridges for connecting the LXC containers
+# [COMMON]
+## WAN side
+ip link add dev br-wan0 type bridge
+ip link set dev br-wan0 up
+ip link add dev br-wan1 type bridge
+ip link set dev br-wan1 up
+# [RealmGateway/CES]
+## WAN side
+ip link add dev br-wan0a type bridge
+ip link set dev br-wan0a up
+ip link add dev br-wan0b type bridge
+ip link set dev br-wan0b up
+## LAN side
+ip link add dev br-lan0a type bridge
+ip link set dev br-lan0a up
+ip link add dev br-lan0b type bridge
+ip link set dev br-lan0b up
+
+## Clone containers
+for i in router proxya cesa hosta public proxyb cesb hostb
+do
+	echo "Cloning ctbase as $i"
+	lxc-copy -n ctbase -N $i -s
+done
+
+## Configure container networking
+### router
+cat <<EOF >> /var/lib/lxc/router/config
+# Network configuration
+##
+lxc.network.type = veth
+lxc.network.veth.pair = ct_router
+lxc.network.link = lxcbr0
+lxc.network.flags = up
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan0
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.0.1/24
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan1
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.1.1/24
+##
+EOF
+
+## Enable DHCP in eth0
+# The NAT network interface
+#auto eth0
+#iface eth0 inet dhcp
+lxc-start -n router
+sleep 1
+cat eth0.dhcp | lxc-attach -n router -- /bin/sh -c "/bin/cat >> /etc/network/interfaces"
+sleep 1
+lxc-stop -n router
+
+### proxya
+cat <<EOF >> /var/lib/lxc/proxya/config
+# Network configuration
+## Inline SYN proxy for 198.18.0.8/29 - 198.18.0.[8-15]
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan0
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.0.8/24
+lxc.network.ipv4.gateway = 198.18.0.1
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan0a
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.0.9/29
+EOF
+
+### cesa
+cat <<EOF >> /var/lib/lxc/cesa/config
+# Network configuration
+## Inline SYN proxy for 198.18.0.8/29 - 198.18.0.[8-15]
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan0a
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.0.10/24
+lxc.network.ipv4 = 198.18.0.11/32
+lxc.network.ipv4 = 198.18.0.12/32
+lxc.network.ipv4 = 198.18.0.13/32
+lxc.network.ipv4 = 198.18.0.14/32
+lxc.network.ipv4.gateway = 198.18.0.1
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-lan0a
+lxc.network.flags = up
+lxc.network.ipv4 = 192.168.0.1/24
+EOF
+
+### hosta
+cat <<EOF >> /var/lib/lxc/hosta/config
+# Network configuration
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-lan0a
+lxc.network.flags = up
+# Uncomment to disable DHCP
+#lxc.network.ipv4 = 192.168.0.100/24
+EOF
+
+### public
+cat <<EOF >> /var/lib/lxc/public/config
+# Network configuration
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-wan1
+lxc.network.flags = up
+lxc.network.ipv4 = 198.18.1.100/24
+EOF
+
+
+## Start containers
+for i in router proxya cesa hosta public #proxyb cesb hostb
+do
+	echo "Starting container $i ..."
+	lxc-start -n $i
+done
+
+## Stop containers
+for i in router proxya cesa hosta public proxyb cesb hostb
+do
+	echo "Stopping container $i ..."
+	lxc-stop -n $i
+done
+
+## Destroy containers
+for i in router proxya cesa hosta public proxyb cesb hostb
+do
+	echo "Destroying container $i ..."
+	lxc-destroy -n $i
+done
+
+# OpenvSwitch configuration
+
+## Unsecured GRE tunnel
+### Endpoint A
+ovs-vsctl del-br insecure
+ovs-vsctl del-br secure
+ovs-vsctl add-br insecure
+ip link set dev insecure up
+ip link set dev insecure mtu 1360
+ip addr add 10.255.255.1/24 dev insecure
+ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=198.18.0.2 options:in_key=flow options:out_key=flow
+### Endpoint B
+ovs-vsctl del-br insecure
+ovs-vsctl del-br secure
+ovs-vsctl add-br insecure
+ip link set dev insecure up
+ip link set dev insecure mtu 1360
+ip addr add 10.255.255.2/24 dev insecure
+ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=198.18.0.1 options:in_key=flow options:out_key=flow
+
+## Secured GRE tunnel
+### Endpoint A
+ovs-vsctl del-br insecure
+ovs-vsctl del-br secure
+ovs-vsctl add-br secure
+ip link set dev secure up
+ip link set dev secure mtu 1360
+ip addr add 10.255.255.1/24 dev secure
+ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=198.18.0.1 options:remote_ip=198.18.0.2 options:psk=secret options:in_key=flow options:out_key=flow
+### Endpoint B
+ovs-vsctl del-br insecure
+ovs-vsctl del-br secure
+ovs-vsctl add-br secure
+ip link set dev secure up
+ip link set dev secure mtu 1360
+ip addr add 10.255.255.2/24 dev secure
+ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=198.18.0.2 options:remote_ip=198.18.0.1 options:psk=secret options:in_key=flow options:out_key=flow
