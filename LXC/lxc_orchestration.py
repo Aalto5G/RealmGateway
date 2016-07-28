@@ -157,7 +157,7 @@ def _create_ctbase():
     if not ct.create("ubuntu", 0, {"user": USER, "password": PASSWORD, "packages": ','.join(p for p in PACKAGES)}):
         print("Failed to create the container rootfs")
         sys.exit(1)
-    
+
     # Start the container
     ct_start(ct, True)
     # Disable all services from container base
@@ -190,17 +190,18 @@ def _clone_container(name):
     # Sync container rootfs
     sync_rootfs_container(ct, os.path.join(CONFIG_PATH, name, ROOTFS_PATH))
     # Restart the container to take in effect new configuration
-    ct_restart(ct)
-        
+    ct_restart(ct, True)
+
+
 ###############################################################################
 ###############################################################################
 
 ct = lxc.Container(LXC_CT_BASE)
 if not ct.defined:
     print("Create base container: {}".format(LXC_CT_BASE))
-    _create_ctbase()  
-    #print("Re-run script to create clones")
-    #sys.exit(0)
+    _create_ctbase()
+    print("Re-run script to create clones")
+    sys.exit(0)
 
 print("Base container found: {}".format(LXC_CT_BASE))
 # Make sure the container is stopped before cloning
@@ -209,6 +210,7 @@ ct_stop(ct)
 # Clone new containers
 filename = os.path.join(CONFIG_PATH, CONFIG_FILE)
 with open(filename, 'r') as main_config:
+    time.sleep(0.5)
     for line in main_config:
         #Sanitize values
         if not sanitize_line(line):
