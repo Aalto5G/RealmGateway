@@ -1,8 +1,8 @@
 router
 proxya
-cesa
-hosta
-public
+#cesa
+#hosta
+#public
 #proxyb
 #cesb
 #hostb

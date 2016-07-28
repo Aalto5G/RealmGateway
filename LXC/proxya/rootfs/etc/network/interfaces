@@ -4,4 +4,4 @@
 # The loopback network interface
 auto lo
 iface lo inet loopback
-    post-up /bin/bash ipt_synproxy.sh
+    post-up /bin/bash /ipt_synproxy.sh
