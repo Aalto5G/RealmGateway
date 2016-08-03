@@ -53,6 +53,7 @@ def sanitize_line(text, comment='#', token=''):
     if token not in text:
         return False
     return True
+
 def get_key_value(text, token=''):
     k = text.strip().split('=')[0].strip()
     v = text.strip().split('=')[1].strip()
@@ -66,7 +67,7 @@ def load_config_container(ct, filename):
             if not sanitize_line(line, token='='):
                 continue
             k,v = get_key_value(line)
-            #print('Adding attribute: {} - {} / {}'.format(ct.name, k, v))
+            print('Setting attribute: {} - {} / {}'.format(ct.name, k, v))
             ct.append_config_item(k, v)
         ct.save_config()
 
@@ -89,6 +90,15 @@ def sync_rootfs_container(ct, path):
             #print('{}# sync {} -> {}'.format(ct.name, _file, ct_file))
             ct_sync_file(ct, _file, ct_file)
 
+def ct_clone(ctbase, ct):
+    if ct.defined:
+        print('Container already exists: {}'.format(ct.name))
+        sys.exit(1)
+    # Clone LXC_CT_BASE with snapshot
+    if not ctbase.clone(ct.name, flags=lxc.LXC_CLONE_SNAPSHOT):
+        print("Failed to clone the container")
+        sys.exit(1)
+
 def ct_start(ct, verbose = False):
     try:
         ## Starting the container
@@ -103,8 +113,9 @@ def ct_start(ct, verbose = False):
         if verbose:
             # Print container stats
             ct_stats(ct)
-    except:
+    except Exception as e:
         print("Failed to start the container {}".format(ct.name))
+        raise(e)
         sys.exit(1)
 
 def ct_stop(ct, verbose = False):
@@ -125,8 +136,9 @@ def ct_stop(ct, verbose = False):
         if verbose:
             # Print container stats
             ct_stats(ct)
-    except:
+    except Exception as e:
         print("Failed to stop the container {}".format(ct.name))
+        raise(e)
         sys.exit(1)
 
 def ct_restart(ct, verbose = False):
@@ -152,41 +164,40 @@ def ct_sync_file(ct, source, destination):
     _sysexec.check_call(command, shell=True)
 
 def _create_ctbase():
-    ct = lxc.Container(LXC_CT_BASE)
+    ctbase = lxc.Container(LXC_CT_BASE)
     # Create the container rootfs
-    if not ct.create("ubuntu", 0, {"user": USER, "password": PASSWORD, "packages": ','.join(p for p in PACKAGES)}):
+    if not ctbase.create("ubuntu", lxc.LXC_CREATE_QUIET, {"user": USER, "password": PASSWORD, "packages": ','.join(p for p in PACKAGES)}):
         print("Failed to create the container rootfs")
         sys.exit(1)
-
     # Start the container
-    ct_start(ct, True)
+    ct_start(ctbase, True)
     # Disable all services from container base
     for service in DISABLED_SERVICES:
-        ct_disable_service(ct, service)
+        ct_disable_service(ctbase, service)
     # Overwrite interfaces file
-    ct_sync_file(ct, '/var/lib/lxc/interfaces.default', '/etc/network/interfaces')
+    ct_sync_file(ctbase, '/var/lib/lxc/interfaces.default', '/etc/network/interfaces')
     # Stop the container
-    ct_stop(ct, True)
-    # Clear all network configuration before the snapshots
-    ct.clear_config_item("lxc.network")
-    ct.save_config()
+    ct_stop(ctbase, True)
+    # Clear all network configuration
+    ctbase.clear_config_item("lxc.network")
+    ctbase.save_config()
 
 def _clone_container(name):
     ctbase = lxc.Container(LXC_CT_BASE)
     ct = lxc.Container(name)
-    print('Cloning {} to {}'.format(ctbase.name, ct.name))
+    print('Cloning {} to {}'.format(ctbase.name, name))
     if ct.defined:
         print('Container already exists: {}'.format(name))
         return
-
     # Clone LXC_CT_BASE with snapshot
-    if not ctbase.clone(name, flags=lxc.LXC_CLONE_SNAPSHOT):
-        print("Failed to clone the container")
-        sys.exit(1)
+    ct_clone(ctbase, ct)
+    #return
+
     # Load container configuration
-    load_config_container(ct, os.path.join(CONFIG_PATH, name, CONFIG_FILE))
+    #load_config_container(ct, os.path.join(CONFIG_PATH, name, CONFIG_FILE))
     # Start the container
     ct_start(ct, True)
+    return
     # Sync container rootfs
     sync_rootfs_container(ct, os.path.join(CONFIG_PATH, name, ROOTFS_PATH))
     # Restart the container to take in effect new configuration
@@ -196,31 +207,50 @@ def _clone_container(name):
 ###############################################################################
 ###############################################################################
 
-ct = lxc.Container(LXC_CT_BASE)
-if not ct.defined:
-    print("Create base container: {}".format(LXC_CT_BASE))
-    _create_ctbase()
-    print("Re-run script to create clones")
-    sys.exit(0)
+if __name__ == "__main__":
+    ctbase = lxc.Container(LXC_CT_BASE)
+    if not ctbase.defined:
+        print("Create base container: {}".format(LXC_CT_BASE))
+        _create_ctbase()
+        print("Re-run script to create clones")
+        sys.exit(0)
 
-print("Base container found: {}".format(LXC_CT_BASE))
-# Make sure the container is stopped before cloning
-ct_stop(ct)
+    print("Base container found: {}".format(LXC_CT_BASE))
+    # Make sure the container is stopped before cloning
+    ct_stop(ctbase)
 
-# Clone new containers
-filename = os.path.join(CONFIG_PATH, CONFIG_FILE)
-with open(filename, 'r') as main_config:
-    time.sleep(0.5)
-    for line in main_config:
-        #Sanitize values
-        if not sanitize_line(line):
-            continue
-        #Sanitize and clone container
-        name = line.strip()
-        _clone_container(name)
+    # Clone new containers
+    filename = os.path.join(CONFIG_PATH, CONFIG_FILE)
+    with open(filename, 'r') as main_config:
+        time.sleep(0.5)
+        for line in main_config:
+            #Sanitize values
+            if not sanitize_line(line):
+                continue
+            #Sanitize and clone container
+            name = line.strip()
+            _clone_container(name)
 
 
 '''
+# [COMMON]
+## WAN side
+ip link add dev br-wan0 type bridge
+ip link set dev br-wan0 up
+ip link add dev br-wan1 type bridge
+ip link set dev br-wan1 up
+# [RealmGateway-A]
+## WAN side
+ip link add dev br-wan0a type bridge
+ip link set dev br-wan0a up
+ip link add dev br-wan0b type bridge
+ip link set dev br-wan0b up
+## LAN side
+ip link add dev br-lan0a type bridge
+ip link set dev br-lan0a up
+ip link add dev br-lan0b type bridge
+ip link set dev br-lan0b up
+
 
 c = lxc.Container('router')
 c.append_config_item('lxc.network.type', 'macvlan')
