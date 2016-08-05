@@ -3,12 +3,11 @@ import sys
 import logging
 
 import time
+import stat
 import lxc
 
-import subprocess as _sysexec
-
-#LOGLEVEL = logging.DEBUG
-LOGLEVEL = logging.INFO
+LOGLEVEL = logging.DEBUG
+#LOGLEVEL = logging.INFO
 logging.basicConfig(level=LOGLEVEL)
 
 
@@ -103,7 +102,7 @@ class LXC_Orchestration(object):
                     continue
                 #Sanitize and clone container
                 ctname = line.strip()
-                self._clone_container(ctname)
+                self._create_container(ctname)
         
     def load_config_container(self, name, filename):
         self.logger.info('Loading configuration: {}'.format(name))
@@ -153,10 +152,9 @@ class LXC_Orchestration(object):
             self.logger.warning('Destination clone already exists: {}'.format(dst))
             return
         # Clone LXC_CT_BASE with snapshot
-        command = 'lxc-copy -n {} -N {} -s'.format(src, dst)
-        #print('sysexec: {}'.format(command))
-        _sysexec.check_call(command, shell=True)
-        #time.sleep(3)
+        #command = 'lxc-copy -n {} -N {} -s'.format(src, dst) # Ubuntu 16.04
+        command = 'lxc-clone -s {} {}'.format(src, dst) # Ubuntu 15.10
+        lxc.subprocess.check_call(command, shell=True)
             
     def _ct_start_lib(self, name, verbose = False):
         try:
@@ -179,9 +177,7 @@ class LXC_Orchestration(object):
     
     def _ct_start_exec(self, name, verbose = False):
         command = 'lxc-start -n {}'.format(name)
-        #print('sysexec: {}'.format(command))
-        _sysexec.check_call(command, shell=True)
-        #time.sleep(3)
+        lxc.subprocess.check_call(command, shell=True)
     
     def _ct_stop_lib(self, name, verbose = False):
         ct = lxc.Container(name)
@@ -211,9 +207,7 @@ class LXC_Orchestration(object):
             self.logger.warning('Not running container cannot be stopped: {}'.format(name))
             return
         command = 'lxc-stop -n {}'.format(name)
-        #print('sysexec: {}'.format(command))
-        _sysexec.check_call(command, shell=True)
-        #time.sleep(3)
+        lxc.subprocess.check_call(command, shell=True)
         
     def ct_restart(self, name, verbose = False):
         self.ct_stop(name, verbose)
@@ -223,27 +217,30 @@ class LXC_Orchestration(object):
         ''' Use call instead of check_call because the service might not exist '''
         ct = lxc.Container(name)
         self.logger.info('Stop & Disable service: {} - {}'.format(name, service))
-        #ct.attach_wait(lxc.attach_run_command, ['systemctl', 'stop', service])
-        #ct.attach_wait(lxc.attach_run_command, ['systemctl', 'disable', service])
-        command = 'lxc-attach -n {} -- systemctl stop {}'.format(name, service)
-        _sysexec.call(command, shell=True)
-        command = 'lxc-attach -n {} -- systemctl disable {}'.format(name, service)
-        _sysexec.call(command, shell=True)
+        ct.attach_wait(lxc.attach_run_command, ['systemctl', 'stop', service])
+        ct.attach_wait(lxc.attach_run_command, ['systemctl', 'disable', service])
     
     def ct_stats(self, name):
         ct = lxc.Container(name)
         self.logger.info('Container {} state: {}'.format(name, ct.state))
-        self.logger.info('Container {} PID: {}'.format(name, ct.init_pid))
+        self.logger.info('Container {} PID:   {}'.format(name, ct.init_pid))
     
     def ct_sync_file(self, name, src, dst):
-        # Create directory
-        command = 'lxc-attach -n {} -- mkdir -p {}'.format(name, os.path.dirname(dst))
-        _sysexec.check_call(command, shell=True)
+        # Create base directory
+        ct = lxc.Container(name)
+        ct.attach_wait(lxc.attach_run_command, ['mkdir', '-p', os.path.dirname(dst)])
+        # Get file's permissions
+        fmode = os.stat(src).st_mode
+        fmode_str = stat.filemode(fmode)
+        fmode_chmod = oct(fmode)[-3:]
         # Create file
         command = 'cat {} | lxc-attach -n {} -- /bin/sh -c "/bin/cat > {}"'.format(src, name, dst)
-        #print('sysexec: {}'.format(command))
-        self.logger.info('[{}] >> Copying {} ...'.format(name, dst))
-        _sysexec.check_call(command, shell=True)
+        self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
+        self.logger.debug('sysexec: {}'.format(command))
+        lxc.subprocess.check_call(command, shell=True)
+        # Set file permissions
+        #ct.attach_wait(lxc.attach_run_command, ['chmod', fmode_chmod, dst])
+        
     
     def _create_ctbase(self):
         ctbase = lxc.Container(self.ctbasename)
@@ -265,7 +262,7 @@ class LXC_Orchestration(object):
         for service in DISABLED_SERVICES:
             self.ct_disable_service(self.ctbasename, service)
         # Overwrite interfaces file
-        self.ct_sync_file(self.ctbasename, '/var/lib/lxc/interfaces.default', '/etc/network/interfaces')
+        self.ct_sync_file(self.ctbasename, 'interfaces.default', '/etc/network/interfaces')
         # Stop the container
         self.ct_stop(self.ctbasename)
         # Clear all network configuration
@@ -273,17 +270,17 @@ class LXC_Orchestration(object):
         ctbase.clear_config_item('lxc.network')
         ctbase.save_config()
     
-    def _clone_container(self, name):
+    def _create_container(self, name):
         try:
             ct = lxc.Container(name)
             self.logger.info('Cloning {} to {}'.format(self.ctbasename, name))
-            if ct.defined:
+            if not ct.defined:
+                # Clone LXC_CT_BASE with snapshot
+                self.ct_clone(self.ctbasename, name)
+                # Load container configuration
+                self.load_config_container(name, os.path.join(CONFIG_PATH, name, CONFIG_FILE))
+            else:
                 self.logger.warning('Container already exists: {}'.format(name))
-                return
-            # Clone LXC_CT_BASE with snapshot
-            self.ct_clone(self.ctbasename, name)
-            # Load container configuration
-            self.load_config_container(name, os.path.join(CONFIG_PATH, name, CONFIG_FILE))
             # Start the container
             self.ct_start(name)
             # Sync container rootfs
