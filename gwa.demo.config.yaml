@@ -1,11 +1,11 @@
 # RealmGateway Configuration Parameters
 
 DEFAULT:
-    name: rgw
+    name: gwa.demo
 
 DNS:
     soa:
-        - rgw.
+        - gwa.demo.
         - 0.168.192.in-addr.arpa.
         - 0.18.198.in-addr.arpa.
     ddnsproxy:
@@ -49,14 +49,14 @@ NETWORK:
 #            - sip
     addresspool:
         servicepool:
-            - 198.18.0.11/32
+            - 198.18.0.18/32
         circularpool:
-            - 198.18.0.12/32
-            - 198.18.0.13/32
-            - 198.18.0.14/32
+            - 198.18.0.19/32
+            - 198.18.0.20/32
+            - 198.18.0.21/32
     iptables:
         circularpool:
-            nfqueue: 2
+            nfqueue: 1
             chain: NAT_PRE_CPOOL
         hostpolicy:
             chain: FILTER_HOST_POLICY
@@ -95,6 +95,6 @@ NETWORK:
             MASK_TUN_EGRESS: 0xFF000040/0xFF0000F0
 
 DATAREPOSITORY:
-    subscriberdata: datarepository.yaml
-    servicedata: datarepository.yaml
-    policydata: datarepository.yaml
+    subscriberdata: gwa.demo.datarepository.yaml
+    servicedata: gwa.demo.datarepository.yaml
+    policydata: gwa.demo.datarepository.yaml

@@ -61,7 +61,7 @@ class RealmGateway(object):
         self._capture_signal()
 
         # Read configuration
-        self._config = self._load_configuration('rgw.yaml')
+        self._config = self._load_configuration('gwa.demo.config.yaml')
         
         # Initialize Data Repository
         self._init_datarepository()
