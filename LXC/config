@@ -1,16 +1,15 @@
-root:
-  config: root/config
-  rootfs: root/rootfs
-  disabled_services: [bind9, isc-dhcp-server, vsftpd, nginx, openvswitch-switch, openvswitch-ipsec, racoon]
+ctbase:
+  config: ctbase/config
+  rootfs: ctbase/rootfs
+  disabled_services: []
   enabled_services: []
-  packages: [sudo, iptables, conntrack, openssh-server, nano, tmux, python3, python3-pip, iperf, htop, ftp, vsftpd, curl, wget, ethtool, tcpdump, traceroute, hping3, lksctp-tools, psmisc, bind9, bind9utils, isc-dhcp-server, nginx-core, openvswitch-switch, openvswitch-ipsec]
-  #packages: []
+  packages: [nano, iperf, isc-dhcp-server, bind9, bind9utils]
 router:
   config: router/config
   rootfs: router/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [bind9, vsftpd, nginx]
+  enabled_services: []
 proxya:
   config: proxya/config
   rootfs: proxya/rootfs
@@ -22,28 +21,28 @@ gwa:
   rootfs: gwa/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [vsftpd, nginx, bind9, isc-dhcp-server, openvswitch-switch, openvswitch-ipsec, racoon]
+  enabled_services: []
 hosta:
   config: hosta/config
   rootfs: hosta/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [vsftpd, nginx]
+  enabled_services: []
 public:
   config: public/config
   rootfs: public/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [vsftpd, nginx]
+  enabled_services: []
 gwb:
   config: gwb/config
   rootfs: gwb/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [vsftpd, nginx, bind9, isc-dhcp-server, openvswitch-switch, openvswitch-ipsec, racoon]
+  enabled_services: []
 hostb:
   config: hostb/config
   rootfs: hostb/rootfs
   packages: []
   disabled_services: []
-  enabled_services: [vsftpd, nginx]
+  enabled_services: []

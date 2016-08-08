@@ -1,4 +1,10 @@
 # Network configuration
+##
+lxc.network.type = macvlan
+lxc.network.macvlan.mode = bridge
+lxc.network.link = br-lan0b
+lxc.network.flags = up
+lxc.network.ipv4 = 192.168.0.1/24
 ## Inline SYN proxy for 198.18.0.32/28 - 198.18.0.[32-47]
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
@@ -18,9 +24,3 @@ lxc.network.ipv4 = 198.18.0.44/32
 lxc.network.ipv4 = 198.18.0.45/32
 lxc.network.ipv4 = 198.18.0.46/32
 lxc.network.ipv4.gateway = 198.18.0.1
-##
-lxc.network.type = macvlan
-lxc.network.macvlan.mode = bridge
-lxc.network.link = br-lan0b
-lxc.network.flags = up
-lxc.network.ipv4 = 192.168.0.1/24

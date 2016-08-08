@@ -12,7 +12,7 @@ LOGLEVEL = logging.DEBUG
 logging.basicConfig(level=LOGLEVEL)
 
 
-LXC_CT_BASE = 'root'
+LXC_CT_BASE = 'ctbase'
 #CONFIG_PATH = '/home/llorenj1/workspace/gitlab/customer_edge_switching_v2/LXC'
 CONFIG_PATH = './'
 CONFIG_FILE = 'config'
@@ -75,10 +75,10 @@ class LXC_Orchestration(object):
         #self.configfile = configfile
         self.ctbasename = ctbasename
 
-        self.ct_clone = self._ct_clone_lib
+        #self.ct_clone = self._ct_clone_lib
         self.ct_start = self._ct_start_lib
         self.ct_stop = self._ct_stop_lib
-        #self.ct_clone = self._ct_clone_exec
+        self.ct_clone = self._ct_clone_exec
         #self.ct_start = self._ct_start_exec
         #self.ct_stop = self._ct_stop_exec
 
@@ -87,13 +87,15 @@ class LXC_Orchestration(object):
         if not ctbase.defined:
             self.logger.info('Create base container: {}'.format(self.ctbasename))
             self._create_ctbase(self.ctbasename)
-            if 0:
+            if 1:
                 self.logger.warning('Re-run script to create clones')
                 sys.exit(0)
 
         self.logger.info('Base container found: {}'.format(self.ctbasename))
         # Make sure the container is stopped before cloning
         self.ct_stop(self.ctbasename)
+        # Remove root container from configuration
+        self.config.pop(self.ctbasename)
 
         # Clone new containers
         '''
@@ -162,8 +164,8 @@ class LXC_Orchestration(object):
             self.logger.warning('Destination clone already exists: {}'.format(dst))
             return
         # Clone LXC_CT_BASE with snapshot
-        #command = 'lxc-copy -n {} -N {} -s'.format(src, dst) # Ubuntu 16.04
-        command = 'lxc-clone -s {} {}'.format(src, dst) # Ubuntu 15.10
+        command = 'lxc-copy -n {} -N {} -s -F'.format(src, dst) # Ubuntu 16.04
+        #command = 'lxc-clone -s {} {}'.format(src, dst) # Ubuntu 15.10
         lxc.subprocess.check_call(command, shell=True)
 
     def _ct_start_lib(self, name, verbose = False):
@@ -243,29 +245,40 @@ class LXC_Orchestration(object):
     def ct_sync_file(self, name, src, dst):
         # Create base directory
         ct = lxc.Container(name)
-        ct.attach_wait(lxc.attach_run_command, ['mkdir', '-p', os.path.dirname(dst)])
+        #print('mkdir -p {}'.format(os.path.dirname(dst)))
+        #ct.attach_wait(lxc.attach_run_command, ['mkdir', '-p', os.path.dirname(dst)])
         # Get file's permissions
         fmode = os.stat(src).st_mode
         fmode_str = stat.filemode(fmode)
         fmode_chmod = oct(fmode)[-3:]
-        # Create file
-        command = 'cat {} | lxc-attach -n {} -- /bin/sh -c "/bin/cat > {}"'.format(src, name, dst)
-        self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
+        time.sleep(0.5)
+        # Create directory
+        command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p {}'.format(name, os.path.dirname(dst))
+        self.logger.info('[{}] >> Creating directory {} ...'.format(name, os.path.dirname(dst)))
         self.logger.debug('sysexec: {}'.format(command))
         lxc.subprocess.check_call(command, shell=True)
+        time.sleep(0.5)
+        # Create file
+        command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/bash -c "/bin/cat > {}"'.format(src, name, dst)
+        self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
+        self.logger.debug('sysexec: {}'.format(command))
+        try:
+            lxc.subprocess.check_call(command, shell=True)
+        except Exception as e:
+            self.logger.error('Failed to copy a file {}: {}'.format(dst, e))
         # Set file permissions
         #ct.attach_wait(lxc.attach_run_command, ['chmod', fmode_chmod, dst])
 
 
     def _create_ctbase(self, name):
         ctbase = lxc.Container(name)
-        config = self.config.pop(name)
+        config = self.config[name]
         print(config)
 
         # Create the container rootfs
-        #verbosity = 0
-        verbosity = lxc.LXC_CREATE_QUIET
-        if not ctbase.create('ubuntu', verbosity, {'user': USER, 'password': PASSWORD, 'packages': ','.join(p for p in config.packages)}):
+        verbosity = 0
+        #verbosity = lxc.LXC_CREATE_QUIET
+        if not ctbase.create('ubuntu', verbosity, {'user': USER, 'password': PASSWORD, 'packages': ','.join(p for p in config.setdefault('packages',[]))}):
             self.logger.error('Failed to create the container rootfs {}'.format(name))
             sys.exit(1)
 
@@ -277,45 +290,46 @@ class LXC_Orchestration(object):
         # Start the container
         self.ct_start(name)
         # Enable services in container
-        for service in config.enabled_services:
+        for service in config.setdefault('enabled_services',[]):
             self.ct_enable_service(name, service)
         # Disable services in container
-        for service in config.disabled_services:
+        for service in config.setdefault('disabled_services', []):
             self.ct_disable_service(name, service)
         # Sync container rootfs
-        self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config.rootfs))
+        self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
         # Overwrite interfaces file
         #self.ct_sync_file(name, 'interfaces.default', '/etc/network/interfaces')
         # Stop the container
         self.ct_stop(name)
         # Clear all network configuration
         #ctbase = lxc.Container(name)
-        #ctbase.clear_config_item('lxc.network')
-        #ctbase.save_config()
+        ctbase.clear_config_item('lxc.network')
+        ctbase.save_config()
         # Overwrite container configuration
-        self.load_config_container(name, os.path.join(CONFIG_PATH, config.config))
+        #self.load_config_container(name, os.path.join(CONFIG_PATH, config['config']))
 
     def _spawn_container(self, base, name, config):
         try:
             ct = lxc.Container(name)
             self.logger.info('Cloning {} to {}'.format(base, name))
+            print(config)
             if not ct.defined:
                 # Clone LXC_CT_BASE with snapshot
                 self.ct_clone(base, name)
                 # Load container configuration
-                self.load_config_container(name, os.path.join(CONFIG_PATH, config.config))
+                self.load_config_container(name, os.path.join(CONFIG_PATH, config['config']))
             else:
                 self.logger.warning('Container already exists: {}'.format(name))
             # Start the container
             self.ct_start(name)
             # Enable services in container
-            for service in config.enabled_services:
+            for service in config.setdefault('enabled_services', []):
                 self.ct_enable_service(name, service)
             # Disable services in container
-            for service in config.disabled_services:
+            for service in config.setdefault('disabled_services', []):
                 self.ct_disable_service(name, service)
             # Sync container rootfs
-            self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config.rootfs))
+            self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
             # Restart the container to take in effect new configuration
             self.ct_restart(name)
         except FileNotFoundError as e:
