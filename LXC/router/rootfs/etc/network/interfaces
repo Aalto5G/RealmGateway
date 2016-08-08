@@ -8,4 +8,5 @@ iface lo inet loopback
 # The NAT'd network interface
 auto eth0
 iface eth0 inet dhcp
-    post-up /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    post-up   /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    post-down /sbin/iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE

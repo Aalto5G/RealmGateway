@@ -29,4 +29,3 @@ iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
 ## Inline TCP SYNProxy: Enable arp_proxy to answer ARP for known routes (RealmGateway)
 sysctl -w net.ipv4.conf.$WAN0.proxy_arp=1
 sysctl -w net.ipv4.conf.$WAN0proxy.proxy_arp=1
-
