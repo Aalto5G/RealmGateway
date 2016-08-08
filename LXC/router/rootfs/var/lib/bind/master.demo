@@ -1,0 +1,15 @@
+$ORIGIN .
+$TTL 10	; 10 seconds
+demo			IN SOA	ns.demo. admin.demo. (
+				2016062111 ; serial
+				10800      ; refresh (3 hours)
+				3600       ; retry (1 hour)
+				604800     ; expire (1 week)
+				3600       ; minimum (1 hour)
+				)
+			NS	ns.demo.
+$ORIGIN demo.
+$TTL 30	; 30 seconds
+ns			A	198.18.0.1
+gwa			A	198.18.0.18
+gwb			A	198.18.0.34

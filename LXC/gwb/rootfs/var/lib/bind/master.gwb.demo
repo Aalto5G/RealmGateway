@@ -1,0 +1,13 @@
+$ORIGIN .
+$TTL 10	; 10 seconds
+gwb.demo		IN SOA	ns.gwb.demo. admin.gwb.demo. (
+				2016062111 ; serial
+				10800      ; refresh (3 hours)
+				3600       ; retry (1 hour)
+				604800     ; expire (1 week)
+				3600       ; minimum (1 hour)
+				)
+			NS	ns.gwb.demo.
+$ORIGIN gwb.demo.
+$TTL 10	; 10 seconds
+ns			A	198.18.0.34
