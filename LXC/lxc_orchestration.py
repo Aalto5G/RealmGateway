@@ -172,9 +172,15 @@ class LXC_Orchestration(object):
         self.ct_stop(name, verbose)
         self.ct_start(name, verbose)
 
+    def ct_reload_services(self, name):
+        ct = lxc.Container(name)
+        self.logger.info('Reload services: {}'.format(name))
+        ct.attach_wait(lxc.attach_run_command, ['systemctl', 'daemon-reload'])
+        
     def ct_enable_service(self, name, service):
         ct = lxc.Container(name)
         self.logger.info('Enable & Start service: {} - {}'.format(name, service))
+        ct.attach_wait(lxc.attach_run_command, ['systemctl', 'daemon-reload'])
         ct.attach_wait(lxc.attach_run_command, ['systemctl', 'enable', service])
         ct.attach_wait(lxc.attach_run_command, ['systemctl', 'start', service])
 
@@ -228,14 +234,16 @@ class LXC_Orchestration(object):
 
         # Start the container
         self.ct_start(name)
+        # Sync container rootfs
+        self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
+        # Reload services
+        self.ct_reload_services(name)
         # Enable services in container
         for service in config.setdefault('enabled_services',[]):
             self.ct_enable_service(name, service)
         # Disable services in container
         for service in config.setdefault('disabled_services', []):
             self.ct_disable_service(name, service)
-        # Sync container rootfs
-        self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
         # Stop the container
         self.ct_stop(name)
         # Clear all network configuration
@@ -260,14 +268,16 @@ class LXC_Orchestration(object):
                 self.logger.warning('Container already exists: {}'.format(name))
             # Start the container
             self.ct_start(name)
+            # Sync container rootfs
+            self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
+            # Reload services
+            self.ct_reload_services(name)
             # Enable services in container
             for service in config.setdefault('enabled_services', []):
                 self.ct_enable_service(name, service)
             # Disable services in container
             for service in config.setdefault('disabled_services', []):
                 self.ct_disable_service(name, service)
-            # Sync container rootfs
-            self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
             # Restart the container to take in effect new configuration
             self.ct_restart(name)
         except FileNotFoundError as e:
