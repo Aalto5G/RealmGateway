@@ -11,7 +11,7 @@ import lxc
 LOGLEVEL = logging.INFO
 logging.basicConfig(level=LOGLEVEL)
 
-SYSEXEC_BACKOFF = 0.25
+SYSEXEC_BACKOFF = 0.15
 LXC_CT_BASE = 'ctbase'
 #CONFIG_PATH = '/home/llorenj1/workspace/gitlab/customer_edge_switching_v2/LXC'
 CONFIG_PATH = './'

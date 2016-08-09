@@ -1,9 +1,9 @@
-root:
-  config: root/config
-  rootfs: root/rootfs
+ctbase:
+  config: ctbase/config
+  rootfs: ctbase/rootfs
   disabled_services: [bind9, isc-dhcp-server, vsftpd, nginx, openvswitch-switch, openvswitch-ipsec, racoon]
-  enabled_services: []
-  packages: [sudo, iptables, conntrack, openssh-server, nano, tmux, python3, python3-pip, iperf, htop, ftp, vsftpd, curl, wget, ethtool, tcpdump, traceroute, hping3, lksctp-tools, psmisc, bind9, bind9utils, isc-dhcp-server, nginx-core, openvswitch-switch, openvswitch-ipsec]
+  enabled_services: [runatstartup]
+  packages: [sudo, iptables, conntrack, openssh-server, nano, tmux, dnsutils, python3, python3-pip, iperf, htop, ftp, vsftpd, curl, wget, ethtool, tcpdump, traceroute, hping3, lksctp-tools, psmisc, bind9, bind9utils, isc-dhcp-server, nginx-core, openvswitch-switch, openvswitch-ipsec]
   #packages: []
 router:
   config: router/config
