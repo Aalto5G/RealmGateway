@@ -11,11 +11,11 @@ import lxc
 LOGLEVEL = logging.INFO
 logging.basicConfig(level=LOGLEVEL)
 
-
+SYSEXEC_BACKOFF = 0.25
 LXC_CT_BASE = 'ctbase'
 #CONFIG_PATH = '/home/llorenj1/workspace/gitlab/customer_edge_switching_v2/LXC'
 CONFIG_PATH = './'
-CONFIG_FILE = 'config'
+CONFIG_FILE = 'config.all'
 ROOTFS_PATH = 'rootfs'
 
 USER='ubuntu'
@@ -38,13 +38,11 @@ class LXC_Orchestration(object):
     def __init__(self, ctbasename, configfile):
         self.logger = logging.getLogger()
         self.config = yaml.load(open(configfile, 'r'))
-        #self.configfile = configfile
         self.ctbasename = ctbasename
-
-        #self.ct_clone = self._ct_clone_lib
+        self.ct_clone = self._ct_clone_lib
         self.ct_start = self._ct_start_lib
         self.ct_stop = self._ct_stop_lib
-        self.ct_clone = self._ct_clone_exec
+        #self.ct_clone = self._ct_clone_exec
         #self.ct_start = self._ct_start_exec
         #self.ct_stop = self._ct_stop_exec
 
@@ -62,25 +60,9 @@ class LXC_Orchestration(object):
         self.ct_stop(self.ctbasename)
         # Remove root container from configuration
         self.config.pop(self.ctbasename)
-
-        # Clone new containers
-        '''
-        #filename = os.path.join(CONFIG_PATH, CONFIG_FILE)
-        filename = self.configfile
-        with open(filename, 'r') as config:
-            time.sleep(0.3)
-            for line in config:
-                #Sanitize values
-                if not sanitize_line(line):
-                    continue
-                #Sanitize and clone container
-                ctname = line.strip()
-                self._spawn_container(ctname)
-        '''
-        # The root container is no longer in the configuration
+        # Clone new containers - The root container is no longer in the configuration
         for name, config in self.config.items():
             self._spawn_container(self.ctbasename, name, config)
-
 
     def load_config_container(self, name, filename):
         self.logger.info('Loading configuration: {}'.format(name))
@@ -131,8 +113,7 @@ class LXC_Orchestration(object):
             return
         # Clone LXC_CT_BASE with snapshot
         command = 'lxc-copy -n {} -N {} -s -F'.format(src, dst) # Ubuntu 16.04
-        #command = 'lxc-clone -s {} {}'.format(src, dst) # Ubuntu 15.10
-        lxc.subprocess.check_call(command, shell=True)
+        self._sysexec(command, 'host')
 
     def _ct_start_lib(self, name, verbose = False):
         try:
@@ -155,7 +136,7 @@ class LXC_Orchestration(object):
 
     def _ct_start_exec(self, name, verbose = False):
         command = 'lxc-start -n {}'.format(name)
-        lxc.subprocess.check_call(command, shell=True)
+        self._sysexec(command, 'host')
 
     def _ct_stop_lib(self, name, verbose = False):
         ct = lxc.Container(name)
@@ -185,7 +166,7 @@ class LXC_Orchestration(object):
             self.logger.warning('Not running container cannot be stopped: {}'.format(name))
             return
         command = 'lxc-stop -n {}'.format(name)
-        lxc.subprocess.check_call(command, shell=True)
+        self._sysexec(command, 'host')
 
     def ct_restart(self, name, verbose = False):
         self.ct_stop(name, verbose)
@@ -211,39 +192,22 @@ class LXC_Orchestration(object):
     def ct_sync_file(self, name, src, dst):
         # Create base directory
         ct = lxc.Container(name)
-        #print('mkdir -p {}'.format(os.path.dirname(dst)))
-        #ct.attach_wait(lxc.attach_run_command, ['mkdir', '-p', os.path.dirname(dst)])
         # Get file's permissions
         fmode = os.stat(src).st_mode
         fmode_str = stat.filemode(fmode)
         fmode_chmod = oct(fmode)[-3:]
         # Create directory
-        command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p -m 755 {}'.format(name, os.path.dirname(dst))
         self.logger.info('[{}] >> Creating directory {} ...'.format(name, os.path.dirname(dst)))
-        self.logger.debug('sysexec: {}'.format(command))
-        time.sleep(0.3)
-        lxc.subprocess.check_call(command, shell=True)
+        command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p -m {} {}'.format(name, '755', os.path.dirname(dst))
+        self._sysexec(command, name)
         # Create file
-        command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/bash -c "/bin/cat > {}"'.format(src, name, dst)
         self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
-        self.logger.debug('sysexec: {}'.format(command))
-        time.sleep(0.3)
-        lxc.subprocess.check_call(command, shell=True)
-        '''
-        try:
-            lxc.subprocess.check_call(command, shell=True)
-        except Exception as e:
-            self.logger.error('\n###\nFailed to copy a file {}: {}\n###\n'.format(dst, e))
-        '''
-        # Set file permissions
-        #ct.attach_wait(lxc.attach_run_command, ['chmod', fmode_chmod, dst])
+        command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/bash -c "/bin/cat > {}"'.format(src, name, dst)
+        self._sysexec(command, name)
         # Set permissions to file
+        self.logger.debug('[{}] >> Setting file permissions {} ...'.format(name, os.path.dirname(dst)))
         command = '/usr/bin/lxc-attach -n {} -- /bin/chmod {} {}'.format(name, fmode_chmod, dst)
-        self.logger.info('[{}] >> Setting file permissions {} ...'.format(name, os.path.dirname(dst)))
-        self.logger.debug('sysexec: {}'.format(command))
-        time.sleep(0.3)
-        lxc.subprocess.check_call(command, shell=True)
-
+        self._sysexec(command, name)
 
     def _create_ctbase(self, name):
         ctbase = lxc.Container(name)
@@ -272,12 +236,10 @@ class LXC_Orchestration(object):
             self.ct_disable_service(name, service)
         # Sync container rootfs
         self.sync_rootfs_container(name, os.path.join(CONFIG_PATH, config['rootfs']))
-        # Overwrite interfaces file
-        #self.ct_sync_file(name, 'interfaces.default', '/etc/network/interfaces')
         # Stop the container
         self.ct_stop(name)
         # Clear all network configuration
-        #ctbase = lxc.Container(name)
+        ctbase = lxc.Container(name)
         ctbase.clear_config_item('lxc.network')
         ctbase.save_config()
         # Overwrite container configuration
@@ -288,6 +250,7 @@ class LXC_Orchestration(object):
             ct = lxc.Container(name)
             self.logger.info('Cloning {} to {}'.format(base, name))
             print(config)
+            
             if not ct.defined:
                 # Clone LXC_CT_BASE with snapshot
                 self.ct_clone(base, name)
@@ -310,6 +273,13 @@ class LXC_Orchestration(object):
         except FileNotFoundError as e:
             self.logger.warning(format(e))
 
+    def _sysexec(self, command, name=''):
+        self.logger.debug('_sysexec: @{}# {}'.format(command, name))
+        try:
+            time.sleep(SYSEXEC_BACKOFF)
+            lxc.subprocess.check_call(command, shell=True)
+        except Exception as e:
+            self.logger.error('_sysexec: {}'.format(e))
 
 ###############################################################################
 ###############################################################################
@@ -320,25 +290,6 @@ if __name__ == '__main__':
     obj.start()
 
 '''
-# [COMMON]
-## WAN side
-ip link add dev br-wan0 type bridge
-ip link set dev br-wan0 up
-ip link add dev br-wan1 type bridge
-ip link set dev br-wan1 up
-# [RealmGateway-A]
-## WAN side
-ip link add dev br-wan0a type bridge
-ip link set dev br-wan0a up
-ip link add dev br-wan0b type bridge
-ip link set dev br-wan0b up
-## LAN side
-ip link add dev br-lan0a type bridge
-ip link set dev br-lan0a up
-ip link add dev br-lan0b type bridge
-ip link set dev br-lan0b up
-#
-
 find ctbase/rootfs/ -type d -exec chmod 775 {} \;
 find gwa/rootfs/    -type d -exec chmod 775 {} \;
 find gwb/rootfs/    -type d -exec chmod 775 {} \;
@@ -361,5 +312,24 @@ find router/rootfs/ -type f -exec chmod 664 {} \;
 
 chmod 775 proxya/rootfs/ipt_synproxy.sh
 chmod 775 proxyb/rootfs/ipt_synproxy.sh
+
+# [COMMON]
+## WAN side
+ip link add dev br-wan0 type bridge
+ip link set dev br-wan0 up
+ip link add dev br-wan1 type bridge
+ip link set dev br-wan1 up
+# [RealmGateway-A]
+## WAN side
+ip link add dev br-wan0a type bridge
+ip link set dev br-wan0a up
+ip link add dev br-wan0b type bridge
+ip link set dev br-wan0b up
+## LAN side
+ip link add dev br-lan0a type bridge
+ip link set dev br-lan0a up
+ip link add dev br-lan0b type bridge
+ip link set dev br-lan0b up
+#
 
 '''
