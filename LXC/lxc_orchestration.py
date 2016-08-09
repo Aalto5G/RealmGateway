@@ -338,4 +338,28 @@ ip link set dev br-lan0a up
 ip link add dev br-lan0b type bridge
 ip link set dev br-lan0b up
 #
+
+find ctbase/rootfs/ -type d -exec chmod 775 {} \;
+find gwa/rootfs/    -type d -exec chmod 775 {} \;
+find gwb/rootfs/    -type d -exec chmod 775 {} \;
+find hosta/rootfs/  -type d -exec chmod 775 {} \;
+find hostb/rootfs/  -type d -exec chmod 775 {} \;
+find proxya/rootfs/ -type d -exec chmod 775 {} \;
+find proxyb/rootfs/ -type d -exec chmod 775 {} \;
+find public/rootfs/ -type d -exec chmod 775 {} \;
+find router/rootfs/ -type d -exec chmod 775 {} \;
+
+find ctbase/rootfs/ -type f -exec chmod 664 {} \;
+find gwa/rootfs/    -type f -exec chmod 664 {} \;
+find gwb/rootfs/    -type f -exec chmod 664 {} \;
+find hosta/rootfs/  -type f -exec chmod 664 {} \;
+find hostb/rootfs/  -type f -exec chmod 664 {} \;
+find proxya/rootfs/ -type f -exec chmod 664 {} \;
+find proxyb/rootfs/ -type f -exec chmod 664 {} \;
+find public/rootfs/ -type f -exec chmod 664 {} \;
+find router/rootfs/ -type f -exec chmod 664 {} \;
+
+chmod 775 proxya/rootfs/ipt_synproxy.sh
+chmod 775 proxyb/rootfs/ipt_synproxy.sh
+
 '''
