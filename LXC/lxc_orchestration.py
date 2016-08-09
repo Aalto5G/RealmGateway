@@ -7,8 +7,8 @@ import time
 import stat
 import lxc
 
-LOGLEVEL = logging.DEBUG
-#LOGLEVEL = logging.INFO
+#LOGLEVEL = logging.DEBUG
+LOGLEVEL = logging.INFO
 logging.basicConfig(level=LOGLEVEL)
 
 
@@ -20,40 +20,6 @@ ROOTFS_PATH = 'rootfs'
 
 USER='ubuntu'
 PASSWORD='ubuntu'
-PACKAGES = ['sudo',
-            'iptables',
-            'conntrack',
-            'openssh-server',
-            'nano',
-            'tmux',
-            'python3',
-            'python3-pip',
-            'iperf',
-            'htop',
-            'ftp',
-            'vsftpd',
-            'curl',
-            'wget',
-            'ethtool',
-            'tcpdump',
-            'traceroute',
-            'hping3',
-            'lksctp-tools',
-            'psmisc',
-            'bind9',
-            'bind9utils',
-            'isc-dhcp-server',
-            'nginx-core',
-            'openvswitch-switch',
-            'openvswitch-ipsec']
-PACKAGES = ['iperf']
-DISABLED_SERVICES = ['bind9',
-                     'isc-dhcp-server',
-                     'openvswitch-switch',
-                     'openvswitch-ipsec',
-                     'racoon',
-                     'vsftpd',
-                     'nginx']
 
 def sanitize_line(text, comment='#', token=''):
     if text.startswith(comment):
@@ -102,7 +68,7 @@ class LXC_Orchestration(object):
         #filename = os.path.join(CONFIG_PATH, CONFIG_FILE)
         filename = self.configfile
         with open(filename, 'r') as config:
-            time.sleep(0.5)
+            time.sleep(0.3)
             for line in config:
                 #Sanitize values
                 if not sanitize_line(line):
@@ -251,23 +217,32 @@ class LXC_Orchestration(object):
         fmode = os.stat(src).st_mode
         fmode_str = stat.filemode(fmode)
         fmode_chmod = oct(fmode)[-3:]
-        time.sleep(0.5)
         # Create directory
-        command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p {}'.format(name, os.path.dirname(dst))
+        command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p -m 755 {}'.format(name, os.path.dirname(dst))
         self.logger.info('[{}] >> Creating directory {} ...'.format(name, os.path.dirname(dst)))
         self.logger.debug('sysexec: {}'.format(command))
+        time.sleep(0.3)
         lxc.subprocess.check_call(command, shell=True)
-        time.sleep(0.5)
         # Create file
         command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/bash -c "/bin/cat > {}"'.format(src, name, dst)
         self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
         self.logger.debug('sysexec: {}'.format(command))
+        time.sleep(0.3)
+        lxc.subprocess.check_call(command, shell=True)
+        '''
         try:
             lxc.subprocess.check_call(command, shell=True)
         except Exception as e:
-            self.logger.error('Failed to copy a file {}: {}'.format(dst, e))
+            self.logger.error('\n###\nFailed to copy a file {}: {}\n###\n'.format(dst, e))
+        '''
         # Set file permissions
         #ct.attach_wait(lxc.attach_run_command, ['chmod', fmode_chmod, dst])
+        # Set permissions to file
+        command = '/usr/bin/lxc-attach -n {} -- /bin/chmod {} {}'.format(name, fmode_chmod, dst)
+        self.logger.info('[{}] >> Setting file permissions {} ...'.format(name, os.path.dirname(dst)))
+        self.logger.debug('sysexec: {}'.format(command))
+        time.sleep(0.3)
+        lxc.subprocess.check_call(command, shell=True)
 
 
     def _create_ctbase(self, name):
