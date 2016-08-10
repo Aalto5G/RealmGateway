@@ -7,15 +7,18 @@ import time
 import stat
 import lxc
 
+# Export environmental variable for installing packages without user interaction
+os.environ['DEBIAN_FRONTEND']='noninteractive'
+
 #LOGLEVEL = logging.DEBUG
 LOGLEVEL = logging.INFO
 logging.basicConfig(level=LOGLEVEL)
 
-SYSEXEC_BACKOFF = 0.15
+SYSEXEC_BACKOFF = 0.25
 LXC_CT_BASE = 'ctbase'
 #CONFIG_PATH = '/home/llorenj1/workspace/gitlab/customer_edge_switching_v2/LXC'
 CONFIG_PATH = './'
-CONFIG_FILE = 'config.all'
+CONFIG_FILE = 'lxc.config'
 ROOTFS_PATH = 'rootfs'
 
 USER='ubuntu'
@@ -65,7 +68,7 @@ class LXC_Orchestration(object):
             self._spawn_container(self.ctbasename, name, config)
 
     def load_config_container(self, name, filename):
-        self.logger.info('Loading configuration: {}'.format(name))
+        self.logger.debug('Loading configuration: {}'.format(name))
         ct = lxc.Container(name)
         with open(filename, 'r') as config:
             for line in config:
@@ -78,7 +81,7 @@ class LXC_Orchestration(object):
             ct.save_config()
 
     def sync_rootfs_container(self, name, path):
-        self.logger.info('Syncing rootfs: {}'.format(name))
+        self.logger.debug('Syncing rootfs: {}'.format(name))
         ct = lxc.Container(name)
         # Backup current working directory
         cwd = os.getcwd()
@@ -174,9 +177,9 @@ class LXC_Orchestration(object):
 
     def ct_reload_services(self, name):
         ct = lxc.Container(name)
-        self.logger.info('Reload services: {}'.format(name))
+        self.logger.debug('Reload services: {}'.format(name))
         ct.attach_wait(lxc.attach_run_command, ['systemctl', 'daemon-reload'])
-        
+
     def ct_enable_service(self, name, service):
         ct = lxc.Container(name)
         self.logger.info('Enable & Start service: {} - {}'.format(name, service))
@@ -203,22 +206,24 @@ class LXC_Orchestration(object):
         fmode_str = stat.filemode(fmode)
         fmode_chmod = oct(fmode)[-3:]
         # Create directory
-        self.logger.info('[{}] >> Creating directory {} ...'.format(name, os.path.dirname(dst)))
+        self.logger.debug('[{}] >> Creating directory {} ...'.format(name, os.path.dirname(dst)))
         command = '/usr/bin/lxc-attach -n {} -- /bin/mkdir -p -m {} {}'.format(name, '755', os.path.dirname(dst))
         self._sysexec(command, name)
-        # Create file
-        self.logger.info('[{}] >> Copying {} {} ...'.format(name, dst, fmode_str))
+        # Create file - Delete existing file to avoid problem with symbolic links
+        self.logger.info('[{}] >> Copying {}'.format(name, dst))
+        command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/rm -f {}'.format(src, name, dst)
+        self._sysexec(command, name)
         command = '/bin/cat {} | /usr/bin/lxc-attach -n {} -- /bin/bash -c "/bin/cat > {}"'.format(src, name, dst)
         self._sysexec(command, name)
         # Set permissions to file
-        self.logger.debug('[{}] >> Setting file permissions {} ...'.format(name, os.path.dirname(dst)))
+        self.logger.debug('[{}] >> Setting file permissions {}'.format(name, os.path.dirname(dst)))
         command = '/usr/bin/lxc-attach -n {} -- /bin/chmod {} {}'.format(name, fmode_chmod, dst)
         self._sysexec(command, name)
 
     def _create_ctbase(self, name):
         ctbase = lxc.Container(name)
         config = self.config[name]
-        print(config)
+        self.logger.debug(config)
 
         # Create the container rootfs
         verbosity = 0
@@ -257,8 +262,8 @@ class LXC_Orchestration(object):
         try:
             ct = lxc.Container(name)
             self.logger.info('Cloning {} to {}'.format(base, name))
-            print(config)
-            
+            self.logger.debug(config)
+
             if not ct.defined:
                 # Clone LXC_CT_BASE with snapshot
                 self.ct_clone(base, name)

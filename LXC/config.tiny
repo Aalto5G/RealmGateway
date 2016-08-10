@@ -1,0 +1,24 @@
+ctbase:
+  config: ctbase/config
+  rootfs: ctbase/rootfs
+  disabled_services: [isc-dhcp-server, bind9]
+  enabled_services: [runatstartup]
+  packages: [nano, iperf, isc-dhcp-server, bind9, bind9utils, dnsutils, iptables]
+router:
+  config: router/config
+  rootfs: router/rootfs
+  packages: []
+  disabled_services: []
+  enabled_services: [bind9]
+proxya:
+  config: proxya/config
+  rootfs: proxya/rootfs
+  packages: []
+  disabled_services: []
+  enabled_services: []
+gwa:
+  config: gwa/config
+  rootfs: gwa/rootfs
+  packages: []
+  disabled_services: []
+  enabled_services: [isc-dhcp-server, bind9]
