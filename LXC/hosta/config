@@ -1,7 +1,0 @@
-# Network configuration
-##
-lxc.network.type = macvlan
-lxc.network.macvlan.mode = bridge
-lxc.network.link = br-lan0a
-lxc.network.flags = up
-lxc.network.ipv4 = 192.168.0.100/24
