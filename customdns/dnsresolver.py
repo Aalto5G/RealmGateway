@@ -150,3 +150,121 @@ class DNSResolver(asyncio.DatagramProtocol):
         if self._toutfuture:
             self._toutfuture.cancel()
             self._toutfuture = None
+
+## EXPERIMENTAL
+class DNSResolver_new():
+    '''
+    # Instantiated as follows
+    resolver = DNSResolver(host_query, host_addr, cb_function, timeouts=[0.100,0.200])
+    loop.create_task(
+        loop.create_datagram_endpoint( lambda: resolver, remote_addr=addr)
+        )
+    '''
+    def __init__(self, host_query, host_addr, server_addr, cb_function, host_rtx=True, timeouts=None):
+        self._logger = logging.getLogger('DNSResolver #{}'.format(id(self)))
+        self._logger.setLevel(LOGLEVEL)
+        self._loop = asyncio.get_event_loop()
+        self._query = host_query
+        self._addr = host_addr
+        self._saddr = server_addr
+        self._cb_function = cb_function
+        # Set the host retransmission parameter
+        self._host_rtx = host_rtx
+        # Set timeout parameters
+        if timeouts is None:
+            timeouts = [0]
+        self._timeouts = list(timeouts)
+        self._toutfuture = None
+        # Get query parameters for printing
+        q = self._query.question[0]
+        self._name = q.name
+        self._rdtype = q.rdtype
+        self._rdclass = q.rdclass
+        # Set time zero
+        self._tref = time.time()
+        self._logger.debug('Resolving with timeouts {}'.format(id(self), self._timeouts))
+        # Connect socket
+        self._sock = yield from self._sock_connect(self._saddr)
+        self._peername = self._sock.getpeername()
+        self._sockname = self._sock.getsockname()
+
+    def _get_runtime(self):
+        return time.time() - self._tref
+    
+    @asyncio.coroutine
+    def resolve(self):
+        self._logger.debug(
+            'Resolve {0} {1}/{2} via {3}:{4} > {5}:{6} with timeouts {7}'.format(
+                self._query.id, self._name.to_text(), dns.rdatatype.to_text(
+                    self._rdtype), self._sockname[0], self._sockname[1],
+                self._peername[0], self._peername[1], self._timeouts))
+                        
+        
+        for tout in self._timeouts:
+            try:
+                self._logger.info('Setting timer value: {num:.3f} sec'.format(num=tout))
+                data = yield from _sock_sendrecv(sock, dnsmsg.to_wire(), tout)
+                response = dns.message.from_wire(data)
+                
+                if not sanitize_response(self._query, response):
+                    self._logger.warning('Not a valid response for query')
+                    break
+                
+                # The response is correct
+                self._logger.warning(
+                    'Resolution succeeded {0} {1}/{2} via {3}:{4} in {num:.3f} msec'.format(
+                        self._query.id, self._name.to_text(), dns.rdatatype.to_text(self._rdtype),
+                        self._peername[0], self._peername[1], num=self._get_runtime() * 1000))
+                
+                # Call callback function
+                self._cb_function(self._query, self._addr, response)
+            except asyncio.TimeoutError:
+                self._logger.debug('Timer expired: {num:.3f} sec'.format(num=tout))
+                continue
+        
+        self._logger.warning('Resolution failed after {num:.3f} msec'.format(num=self._get_runtime() * 1000))
+        # Call callback function with None response
+        self._cb_function(self._query, self._addr, None)
+        
+    @asyncio.coroutine
+    def _sock_connect(self, addr):
+        sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        yield from self._loop.sock_connect(sock, addr)
+        return sock
+        
+    @asyncio.coroutine
+    def _sock_sendrecv(self, sock, message, timeout=None):
+        """
+        @param timeout: 'None' sets socket in blocking mode.
+        """        
+        if timeout is None:
+            sock.setblocking(True)
+        else:
+            sock.setblocking(False)
+        yield from self._loop.sock_sendall(self._sock, message)
+        data = yield from asyncio.wait_for(self._loop.sock_recv(self._sock, 1024), timeout=timeout)
+        self._sock.close()
+        return data
+
+    @asyncio.coroutine
+    def process_query(self, query, addr):
+        q = query.question[0]
+        if not self._host_rtx:
+            self._logger.debug(
+                'Retransmission disabled for {0} {1}/{2} from {3}{4}'.format(
+                    query.id, q.name.to_text(), dns.rdatatype.to_text(
+                        q.rdtype), addr[0], addr[1]))
+            return
+
+        self._logger.debug(
+                'Received retransmission {0} {1}/{2} from {3}{4}'.format(
+                    query.id, q.name.to_text(), dns.rdatatype.to_text(
+                        q.rdtype), addr[0], addr[1]))
+
+        # Forward host retransmission
+        yield from self._sendmsg(self._query.to_wire())
+    
+    @asyncio.coroutine
+    def _sendmsg(self, dnsmsg):
+        yield from self._loop.sock_sendall(self._sock, dnsmsg)
+
