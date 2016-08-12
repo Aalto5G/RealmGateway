@@ -340,3 +340,18 @@ iptables -A INPUT  -p udp --dport 53 -m u32 --u32 "28&0x0000FF00=0x0100" -j DROP
 # Filter incoming DNS queries from Internet for other domains not in RGW
 sudo iptables -I OUTPUT -m string --algo bm --hex-string "|04|test|03|com|00|" -j DROP -m comment --comment "FQDN endswith test.com"
 
+
+
+
+# Steps required to install CES/RGW in a Linux Container
+
+## Install CES/RGW dependencies
+apt-get install git build-essential python3-dev libnetfilter-queue-dev
+pip3 install --upgrade pip setuptools 
+pip3 install pip-review ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu
+### Update all pip packages
+pip-review --auto -v
+
+## Clone CES/RGW repository
+git clone http://cesguest:cesguest@gitlab.cloud.mobilesdn.org/CES/customer_edge_switching_v2.git /customer_edge_switching_v2
+
