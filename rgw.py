@@ -62,7 +62,7 @@ class RealmGateway(object):
 
         # Read configuration
         self._config = self._load_configuration('gwa.demo.config.yaml')
-        
+
         # Initialize Data Repository
         self._init_datarepository()
 
@@ -80,10 +80,10 @@ class RealmGateway(object):
 
         # Initialize DNS
         self._init_dns()
-        
+
         # Initialize configured subscriber data
         self._init_subscriberdata()
-        
+
         # Do debugging
         '''
         print('\nHostTable')
@@ -100,7 +100,7 @@ class RealmGateway(object):
 
     def _load_configuration(self, filename):
         return yaml.load(open(filename,'r'))
-    
+
     def _init_datarepository(self):
         # Initialize Data Repository
         self._logger.warning('Initializing data repository')
@@ -108,7 +108,7 @@ class RealmGateway(object):
         servicedata = self._config['DATAREPOSITORY']['servicedata']
         policydata = self._config['DATAREPOSITORY']['policydata']
         self._datarepository = DataRepository(subscriberdata=subscriberdata,servicedata=servicedata,policydata=policydata)
-        
+
     def _init_hosttable(self):
         # Create container of Hosts
         self._hosttable = HostTable()
@@ -120,7 +120,7 @@ class RealmGateway(object):
     def _init_pools(self):
         # Create container of Address Pools
         self._pooltable = PoolContainer()
-        
+
         '''
         This is not required anymore for RealmGateway as the flow
         is configured to proxy_required=True/False
@@ -163,17 +163,25 @@ class RealmGateway(object):
             self.dnscb.dns_register_soa(name)
         soa_list = self.dnscb.dns_get_soa()
 
-        # Register DNS resolver
+        # Register DNS resolvers
         addr = self._config['DNS']['resolver']['ip'], self._config['DNS']['resolver']['port']
         self.dnscb.dns_register_resolver(addr)
 
         # Initiate specific DNS servers
 
-        ## DDNS Server for DHCP Server
+        ## DDNS Server for DHCP Server with forwarding to BIND9 server
+        '''
         addr = self._config['DNS']['ddnsproxy']['ip'], self._config['DNS']['ddnsproxy']['port']
         ddnsserver_addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
         self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
         obj_ddns = DDNSProxy(dns_addr = ddnsserver_addr, cb_default = self.dnscb.ddns_process)
+        self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
+        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
+        '''
+        ## DDNS Server for DHCP Server
+        addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
+        self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
+        obj_ddns = DDNSServer(cb_default = self.dnscb.ddns_process)
         self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
 
@@ -184,8 +192,9 @@ class RealmGateway(object):
         self.dnscb.register_object('DNS_Server_WAN', obj_serverwan)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_serverwan, local_addr=addr))
 
-        '''
-        # This is only required for CES - RGW does not perform DNS QUERY MANGLING!
+
+        '''# This is only required for CES - RGW does not perform DNS QUERY MANGLING!'''
+        # Create DNS Proxy as forwarders to local resolver for LAN and Local
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
         self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
@@ -217,7 +226,7 @@ class RealmGateway(object):
         # Register NFQUEUE callback
         queue = self._config['NETWORK']['iptables']['circularpool']['nfqueue']
         self._network.ipt_register_nfqueue(queue, self.packetcb.packet_in_circularpool)
-        
+
 
     def _set_verbose(self, loglevel = logging.INFO):
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))

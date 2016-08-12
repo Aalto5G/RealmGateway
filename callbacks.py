@@ -117,14 +117,29 @@ class DNSCallbacks(object):
 
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
-        # This function is not performed by BIND and its local zone
-        pass
+        # Forward or continue to DNS resolver
+        self._logger.warning('dns_process_rgw_lan_soa')
+        fqdn = query.question[0].name.to_text()
+        rdtype = query.question[0].rdtype
+        if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+            # FQDN not found! Answer NXDOMAIN
+            response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
+            return
+
+        host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
+        if rdtype == 1:
+            # Resolve A type and answer with IPv4 address of the host
+            response = dnsutils.make_response_answer_rr(query, fqdn, 1, host_obj.ipv4, rdclass=1, ttl=30)
+        else:
+            # Answer with empty records for other types
+            response = dnsutils.make_response_rcode(query)
+        self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
+        cback(query, addr, response)
 
     def dns_process_rgw_lan_nosoa(self, query, addr, cback):
-        # This function is not performed by BIND and its forwarder configuration
-        pass
         """ Process DNS query from private network of a name not in a SOA zone """
-        '''
         # Forward or continue to DNS resolver
         self._logger.warning('dns_process_rgw_lan_nosoa')
         q = query.question[0]
@@ -150,7 +165,7 @@ class DNSCallbacks(object):
                         q.rdtype), addr[0], addr[1]))
             (resolver, cback) = self.activequeries[key]
             resolver.process_query(query, addr)
-        '''
+
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
