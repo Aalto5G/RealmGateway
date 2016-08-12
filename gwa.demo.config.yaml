@@ -8,24 +8,24 @@ DNS:
         - gwa.demo.
         - 0.168.192.in-addr.arpa.
         - 0.18.198.in-addr.arpa.
-    ddnsproxy:
+#    ddnsproxy:
+#        ip: 127.0.0.2
+#        port: 53
+    ddnsserver:
         ip: 127.0.0.2
         port: 53
-    ddnsserver:
+    proxylan:
+        ip: 192.168.0.1
+        port: 53
+    proxylocal:
         ip: 127.0.0.1
         port: 53
-#    proxylan:
-#        ip: 192.168.0.1
-#        port: 53000
-#    proxylocal:
-#        ip: 127.0.0.1
-#        port: 53000
     server:
-        ip: 198.18.0.11
+        ip: 198.18.1.130
         port: 53
     resolver:
         ip: 127.0.0.1
-        port: 5354
+        port: 54
     timeouts:
         naptr:
             - 0.010
@@ -49,11 +49,11 @@ NETWORK:
 #            - sip
     addresspool:
         servicepool:
-            - 198.18.0.18/32
+            - 198.18.1.130/32
         circularpool:
-            - 198.18.0.19/32
-            - 198.18.0.20/32
-            - 198.18.0.21/32
+            - 198.18.1.133/32
+            - 198.18.1.134/32
+            - 198.18.1.135/32
     iptables:
         circularpool:
             nfqueue: 1
