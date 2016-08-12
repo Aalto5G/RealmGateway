@@ -39,7 +39,7 @@ SUBSCRIBER_SERVICES:
             - {'priority': 10,  'direction': 'INGRESS', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Deny incoming ICMP'}
             - {'priority': 10,  'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 5900, 'action': 'DROP', 'comment':'Deny incoming VNC over UDP'}
             - {'priority': 10,  'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 5900, 'action': 'DROP', 'comment':'Deny incoming VNC over TCP'}
-            - {'priority': 10,  'direction': 'EGRESS',  'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 22, 'action': 'ACCEPT', 'comment':'Allow SSH'}
+            - {'priority': 10,  'direction': 'ANY',     'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 22, 'action': 'ACCEPT', 'comment':'Allow SSH'}
             - {'priority': 255, 'direction': 'EGRESS',  'action': 'ACCEPT', 'comment':'Allow outgoing'}
             - {'priority': 255, 'direction': 'INGRESS', 'action': 'DROP',   'comment':'Drop incoming'}
 
