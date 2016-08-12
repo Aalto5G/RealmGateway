@@ -79,8 +79,16 @@ class Network(object):
 
     def ipt_nfpacket_dnat(self, packet, ipaddr):
         mark = self._pktmark_cpool[ipaddr]
-        packet.set_mark(mark)
+        # New version of NetfilterQueue does htonl(mark)
+        ## We want to undo it
+        packet.set_mark(htonl(mark))
         packet.accept()
+
+    def ipt_nfpacket_accept(self, packet):
+        packet.accept()
+
+    def ipt_nfpacket_drop(self, packet):
+        packet.drop()
 
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()

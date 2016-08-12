@@ -412,6 +412,7 @@ class PacketCallbacks(object):
 
         if conn is None:
             self._logger.warning('No connection found for packet: {}'.format(packet_fields))
+            self.network.ipt_nfpacket_drop(packet)
             return
 
         # DNAT to private host
