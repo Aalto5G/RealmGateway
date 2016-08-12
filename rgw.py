@@ -208,7 +208,6 @@ class RealmGateway(object):
         obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_lan_soa, cb_nosoa = self.dnscb.dns_process_rgw_lan_nosoa)
         self.dnscb.register_object('DNS_Proxy_Local', obj_proxylocal)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
-        '''
 
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
