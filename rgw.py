@@ -20,7 +20,7 @@ from connection import ConnectionTable
 from callbacks import DNSCallbacks, PacketCallbacks
 
 import customdns
-from customdns.ddns import DDNSProxy
+from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy
 
 from utils import is_ipv4, is_ipv6, trace
