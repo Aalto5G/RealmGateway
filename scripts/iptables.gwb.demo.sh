@@ -154,16 +154,16 @@ iptables -t mangle -A FORWARD -j MANGLE_FWD_MARK
 iptables -t mangle -A INPUT   -j MANGLE_INPUT_MARK
 iptables -t mangle -A OUTPUT  -j MANGLE_OUTPUT_MARK
 # Populate custom chains of MANGLE PREROUTING table
-iptables -t mangle -A MANGLE_FWD_MARK -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_WAN   -m comment --comment "Mark LAN_FROM_WAN"
-iptables -t mangle -A MANGLE_FWD_MARK -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_TUN   -m comment --comment "Mark LAN_FROM_TUN"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $MARK_LAN_TO_WAN     -m comment --comment "Mark LAN_TO_WAN"
-iptables -t mangle -A MANGLE_FWD_MARK -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $MARK_LAN_TO_TUN     -m comment --comment "Mark LAN_TO_TUN"
-iptables -t mangle -A MANGLE_INPUT_MARK  -i $LAN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_LAN -m comment --comment "Mark LOCAL_FROM_LAN"
-iptables -t mangle -A MANGLE_INPUT_MARK  -i $WAN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_WAN -m comment --comment "Mark LOCAL_FROM_WAN"
-iptables -t mangle -A MANGLE_INPUT_MARK  -i $TUN_L3         -j MARK --set-mark $MARK_LOCAL_FROM_TUN -m comment --comment "Mark LOCAL_FROM_TUN"
-iptables -t mangle -A MANGLE_OUTPUT_MARK -o $LAN_L3         -j MARK --set-mark $MARK_LOCAL_TO_LAN   -m comment --comment "Mark LOCAL_TO_LAN"
-iptables -t mangle -A MANGLE_OUTPUT_MARK -o $WAN_L3         -j MARK --set-mark $MARK_LOCAL_TO_WAN   -m comment --comment "Mark LOCAL_TO_WAN"
-iptables -t mangle -A MANGLE_OUTPUT_MARK -o $TUN_L3         -j MARK --set-mark $MARK_LOCAL_TO_TUN   -m comment --comment "Mark LOCAL_TO_TUN"
+iptables -t mangle -A MANGLE_FWD_MARK    -i $WAN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_WAN   -m comment --comment "Mark LAN_FROM_WAN"
+iptables -t mangle -A MANGLE_FWD_MARK    -i $TUN_L3 -o $LAN_L3 -j MARK --set-mark $MARK_LAN_FROM_TUN   -m comment --comment "Mark LAN_FROM_TUN"
+iptables -t mangle -A MANGLE_FWD_MARK    -i $LAN_L3 -o $WAN_L3 -j MARK --set-mark $MARK_LAN_TO_WAN     -m comment --comment "Mark LAN_TO_WAN"
+iptables -t mangle -A MANGLE_FWD_MARK    -i $LAN_L3 -o $TUN_L3 -j MARK --set-mark $MARK_LAN_TO_TUN     -m comment --comment "Mark LAN_TO_TUN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $LAN_L3            -j MARK --set-mark $MARK_LOCAL_FROM_LAN -m comment --comment "Mark LOCAL_FROM_LAN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $WAN_L3            -j MARK --set-mark $MARK_LOCAL_FROM_WAN -m comment --comment "Mark LOCAL_FROM_WAN"
+iptables -t mangle -A MANGLE_INPUT_MARK  -i $TUN_L3            -j MARK --set-mark $MARK_LOCAL_FROM_TUN -m comment --comment "Mark LOCAL_FROM_TUN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $LAN_L3            -j MARK --set-mark $MARK_LOCAL_TO_LAN   -m comment --comment "Mark LOCAL_TO_LAN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $WAN_L3            -j MARK --set-mark $MARK_LOCAL_TO_WAN   -m comment --comment "Mark LOCAL_TO_WAN"
+iptables -t mangle -A MANGLE_OUTPUT_MARK -o $TUN_L3            -j MARK --set-mark $MARK_LOCAL_TO_TUN   -m comment --comment "Mark LOCAL_TO_TUN"
 
 
 
@@ -294,10 +294,10 @@ iptables -t filter -N CES_DNS_TUN
 iptables -t filter -F CES_DNS_TUN
 
 # Populate custom chain FILTER_SELF_POLICY of FILTER table
-iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
-iptables -t filter -A FILTER_SELF_POLICY -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
-iptables -t filter -A FILTER_SELF_POLICY -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
-iptables -t filter -A FILTER_SELF_POLICY                                     -j ACCEPT   -m comment --comment "Accept"
+iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
+iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
+iptables -t filter -A FILTER_SELF_POLICY                                                                -j ACCEPT   -m comment --comment "Accept"
 
 # Set policy for DHCP traffic
 ## Add rate limitations ?
