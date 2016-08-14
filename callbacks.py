@@ -135,6 +135,7 @@ class DNSCallbacks(object):
             response = dnsutils.make_response_rcode(query)
         cback(query, addr, response)
 
+    @asyncio.coroutine
     def dns_process_rgw_lan_nosoa(self, query, addr, cback):
         """ Process DNS query from private network of a name not in a SOA zone """
         # Forward or continue to DNS resolver

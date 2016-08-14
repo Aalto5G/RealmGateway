@@ -198,7 +198,8 @@ class RealmGateway(object):
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
         self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
-        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_lan_soa, cb_nosoa = self.dnscb.dns_process_rgw_lan_nosoa)
+        cb_nosoa = cb = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_lan_soa, cb_nosoa = cb_nosoa)
         self.dnscb.register_object('DNS_Proxy_LAN', obj_proxylan)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylan, local_addr=addr))
 
