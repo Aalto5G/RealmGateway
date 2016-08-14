@@ -118,13 +118,11 @@ class DNSCallbacks(object):
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
         # Forward or continue to DNS resolver
-        self._logger.warning('dns_process_rgw_lan_soa')
         fqdn = query.question[0].name.to_text()
         rdtype = query.question[0].rdtype
         if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
             response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
-            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
             return
 
@@ -135,23 +133,16 @@ class DNSCallbacks(object):
         else:
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
-        self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
         cback(query, addr, response)
 
     def dns_process_rgw_lan_nosoa(self, query, addr, cback):
         """ Process DNS query from private network of a name not in a SOA zone """
         # Forward or continue to DNS resolver
-        self._logger.warning('dns_process_rgw_lan_nosoa')
         q = query.question[0]
         key = (query.id, q.name, q.rdtype, addr)
 
         if key not in self.activequeries:
-            # Create new resolution
-            self._logger.warning(
-                'Resolve normal query {0} {1}/{2} from {3}:{4}'.format(
-                    query.id, q.name.to_text(), dns.rdatatype.to_text(
-                        q.rdtype), addr[0], addr[1]))
-            # Create factory
+            # Create factory for new resolution
             cb_f = self._do_callback
             resolver = DNSResolver(query, addr, cb_f, timeouts=None) #Passive resolution
             self.activequeries[key] = (resolver, cback)
@@ -159,13 +150,8 @@ class DNSCallbacks(object):
             self.loop.create_task(self.loop.create_datagram_endpoint(lambda: resolver, remote_addr=raddr))
         else:
             # Continue ongoing resolution
-            self._logger.warning(
-                'Continue query resolution {0} {1}/{2} from {3}:{4}'.format(
-                    query.id, q.name.to_text(), dns.rdatatype.to_text(
-                        q.rdtype), addr[0], addr[1]))
             (resolver, cback) = self.activequeries[key]
             resolver.process_query(query, addr)
-
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
@@ -185,7 +171,6 @@ class DNSCallbacks(object):
         if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
             response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
-            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
         elif rdtype == 1:
             # Resolve A type via Circular Pool
@@ -193,9 +178,7 @@ class DNSCallbacks(object):
         else:
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
-            self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
-
 
     def _dns_process_rgw_wan_soa_a(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
@@ -213,6 +196,9 @@ class DNSCallbacks(object):
             ap_spool = self.pooltable.get('servicepool')
             allocated_ipv4 = ap_spool.allocate()
             ap_spool.release(allocated_ipv4)
+        elif fqdn == self.soa_list[0]:
+            self._logger.debug('Use NS address for {}'.format(fqdn))
+            allocated_ipv4 = host_obj.ipv4
         elif self._check_policyrgw(fqdn, addr[0], None):
             self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
             allocated_ipv4 = self._create_connectionentryrgw(query, addr, cback)
@@ -230,27 +216,24 @@ class DNSCallbacks(object):
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
         self._logger.warning('dns_process_rgw_wan_nosoa')
-        # For testing purposes
-        # Answer with empty records for other types
-        #response = dnsutils.make_response_rcode(query)
-        #self._logger.warning('Send empty DNS response to {}:{}'.format(addr[0],addr[1]))
-        #cback(query, addr, response)
         # Drop DNS Query
         return
 
     def dns_process_ces_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
-        fqdn = query.question[0].name.to_text()
-        pass
+        self._logger.warning('dns_process_ces_wan_soa')
+        # Drop DNS Query
+        return
 
     def dns_process_ces_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
-        fqdn = query.question[0].name.to_text()
-        pass
+        self._logger.warning('dns_process_ces_wan_nosoa')
+        # Drop DNS Query
+        return
 
     def _check_policyrgw(self, fqdn, dns_server_ip, dns_client_ip):
         # Get RGW and host objects
-        rgw_obj = self.hosttable.get((host.KEY_HOST_FQDN, '.'))
+        rgw_obj = self.hosttable.get((host.KEY_HOST_FQDN, self.soa_list[0]))
         host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
         # Update table and remove for expired connections
         self.connectiontable.update_all_rgw()

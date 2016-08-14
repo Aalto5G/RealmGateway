@@ -1,12 +1,14 @@
 SUBSCRIBER_ID:
-    .:                {fqdn: '.',                ipv4: '000.000.0.000', msisdn: '0000000000' }
+    gwa.demo.:        {fqdn: 'gwa.demo.',        ipv4: '198.18.1.130',  msisdn: '0000000000' }
     foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100' }
     foo101.gwa.demo.: {fqdn: 'foo101.gwa.demo.', ipv4: '192.168.0.101', msisdn: '0000000101' }
 
 SUBSCRIBER_SERVICES:
-    .:
+    gwa.demo.:
         CIRCULARPOOL:
             - {max: 5 }
+        SFQDN:
+            - {fqdn: 'gwa.demo.'}
         FIREWALL_EXAMPLE:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'ACCEPT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-upto 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'DROP', 'metadata': {'ipt_string': '-m string --algo bm ! --hex-string "|04|nsfw"'}, 'comment':'Forbidden DNS domain'}
@@ -68,5 +70,3 @@ SUBSCRIBER_SERVICES:
             - {'priority': 5,   'direction': 'ANY',     'protocol': 6,  'destination-port': 22, 'action': 'ACCEPT', 'comment':'Allow all SSH'}
             - {'priority': 6,   'direction': 'INGRESS', 'protocol': 6,  'destination-port': 22, 'action': 'DROP', 'comment':'Deny incoming SSH*'}
             - {'priority': 6,   'direction': 'EGRESS',  'protocol': 6,  'destination-port': 22, 'action': 'DROP', 'comment':'Deny outgoing SSH*'}
-
-
