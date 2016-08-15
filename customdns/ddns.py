@@ -78,11 +78,11 @@ class DDNSProxy(asyncio.DatagramProtocol):
             self._logger.warning('Not "A" record found')
             return
 
-        name_str = rr_a.name.to_text()
+        name = format(rr_a.name)
         if rr_a.ttl:
-            self._do_add(name_str, rr_a.rdtype, rr_a[0].address)
+            self._do_add(name, rr_a.rdtype, rr_a[0].address)
         else:
-            self._do_delete(name_str, rr_a.rdtype, rr_a[0].address)
+            self._do_delete(name, rr_a.rdtype, rr_a[0].address)
 
         # Send generic DDNS Response NOERROR
         response = make_response_rcode(query)
@@ -173,11 +173,11 @@ class DDNSServer(asyncio.DatagramProtocol):
             self._logger.warning('Not "A" record found')
             return
 
-        name_str = rr_a.name.to_text()
+        name = format(rr_a.name)
         if rr_a.ttl:
-            self._do_add(name_str, rr_a.rdtype, rr_a[0].address)
+            self._do_add(name, rr_a.rdtype, rr_a[0].address)
         else:
-            self._do_delete(name_str, rr_a.rdtype, rr_a[0].address)
+            self._do_delete(name, rr_a.rdtype, rr_a[0].address)
 
         # Send generic DDNS Response NOERROR
         response = make_response_rcode(query)

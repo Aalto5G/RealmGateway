@@ -104,9 +104,9 @@ class DNSCallbacks(object):
             for rr in query.authority:
                 #Filter out non A record types
                 if rr.rdtype == dns.rdatatype.A and rr.ttl != 0:
-                    self.ddns_register_user(rr.name.to_text(), rr.rdtype, rr[0].address)
+                    self.ddns_register_user(format(rr.name), rr.rdtype, rr[0].address)
                 elif rr.rdtype == dns.rdatatype.A and rr.ttl == 0:
-                    self.ddns_deregister_user(rr.name.to_text(), rr.rdtype, rr[0].address)
+                    self.ddns_deregister_user(format(rr.name), rr.rdtype, rr[0].address)
 
             # Send generic DDNS Response NOERROR
             response = dnsutils.make_response_rcode(query)
@@ -118,7 +118,7 @@ class DNSCallbacks(object):
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
         # Forward or continue to DNS resolver
-        fqdn = query.question[0].name.to_text()
+        fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
         if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
@@ -170,18 +170,16 @@ class DNSCallbacks(object):
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
-        fqdn = query.question[0].name.to_text()
         pass
 
     def dns_process_ces_lan_nosoa(self, query, addr, cback):
         """ Process DNS query from private network of a name not in a SOA zone """
-        fqdn = query.question[0].name.to_text()
         pass
 
     def dns_process_rgw_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
         self._logger.debug('dns_process_rgw_wan_soa')
-        fqdn = query.question[0].name.to_text()
+        fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
         if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
@@ -202,7 +200,7 @@ class DNSCallbacks(object):
         allocated_ipv4 = None
 
         # Get host object
-        fqdn = query.question[0].name.to_text()
+        fqdn = format(query.question[0].name)
         host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
         # Get data service from FQDN
         service_data = host_obj.get_service_sfqdn(fqdn)
@@ -275,7 +273,7 @@ class DNSCallbacks(object):
         """ Return the allocated IPv4 address """
         allocated_ipv4 = None
         # Get host object
-        fqdn = query.question[0].name.to_text()
+        fqdn = format(query.question[0].name)
         host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
         # Get data service from FQDN
         service_data = host_obj.get_service_sfqdn(fqdn)

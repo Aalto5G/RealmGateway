@@ -7,13 +7,14 @@ from dns.exception import DNSException
 from dns.rdataclass import *
 from dns.rdatatype import *
 
+'''
 #Hack for dnspython (1.14.0)) - Monkey patch to_text() function
 import dns.name
 try:
     dns.name.Name.to_text = dns.name.Name.to_unicode
 except AttributeError:
     pass
-
+'''
 def debug_data(data):
     return('({} bytes) "{}"'.format(len(data), data))
 
@@ -22,11 +23,11 @@ def debug_data_addr(data, addr):
 
 def debug_msg(dnsmsg):
     q = dnsmsg.question[0]
-    return('{} {}/{} {}'.format(dnsmsg.id, q.name.to_text(), dns.rdatatype.to_text(q.rdtype),dns.rcode.to_text(dnsmsg.rcode())))
+    return('{} {}/{} {}'.format(dnsmsg.id, q.name, dns.rdatatype.to_text(q.rdtype),dns.rcode.to_text(dnsmsg.rcode())))
 
 def debug_msg_addr(dnsmsg, addr):
     q = dnsmsg.question[0]
-    return('{}:{} {} {}/{} {}'.format(addr[0], addr[1], dnsmsg.id, q.name.to_text(), dns.rdatatype.to_text(q.rdtype),dns.rcode.to_text(dnsmsg.rcode())))
+    return('{}:{} {} {}/{} {}'.format(addr[0], addr[1], dnsmsg.id, q.name, dns.rdatatype.to_text(q.rdtype),dns.rcode.to_text(dnsmsg.rcode())))
 
 def sanitize_query(query):
     try:

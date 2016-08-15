@@ -48,9 +48,10 @@ class DNSResolver(asyncio.DatagramProtocol):
 
         self._logger.debug(
             'Resolve {0} {1}/{2} via {3}:{4} > {5}:{6} with timeouts {7}'.format(
-                self._query.id, self._name.to_text(), dns.rdatatype.to_text(
-                    self._rdtype), self._sockname[0], self._sockname[1],
-                self._peername[0], self._peername[1], self._timeouts))
+                self._query.id, self._name, dns.rdatatype.to_text(self._rdtype),
+                self._sockname[0], self._sockname[1],
+                self._peername[0], self._peername[1],
+                self._timeouts))
 
         self._sendmsg(self._query)
         self._set_timeout()
@@ -73,7 +74,7 @@ class DNSResolver(asyncio.DatagramProtocol):
             self._logger.info(
                 'Resolution succeeded {0} {1}/{2} via {3}:{4} in {num:.3f} msec'.format(
                     self._query.id,
-                    self._name.to_text(),
+                    self._name,
                     dns.rdatatype.to_text(self._rdtype),
                     self._peername[0],
                     self._peername[1],
@@ -101,13 +102,13 @@ class DNSResolver(asyncio.DatagramProtocol):
         if not self._host_rtx:
             self._logger.debug(
                 'Retransmission disabled for {0} {1}/{2} from {3}{4}'.format(
-                    query.id, q.name.to_text(), dns.rdatatype.to_text(
+                    query.id, q.name, dns.rdatatype.to_text(
                         q.rdtype), addr[0], addr[1]))
             return
 
         self._logger.debug(
                 'Received retransmission {0} {1}/{2} from {3}{4}'.format(
-                    query.id, q.name.to_text(), dns.rdatatype.to_text(
+                    query.id, q.name, dns.rdatatype.to_text(
                         q.rdtype), addr[0], addr[1]))
 
         # Forward host retransmission
