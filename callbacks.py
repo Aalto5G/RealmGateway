@@ -7,7 +7,7 @@ from functools import partial
 
 import customdns
 from customdns import dnsutils
-from customdns.dnsresolver import DNSResolver
+from customdns.dnsresolver import DNSResolver, uDNSResolver
 
 import dns
 import dns.message
@@ -142,6 +142,19 @@ class DNSCallbacks(object):
         q = query.question[0]
         key = (query.id, q.name, q.rdtype, addr)
 
+        if key in self.activequeries:
+            # Continue ongoing resolution
+            resolver = self.activequeries[key]
+            resolver.do_continue(query)
+            return
+
+        # Create factory for new resolution
+        raddr = self.dns_get_resolver()
+        resolver = uDNSResolver()
+        self.activequeries[key] = resolver
+        response = yield from resolver.do_resolve(query, raddr, timeouts=[0.0001, 1])
+        cback(query, addr, response)
+        '''
         if key not in self.activequeries:
             # Create factory for new resolution
             cb_f = self._do_callback
@@ -153,6 +166,7 @@ class DNSCallbacks(object):
             # Continue ongoing resolution
             (resolver, cback) = self.activequeries[key]
             resolver.process_query(query, addr)
+        '''
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
