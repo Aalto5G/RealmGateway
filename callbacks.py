@@ -152,21 +152,9 @@ class DNSCallbacks(object):
         raddr = self.dns_get_resolver()
         resolver = uDNSResolver()
         self.activequeries[key] = resolver
-        response = yield from resolver.do_resolve(query, raddr, timeouts=[0.0001, 1])
+        response = yield from resolver.do_resolve(query, raddr, timeouts=[1, 1, 1])
+        del self.activequeries[key]
         cback(query, addr, response)
-        '''
-        if key not in self.activequeries:
-            # Create factory for new resolution
-            cb_f = self._do_callback
-            resolver = DNSResolver(query, addr, cb_f, timeouts=None) #Passive resolution
-            self.activequeries[key] = (resolver, cback)
-            raddr = self.dns_get_resolver()
-            self.loop.create_task(self.loop.create_datagram_endpoint(lambda: resolver, remote_addr=raddr))
-        else:
-            # Continue ongoing resolution
-            (resolver, cback) = self.activequeries[key]
-            resolver.process_query(query, addr)
-        '''
 
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# TODO: Read DNS timeouts from file and use them in DNSCallbacks
+
 import asyncio
 import pool
 import configparser
