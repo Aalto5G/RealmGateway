@@ -3,10 +3,12 @@
 from netfilterqueue import NetfilterQueue
 import functools
 import asyncio
+import logging
 
 class AsyncNFQueue(object):
     def __init__(self, queue, callback = None):
-        print('Binding to netfilterqueue {}'.format(queue))
+        self.logger = logging.getLogger('AsyncNFQueue')
+        self.logger.info('Binding to NFQueue #{}'.format(queue))
         self._loop = asyncio.get_event_loop()
         self.queue = queue
         # Create NetfilterQueue object
@@ -23,7 +25,7 @@ class AsyncNFQueue(object):
 
     def _nfcallback(self, pkt):
         data = pkt.get_payload()
-        print('#{}: {}'.format(self.queue, data))
+        self.logger.info('#{}: {}'.format(self.queue, data))
         pkt.drop()
 
     def set_callback(self, callback):

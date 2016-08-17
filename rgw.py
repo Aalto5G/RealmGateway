@@ -9,6 +9,7 @@ import dns
 import network
 import mydns
 import logging
+import logging.handlers
 import signal
 import sys
 import traceback
@@ -254,11 +255,15 @@ class RealmGateway(object):
         self._loop.run_forever()
 
 if __name__ == '__main__':
-    formatter = logging.Formatter('%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s')
-    logging.basicConfig(level = logging.DEBUG,
-                        filename = 'rgw.log',
-                        filemode = 'a',
-                        formatter = formatter)
+    log = logging.getLogger('')
+    log.setLevel(logging.DEBUG)
+    format = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(format)
+    log.addHandler(ch)
+    fh = logging.handlers.RotatingFileHandler('rgw.log', maxBytes=(1048576*5), backupCount=7)
+    fh.setFormatter(format)
+    log.addHandler(fh)
     try:
         loop = asyncio.get_event_loop()
         rgw = RealmGateway()
@@ -269,3 +274,4 @@ if __name__ == '__main__':
     finally:
         loop.close()
     print('Bye!')
+
