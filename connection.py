@@ -83,7 +83,7 @@ class ConnectionLegacy(container3.ContainerNode):
         # Take creation timestamp
         self.timestamp_zero = time.time()
         ## Override timeout ##
-        self.timeout = 600.0
+        #self.timeout = 600.0
         ######################
         self.timestamp_eol = self.timestamp_zero + self.timeout
         self._build_lookupkeys()

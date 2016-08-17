@@ -42,15 +42,18 @@ class Container(object):
         for key, isunique in keys:
             # The key is not unique - remove from set of items for key
             if not isunique:
+                self._logger.debug('Removed shared key {} of node {}'.format(key, node))
                 self._dict[key].remove(node)
                 # The set has no more items, remove set
                 if len(self._dict[key]) == 0:
+                    self._logger.debug('The set has no more items, remove set')
                     del self._dict[key]
             # Check the unique key is already in use
             elif key not in self._dict:
                 raise KeyError('Failed to remove: key {} does not exists in dictionary for node {}'.format(key, node))
             # Add the unique key to the dictionary
             else:
+                self._logger.debug('Removed unique key {} of node {}'.format(key, node))
                 del self._dict[key]
 
     def add(self, node):

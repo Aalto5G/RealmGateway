@@ -268,19 +268,18 @@ class DNSCallbacks(object):
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         # Check if existing connections can be overloaded
+        self._logger.info('Overload connection for {} @ {}:{}'.format(fqdn, service_data['port'], service_data['protocol']))
         allocated_ipv4 = self._overload_connectionentryrgw(service_data['port'], service_data['protocol'])
 
         if allocated_ipv4:
             self._logger.warning('Overloading {} for {}!!'.format(allocated_ipv4, fqdn))
         else:
-            self._logger.debug('Cannot overload address for {}. Allocate new address from CircularPool'.format(fqdn))
+            self._logger.warning('Cannot overload address for {}. Allocate new address from CircularPool ?'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
+            if allocated_ipv4 is None:
+                return None
+            self._logger.info('Allocated IP address from Circular Pool: {} @ {}'.format(fqdn, allocated_ipv4))
 
-        if allocated_ipv4 is None:
-            # The pool is depleted
-            return None
-
-        self._logger.info('Allocated IP address from Circular Pool: {}'.format(allocated_ipv4))
         # Create RealmGateway connection
         conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
@@ -294,6 +293,7 @@ class DNSCallbacks(object):
 
     def _overload_connectionentryrgw(self, port, protocol):
         """ Returns the IPv4 address to overload or None """
+        self._logger.debug('Attempt to overload connection for {}:{}'.format(port, protocol))
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         # Iterate all RealmGateway connections and try to reuse existing allocated IP addresses
@@ -327,10 +327,10 @@ class DNSCallbacks(object):
         ipaddr = conn.outbound_ip
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
-            self._logger.warning('Cannot release IP address to Circular Pool: {} still in use'.format(ipaddr))
+            self._logger.info('Cannot release IP address to Circular Pool: {} still in use'.format(ipaddr))
             return
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {}'.format(ipaddr))
+        self._logger.warning('Released IP address to Circular Pool: {}'.format(ipaddr))
 
     def _do_callback(self, query, addr, response=None):
         try:
@@ -366,6 +366,8 @@ class PacketCallbacks(object):
         sport, dport =  (0,0)
         if 'dport' in packet_fields:
             sport, dport = (packet_fields['sport'],packet_fields['dport'])
+        sender = '{}:{}'.format(src, sport)
+        self._logger.debug('Received PacketIn: {}'.format(packet_fields))
 
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
@@ -383,19 +385,19 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.info('No connection found for IP: {}'.format(dst))
+            self._logger.info('No connection found for IP: {} from {}'.format(dst,sender))
             return
 
         # Lookup connection in table with rest of the keys
         conn = None
         for key in [key2, key3, key4, key5, key6]:
             if self.connectiontable.has(key):
-                self._logger.info('Connection found for n-tuple*: {}'.format(key))
+                self._logger.info('Connection found for n-tuple*: {} from {}'.format(key,sender))
                 conn = self.connectiontable.get(key)
                 break
 
         if conn is None:
-            self._logger.warning('No connection found for packet: {}'.format(packet_fields))
+            self._logger.warning('No connection found for packet: {} from {}'.format(packet_fields,sender))
             self.network.ipt_nfpacket_drop(packet)
             return
 

@@ -253,12 +253,16 @@ class RealmGateway(object):
         self._logger.info('RealmGateway_v2 is starting...')
         self._loop.run_forever()
 
-
 if __name__ == '__main__':
+    formatter = logging.Formatter('%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s')
+    logging.basicConfig(level = logging.DEBUG,
+                        filename = 'rgw.log',
+                        filemode = 'a',
+                        formatter = formatter)
     try:
         loop = asyncio.get_event_loop()
-        ces = RealmGateway()
-        ces.begin()
+        rgw = RealmGateway()
+        rgw.begin()
     except Exception as e:
         print(format(e))
         trace()
