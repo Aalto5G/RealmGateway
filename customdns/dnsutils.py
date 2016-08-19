@@ -61,6 +61,6 @@ def make_response_rcode(query, rcode = dns.rcode.NOERROR):
 
 def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
     response = dns.message.make_response(query, recursion_available=True)
-    response.flags |= dns.flags.CD
+#    response.flags |= dns.flags.CD
     response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
     return response
