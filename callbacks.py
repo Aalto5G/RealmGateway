@@ -24,7 +24,8 @@ from host import HostEntry
 import connection
 from connection import ConnectionLegacy
 
-LOGLEVELCALLBACK = logging.INFO
+LOGLEVELCALLBACK = logging.WARNING
+#LOGLEVELCALLBACK = logging.INFO
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
@@ -64,7 +65,7 @@ class DNSCallbacks(object):
     def dns_get_resolver(self, any=True):
         n = 0
         if any:
-            n = random.randint(0, len(self.resolver_list) - 1)
+            n = random.randrange(len(self.resolver_list))
         return self.resolver_list[n]
 
     def ddns_register_user(self, fqdn, rdtype, ipaddr):

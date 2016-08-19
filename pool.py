@@ -210,13 +210,8 @@ class _AddressPoolUnit_set(object):
             return None
 
     def allocate_random(self):
-        try:
-            #n = random.randint(0, len(self._available) - 1)
-            addr = self._available.pop()
-            self._allocated.add(addr)
-            return addr
-        except:
-            return None
+        # Pop operation in set is always random
+        return self.allocate()
 
     def release(self, addr):
         self._allocated.remove(addr)
@@ -230,6 +225,7 @@ class _AddressPoolUnit_list(object):
         self._pool = []
         self._allocated = []
         self._available = []
+        self._sortflag = True
 
     def add_to_pool(self, addrmask):
         self._logger.debug('Add network {} to pool'.format(addrmask))
@@ -238,6 +234,9 @@ class _AddressPoolUnit_list(object):
                 continue
             self._pool.append(addr)
             self._available.append(addr)
+        if self._sortflag:
+           self._pool.sort()
+           self._available.sort()
 
     def get_pool(self):
         return list(self._pool)
@@ -268,20 +267,31 @@ class _AddressPoolUnit_list(object):
             return addr
         except:
             return None
+        finally:
+            if self._sortflag:
+                self._available.sort()
+                self._allocated.sort()
 
     def allocate_random(self):
         try:
-            n = random.randint(0, len(self._available) - 1)
+            n = random.randrange(len(self._available))
             addr = self._available.pop(n)
             self._allocated.append(addr)
             return addr
         except:
             return None
+        finally:
+            if self._sortflag:
+                self._available.sort()
+                self._allocated.sort()
 
     def release(self, addr):
         self._allocated.remove(addr)
         self._available.append(addr)
+        if self._sortflag:
+           self._allocated.sort()
+           self._available.sort()
 
 # Define AddressPoolUnit in use
-_AddressPoolUnit = _AddressPoolUnit_list
-#_AddressPoolUnit = _AddressPoolUnit_set
+_AddressPoolUnit = _AddressPoolUnit_list #Extracts a controlled element
+#_AddressPoolUnit = _AddressPoolUnit_set #Extracts a random element
