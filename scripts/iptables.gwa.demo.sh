@@ -116,7 +116,7 @@ iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p udp       -m conntrack --ctstat
 iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p icmp      -m conntrack --ctstate NEW -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
 
 ## Trace traffic for debugging
-#iptables -t mangle -I PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "MANGLE.PRE "
+#iptables -t mangle -I PREROUTING -m mark ! --mark 0x00 -j NFLOG --nflog-prefix "MANGLE.PRE "
 
 
 # --- NAT TABLE ---  #
@@ -129,11 +129,11 @@ iptables -t nat -F PREROUTING
 # Populate chain of NAT table
 iptables -t nat -A PREROUTING -i $WAN_L3 -m mark ! --mark 0x00 -j NAT_PRE_CPOOL -m comment --comment "[CircularPool] Send to DNAT chain"
 ## Do DNAT towards private host @L3-WAN - Add 1 rule per private host
-iptables -t nat -A NAT_PRE_CPOOL -j LOG --log-level 7 --log-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
+iptables -t nat -A NAT_PRE_CPOOL -j NFLOG --nflog-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
 
 
 ## Trace traffic for debugging
-#iptables -t nat -I PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "NAT.PRE "
+#iptables -t nat -I PREROUTING -m mark ! --mark 0x00 -j NFLOG --nflog-prefix "NAT.PRE "
 
 
 # --- MANGLE TABLE ---  #
