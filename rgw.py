@@ -231,7 +231,7 @@ class RealmGateway(object):
         self._network.ipt_register_nfqueue(queue, self.packetcb.packet_in_circularpool)
 
 
-    def _set_verbose(self, loglevel = logging.INFO):
+    def _set_verbose(self, loglevel = LOGLEVELMAIN):
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
         logging.basicConfig(level=loglevel)
         if loglevel <= logging.DEBUG:
@@ -256,7 +256,7 @@ class RealmGateway(object):
 
 if __name__ == '__main__':
     log = logging.getLogger('')
-    log.setLevel(logging.DEBUG)
+    log.setLevel(LOGLEVELMAIN)
     format = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(format)

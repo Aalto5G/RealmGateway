@@ -166,8 +166,8 @@ class DNSCallbacks(object):
 
     def dns_process_rgw_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
-        self._logger.debug('dns_process_rgw_wan_soa')
         fqdn = format(query.question[0].name)
+        self._logger.debug('dns_process_rgw_wan_soa {}'.format(fqdn))
         rdtype = query.question[0].rdtype
         if not self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # FQDN not found! Answer NXDOMAIN
@@ -206,7 +206,7 @@ class DNSCallbacks(object):
 
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query
-            self._logger.info('Failed to allocate an address for {}'.format(fqdn))
+            self._logger.warning('Failed to allocate an address for {}'.format(fqdn))
             return
 
         # Create DNS Response
@@ -268,13 +268,13 @@ class DNSCallbacks(object):
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         # Check if existing connections can be overloaded
-        self._logger.info('Overload connection for {} @ {}:{}'.format(fqdn, service_data['port'], service_data['protocol']))
+        self._logger.debug('Overload connection for {} @ {}:{}'.format(fqdn, service_data['port'], service_data['protocol']))
         allocated_ipv4 = self._overload_connectionentryrgw(service_data['port'], service_data['protocol'])
 
         if allocated_ipv4:
-            self._logger.warning('Overloading {} for {}!!'.format(allocated_ipv4, fqdn))
+            self._logger.info('Overloading {} for {}'.format(allocated_ipv4, fqdn))
         else:
-            self._logger.warning('Cannot overload address for {}. Allocate new address from CircularPool ?'.format(fqdn))
+            self._logger.debug('Cannot overload address for {}'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
             if allocated_ipv4 is None:
                 return None
