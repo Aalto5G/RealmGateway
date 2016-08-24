@@ -403,7 +403,13 @@ class PacketCallbacks(object):
             return
 
         # DNAT to private host
+        self._logger.warning('DNAT to {}'.format(conn.private_ip))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
+
+        UDP_LOOSE = True
+        if conn.protocol == 17 and UDP_LOOSE:
+            # Do not delete - Allow 2 second loose forwarding
+            return
+
         # Delete connection and trigger IP address release
         self.connectiontable.remove(conn)
-
