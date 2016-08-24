@@ -108,7 +108,7 @@ class Container(object):
             if not isinstance(node, ContainerNode):
                 return True
             if check_expire and node.hasexpired():
-                self.delete(node)
+                self.remove(node)
                 return False
             return True
         except KeyError:
