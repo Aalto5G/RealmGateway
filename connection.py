@@ -75,7 +75,8 @@ class ConnectionLegacy(container3.ContainerNode):
         # Set attributes
         utils.set_attributes(self, **kwargs)
         # Set default unset attributes
-        attrlist_zero = ['private_ip', 'private_port', 'outbound_ip', 'outbound_port', 'remote_ip', 'remote_port', 'protocol']
+        attrlist_zero = ['private_ip', 'private_port', 'outbound_ip', 'outbound_port',
+                         'remote_ip', 'remote_port', 'protocol', 'loose_packet']
         attrlist_none = ['fqdn', 'dns_server', 'dns_client']
         utils.set_default_attributes(self, attrlist_zero, 0)
         utils.set_default_attributes(self, attrlist_none, None)
@@ -87,6 +88,10 @@ class ConnectionLegacy(container3.ContainerNode):
         ######################
         self.timestamp_eol = self.timestamp_zero + self.timeout
         self._build_lookupkeys()
+        # Set post-processing function according to loose_packet value
+        self.post_processing = self._post_processing_ok
+        if self.loose_packet:
+            self.post_processing = self._post_processing_nok
 
     def _build_lookupkeys(self):
         # Build set of lookupkeys
@@ -110,6 +115,26 @@ class ConnectionLegacy(container3.ContainerNode):
     def hasexpired(self):
         """ Return True if the timeout has expired """
         return time.time() > self.timestamp_eol
+
+    def _post_processing_ok(self, connection_table, remote_ip, remote_port):
+        """ Return True if no further actions are required """
+        return True
+
+    def _post_processing_nok(self, connection_table, remote_ip, remote_port):
+        """ Return True if no further actions are required """
+        if self.protocol == 17 and self.loose_packet > 0:
+            # Consume loose token
+            self.loose_packet -= 1
+            # Bind connection to 5-tuple match
+            self.remote_ip, self.remote_port = remote_ip, remote_port
+            self._built_lookupkeys = [(KEY_RGW, False),
+                                      ((KEY_RGW, self.outbound_ip), False),
+                                      ((KEY_RGW, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True)]
+            # Update keys in connection table
+            connection_table.updatekeys(self)
+            return False
+        else:
+            return True
 
     def __repr__(self):
         ret = ''

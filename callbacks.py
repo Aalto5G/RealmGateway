@@ -284,7 +284,8 @@ class DNSCallbacks(object):
         # Create RealmGateway connection
         conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
-                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0] }
+                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0],
+                      'loose_packet': service_data['loose_packet']}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
@@ -406,10 +407,6 @@ class PacketCallbacks(object):
         self._logger.warning('DNAT to {}'.format(conn.private_ip))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
-        UDP_LOOSE = True
-        if conn.protocol == 17 and UDP_LOOSE:
-            # Do not delete - Allow 2 second loose forwarding
-            return
-
-        # Delete connection and trigger IP address release
-        self.connectiontable.remove(conn)
+        if conn.post_processing(self.connectiontable, src, sport):
+            # Delete connection and trigger IP address release
+            self.connectiontable.remove(conn)

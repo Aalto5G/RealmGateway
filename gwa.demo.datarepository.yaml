@@ -31,7 +31,7 @@ SUBSCRIBER_SERVICES:
             - {fqdn: 'vnc.foo100.gwa.demo.'      , protocol: 6,    port: 5900, proxy_required: false}
             - {fqdn: 'www.foo100.gwa.demo.'      , protocol: 6,    port: 80  , proxy_required: true }
             - {fqdn: 'sip.foo100.gwa.demo.'      , protocol: 17,   port: 5060, proxy_required: true }
-            - {fqdn: 'udp2000.foo100.gwa.demo.'  , protocol: 17,   port: 2000, proxy_required: false}
+            - {fqdn: 'udp2000.foo100.gwa.demo.'  , protocol: 17,   port: 2000, proxy_required: false, loose_packet: 2}
             - {fqdn: 'udp2001.foo100.gwa.demo.'  , protocol: 17,   port: 2001, proxy_required: false}
             - {fqdn: 'udp2002.foo100.gwa.demo.'  , protocol: 17,   port: 2002, proxy_required: false}
             - {fqdn: 'udp2003.foo100.gwa.demo.'  , protocol: 17,   port: 2003, proxy_required: false}
