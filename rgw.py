@@ -269,7 +269,7 @@ if __name__ == '__main__':
         rgw = RealmGateway()
         rgw.begin()
     except Exception as e:
-        print(format(e))
+        print(e)
         trace()
     finally:
         loop.close()
