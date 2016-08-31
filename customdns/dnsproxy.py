@@ -20,14 +20,17 @@ class DNSProxy(asyncio.DatagramProtocol):
         self._logger.warning('Error received @{0}:{1} {2}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):
-        self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
-        query = dns.message.from_wire(data)
-        fqdn = format(query.question[0].name)
-        cb_f = self.callback_send
-        if self._name_in_soa(fqdn):
-            self.cb_soa(query, addr, cb_f)
-        else:
-            self.cb_nosoa(query, addr, cb_f)
+        try:
+            self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
+            query = dns.message.from_wire(data)
+            fqdn = format(query.question[0].name)
+            cb_f = self.callback_send
+            if self._name_in_soa(fqdn):
+                self.cb_soa(query, addr, cb_f)
+            else:
+                self.cb_nosoa(query, addr, cb_f)
+        except Exception as e:
+            self._logger.error('Failed to process DNS message: {}'.format(e))
 
     def callback_send(self, query, addr, response=None):
         if response is None:

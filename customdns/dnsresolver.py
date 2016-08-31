@@ -57,35 +57,38 @@ class DNSResolver(asyncio.DatagramProtocol):
         self._set_timeout()
 
     def datagram_received(self, data, addr):
-        self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
+        try:
+            self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
 
-        if self._peername != addr:
-            self._logger.error('Unexpected source! {0}:{1} != {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
-            return
+            if self._peername != addr:
+                self._logger.error('Unexpected source! {0}:{1} != {2}:{3}'.format(self._peername[0], self._peername[1], addr[0], addr[1]))
+                return
 
-        response = dns.message.from_wire(data)
+            response = dns.message.from_wire(data)
 
-        if not sanitize_response(self._query, response):
-            # Sanitize incoming response
-            self._logger.warning('Not a valid response for query\n{}'.format(response))
-            response = None
-        else:
-            # The response is correct
-            self._logger.info(
-                'Resolution succeeded {0} {1}/{2} via {3}:{4} in {num:.3f} msec'.format(
-                    self._query.id,
-                    self._name,
-                    dns.rdatatype.to_text(self._rdtype),
-                    self._peername[0],
-                    self._peername[1],
-                    num=self._get_runtime() * 1000))
+            if not sanitize_response(self._query, response):
+                # Sanitize incoming response
+                self._logger.warning('Not a valid response for query\n{}'.format(response))
+                response = None
+            else:
+                # The response is correct
+                self._logger.info(
+                    'Resolution succeeded {0} {1}/{2} via {3}:{4} in {num:.3f} msec'.format(
+                        self._query.id,
+                        self._name,
+                        dns.rdatatype.to_text(self._rdtype),
+                        self._peername[0],
+                        self._peername[1],
+                        num=self._get_runtime() * 1000))
 
-        # Cancel timer
-        self._cancel_timeout()
-        # Terminate connection
-        self.connection_lost(None)
-        # Call callback function
-        self._cb_function(self._query, self._addr, response)
+            # Cancel timer
+            self._cancel_timeout()
+            # Terminate connection
+            self.connection_lost(None)
+            # Call callback function
+            self._cb_function(self._query, self._addr, response)
+        except Exception as e:
+            self._logger.error('Failed to process DNS message: {}'.format(e))
 
     def error_received(self, exc):
         # The remote end has closed the connection - ICMP Port unreachable

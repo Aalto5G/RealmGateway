@@ -31,15 +31,18 @@ class DDNSProxy(asyncio.DatagramProtocol):
         self._logger.error('Error received @{}:{} {}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):
-        self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
-        # Drop responses from DNS server
-        if addr == self._dns_addr:
-            return
-        # Send proxied message to DNS server
-        self._transport.sendto(data, self._dns_addr)
-        # Process message locally
-        query = dns.message.from_wire(data)
-        self.process_message(query, addr)
+        try:
+            self._logger.debug('Received data from {}"'.format(debug_data_addr(data, addr)))
+            # Drop responses from DNS server
+            if addr == self._dns_addr:
+                return
+            # Send proxied message to DNS server
+            self._transport.sendto(data, self._dns_addr)
+            # Process message locally
+            query = dns.message.from_wire(data)
+            self.process_message(query, addr)
+        except Exception as e:
+            self._logger.error('Failed to process DDNS message: {}'.format(e))
 
     def process_message(self, query, addr):
         """ Process a DNS message received by the DNS Server """
