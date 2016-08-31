@@ -260,6 +260,7 @@ class Network(object):
             else:
                 subprocess.check_call(command, shell=True)
         except Exception as e:
+            self._logger.warning(e)
             if raise_exc:
                 raise e
 
