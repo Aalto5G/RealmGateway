@@ -18,11 +18,17 @@ sysctl -w net.ipv4.ip_forward=1
 
 ## Connection limits
 LIMIT_GLOBAL_NEW_CONN="3000/sec"
+LIMIT_GLOBAL_NEW_CONN_BURST="3000"
 LIMIT_WAN_DNS_WL="3000/sec"
+LIMIT_WAN_DNS_WL_BURST="3000"
 LIMIT_WAN_DNS_WKGL="3000/sec"
+LIMIT_WAN_DNS_WKGL_BURST="3000"
 LIMIT_WAN_DNS_GL="3000/sec"
+LIMIT_WAN_DNS_GL_BURST="3000"
 LIMIT_WAN_DNS_SHARED="3000/sec"
+LIMIT_WAN_DNS_SHARED_BURST="3000"
 LIMIT_LAN_DNS_HOSTS="3000/sec"
+LIMIT_LAN_DNS_HOSTS_BURST="3000"
 
 ## DNS settings
 DNS_SOA1="|07|in-addr|04|arpa|00|"
@@ -262,9 +268,9 @@ TCP_MULTIPORTS_BLOCKED="135,137,138,139"
 iptables -t filter -A FILTER_PREEMPTIVE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j _REJECT  -m comment --comment "Reject vulnerable multiport TCP services"
 
 ### Set upper bound for potentially accepting new connections
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
 
 
 ## Apply HOST specific policy
@@ -383,17 +389,17 @@ iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm --hex-string 
 iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -j DROP -m comment --comment "Drop \!SOA allowed records"
 
 ## Accept whitelisted servers up to threshold else goto wellknown greylist chain
-iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WL --hashlimit-name wan_dns_wl --hashlimit-mode srcip -j ACCEPT -m comment --comment "SLA Whitelist"
-iptables -t filter -A CES_DNS_WAN_WHITELIST  -g CES_DNS_WAN_WKGREYLIST                                                                                    -m comment --comment "Continue as WK-Greylist"
+iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WL --hashlimit-burst $LIMIT_WAN_DNS_WL_BURST --hashlimit-name wan_dns_wl --hashlimit-mode srcip -j ACCEPT   -m comment --comment "SLA Whitelist"
+iptables -t filter -A CES_DNS_WAN_WHITELIST  -g CES_DNS_WAN_WKGREYLIST -m comment --comment "Continue as WK-Greylist"
 ## Pseudo-acccept wellknown greylist servers up to threshold else goto greylist chain
-iptables -t filter -A CES_DNS_WAN_WKGREYLIST -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WKGL --hashlimit-name wan_dns_wkgl -g CES_DNS_WAN_GLOBAL_LIMIT  -m comment --comment "Preferred WK-Greylist"
-iptables -t filter -A CES_DNS_WAN_WKGREYLIST -g CES_DNS_WAN_GREYLIST                                                                                      -m comment --comment "Continue as Greylist"
+iptables -t filter -A CES_DNS_WAN_WKGREYLIST -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WKGL --hashlimit-burst $LIMIT_WAN_DNS_WKGL_BURST --hashlimit-name wan_dns_wkgl -g CES_DNS_WAN_GLOBAL_LIMIT  -m comment --comment "Preferred WK-Greylist"
+iptables -t filter -A CES_DNS_WAN_WKGREYLIST -g CES_DNS_WAN_GREYLIST -m comment --comment "Continue as Greylist"
 ## Pseudo-acccept greylist servers up to threshold else DROP
-iptables -t filter -A CES_DNS_WAN_GREYLIST   -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_GL --hashlimit-name wan_dns_gl -g CES_DNS_WAN_GLOBAL_LIMIT      -m comment --comment "Best effort Greylist"
+iptables -t filter -A CES_DNS_WAN_GREYLIST   -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_GL --hashlimit-burst $LIMIT_WAN_DNS_GL_BURST --hashlimit-name wan_dns_gl -g CES_DNS_WAN_GLOBAL_LIMIT        -m comment --comment "Best effort Greylist"
 iptables -t filter -A CES_DNS_WAN_GREYLIST   -j DROP -m comment --comment "Drop excess in Greylist"
 ## Apply global limit to WK-Greylist and Greylist
-iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_SHARED --hashlimit-name wan_dns_gl -j ACCEPT                  -m comment --comment "Accept Non-SLA traffic"
-iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -j DROP                                                                                                    -m comment --comment "Drop excess"
+iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_SHARED  --hashlimit-burst $LIMIT_WAN_DNS_SHARED_BURST --hashlimit-name wan_dns_gl -j ACCEPT               -m comment --comment "Accept Non-SLA traffic"
+iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -j DROP -m comment --comment "Drop excess"
 
 
 # Populate custom chain CES_DNS_LAN of FILTER table
@@ -404,8 +410,8 @@ iptables -t filter -A CES_DNS_LAN  -j DROP                     -m comment --comm
 ## Example:
 ## iptables -t filter -A CES_DNS_LAN_BLACKLIST -m string --algo bm ! --hex-string "|07|youtube|03|com|00|" -j DROP -m comment --comment "Drop not SOA record"
 ## Apply global limit to WK-Greylist and Greylist
-iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_LAN_DNS_HOSTS --hashlimit-name lan_dns -j ACCEPT -m comment --comment "Accept LAN traffic"
-iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT                                                                             -j DROP   -m comment --comment "Drop excess"
+iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_LAN_DNS_HOSTS  --hashlimit-burst $LIMIT_LAN_DNS_HOSTS_BURST --hashlimit-name lan_dns -j ACCEPT -m comment --comment "Accept LAN traffic"
+iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT -j DROP   -m comment --comment "Drop excess"
 
 # Populate custom chain CES_DNS_TUN of FILTER table
 iptables -t filter -A CES_DNS_TUN -j DROP   -m comment --comment "Drop DNS @TUN"
