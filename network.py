@@ -165,10 +165,12 @@ class Network(object):
             self._ipt_remove_chain('filter', chain)
 
     def _ipt_create_chain(self, table, chain):
+        # Create and flush to ensure an empty table
         self._do_subprocess_call('iptables -t {} -N {}'.format(table, chain))
         self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
 
     def _ipt_remove_chain(self, table, chain):
+        # Flush and delete to ensure the table is removed
         self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
         self._do_subprocess_call('iptables -t {} -X {}'.format(table, chain))
 
@@ -209,10 +211,10 @@ class Network(object):
             chain_accept = self.iptables['hostpolicy']['accept']
             ret += ' -g {}'.format(chain_accept)
         elif rule['action'] == 'DROP':
-            # If we only DROP, there is TCP retransmission and will mess up with CircularPool
-            #ret += ' -j DROP'
-            # We REJECT the packet to avoid TCP retransmissions for the Circular Pool
-            ret += ' -j REJECT'
+            ret += ' -j DROP'
+        elif rule['action'] == 'REJECT':
+            # Modify REJECT to custom target
+            ret += ' -j _REJECT'
         else:
             self.logger.error('Unknown action: {}'.format(rule['action']))
             return
