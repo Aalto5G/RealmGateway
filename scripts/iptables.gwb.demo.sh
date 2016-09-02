@@ -16,22 +16,44 @@ sysctl -w net.ipv4.ip_forward=1
 
 # Definition of variables
 
+## Connection limits
+LIMIT_GLOBAL_NEW_CONN="3000/sec"
+LIMIT_GLOBAL_NEW_CONN_BURST="3000"
+LIMIT_WAN_DNS_WL="3000/sec"
+LIMIT_WAN_DNS_WL_BURST="3000"
+LIMIT_WAN_DNS_WKGL="3000/sec"
+LIMIT_WAN_DNS_WKGL_BURST="3000"
+LIMIT_WAN_DNS_GL="3000/sec"
+LIMIT_WAN_DNS_GL_BURST="3000"
+LIMIT_WAN_DNS_SHARED="3000/sec"
+LIMIT_WAN_DNS_SHARED_BURST="3000"
+LIMIT_LAN_DNS_HOSTS="3000/sec"
+LIMIT_LAN_DNS_HOSTS_BURST="3000"
+
+## DNS settings
+DNS_SOA1="|07|in-addr|04|arpa|00|"
+#DNS_SOA2="|03|gwa|04|demo|00|"
+DNS_SOA2="|03|gwb|04|demo|00|"
+
 ## Interface names
 LAN_L3="eth0"
 WAN_L3="eth1"
 TUN_L3="tun0"
+
 ## Networks
 LAN_NET="192.168.0.0/24"
+PROXY_NET="172.16.0.0/16"
+#CPOOL_NET="198.18.1.133/32 198.18.1.134/32 198.18.1.135/32 198.18.1.136/32 198.18.1.137/32 198.18.1.138/32 198.18.1.139/32 198.18.1.140/32 198.18.1.141/32 198.18.1.142/32"
+#CPOOL_SNAT="198.18.1.133-198.18.1.142"
 CPOOL_NET="198.18.2.133/32 198.18.2.134/32 198.18.2.135/32 198.18.2.136/32 198.18.2.137/32 198.18.2.138/32 198.18.2.139/32 198.18.2.140/32 198.18.2.141/32 198.18.2.142/32"
 CPOOL_SNAT="198.18.2.133-198.18.2.142"
-#CPOOL_NET="198.18.2.133/32 198.18.2.134/32 198.18.2.135/32"
-#CPOOL_SNAT="198.18.2.133-198.18.2.135"
-PROXY_NET="172.16.0.0/16"
 SPOOF_LAN_NET="0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 224.0.0.0/3"
 SPOOF_WAN_NET="0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 224.0.0.0/3"
 SPOOF_TUN_NET="0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 192.168.0.0/16 224.0.0.0/3"
+
 ## Netfilter Queues
-NFQUEUE_CPOOL="1"
+NFQUEUE_CPOOL=1
+
 ## IPSets
 SPOOF_LAN_IPSET="spoof_lan_ipset"
 SPOOF_WAN_IPSET="spoof_wan_ipset"
@@ -39,9 +61,7 @@ SPOOF_TUN_IPSET="spoof_tun_ipset"
 CPOOL_IPSET="circularpool_ipset"
 BLACKLIST_IPSET="blacklist_ipset"
 WHITELIST_IPSET="whitelist_ipset"
-## DNS settings
-DNS_SOA1="|03|gwb|04|demo|00|"
-DNS_SOA2="|07|in-addr|04|arpa|00|"
+
 ## Definition of specific packet MARK for traffic
 MARK_LOCAL_FROM_LAN="0xFF121212/0xFFFFFFFF"
 MARK_LOCAL_TO_LAN="0xFF211221/0xFFFFFFFF"
@@ -53,6 +73,7 @@ MARK_LAN_TO_WAN="0xFF222232/0xFFFFFFFF"
 MARK_LAN_FROM_WAN="0xFF112223/0xFFFFFFFF"
 MARK_LAN_TO_TUN="0xFF222342/0xFFFFFFFF"
 MARK_LAN_FROM_TUN="0xFF112324/0xFFFFFFFF"
+
 ## Definition of packet MASKS for traffic
 ### Classified by traffic scope and direction
 MASK_LOCAL="0xFF001010/0xFF00F0F0"
@@ -107,16 +128,16 @@ iptables -t mangle -F MANGLE_PRE_CPOOL_POLICY
 # Flush PREROUTING chain of MANGLE table
 iptables -t mangle -F PREROUTING
 # Populate chain of MANGLE table
-iptables -t mangle -A PREROUTING -i $WAN_L3 -m set --match-set $CPOOL_IPSET dst -j MANGLE_PRE_CPOOL_POLICY -m comment --comment "[$WAN_L3] CircularPool chain"
+iptables -t mangle -A PREROUTING -i $WAN_L3 -m conntrack --ctstate NEW -m set --match-set $CPOOL_IPSET dst -j MANGLE_PRE_CPOOL_POLICY -m comment --comment "[$WAN_L3] CircularPool chain"
 # Populate custom chains of MANGLE PREROUTING table
 ## Match only incoming connections in $WAN_L3 for processing in Circular Pool
 ## We can apply different policies, rate limitation, protocol matches, etc...
-iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p tcp --syn -m conntrack --ctstate NEW -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
-iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p udp       -m conntrack --ctstate NEW -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
-iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p icmp      -m conntrack --ctstate NEW -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
+iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p tcp --syn -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
+iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p udp       -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
+iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p icmp      -j NFQUEUE --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
 
 ## Trace traffic for debugging
-#iptables -t mangle -I PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "MANGLE.PRE "
+#iptables -t mangle -I PREROUTING -m mark ! --mark 0x00 -j NFLOG --nflog-prefix "MANGLE.PRE "
 
 
 # --- NAT TABLE ---  #
@@ -129,11 +150,12 @@ iptables -t nat -F PREROUTING
 # Populate chain of NAT table
 iptables -t nat -A PREROUTING -i $WAN_L3 -m mark ! --mark 0x00 -j NAT_PRE_CPOOL -m comment --comment "[CircularPool] Send to DNAT chain"
 ## Do DNAT towards private host @L3-WAN - Add 1 rule per private host
-iptables -t nat -A NAT_PRE_CPOOL -j LOG --log-level 7 --log-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
+iptables -t nat -A NAT_PRE_CPOOL -m hashlimit --hashlimit-upto 1/sec --hashlimit-name cpool_dnat -j NFLOG --nflog-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
+
 
 
 ## Trace traffic for debugging
-#iptables -t nat -I PREROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "NAT.PRE "
+#iptables -t nat -I PREROUTING -m mark ! --mark 0x00 -j NFLOG --nflog-prefix "NAT.PRE "
 
 
 # --- MANGLE TABLE ---  #
@@ -183,11 +205,11 @@ iptables -t filter -N FILTER_SELF_POLICY
 iptables -t filter -F FILTER_SELF_POLICY
 
 # Create specific table for REJECT target
-iptables -t filter -N doREJECT
-iptables -t filter -F doREJECT
-iptables -t filter -A doREJECT -p udp -j REJECT --reject-with icmp-port-unreachable
-iptables -t filter -A doREJECT -p tcp -j REJECT --reject-with tcp-reset
-iptables -t filter -A doREJECT -j REJECT --reject-with icmp-proto-unreachable
+iptables -t filter -N _REJECT
+iptables -t filter -F _REJECT
+iptables -t filter -A _REJECT -p udp -j REJECT --reject-with icmp-port-unreachable
+iptables -t filter -A _REJECT -p tcp -j REJECT --reject-with tcp-reset
+iptables -t filter -A _REJECT        -j REJECT --reject-with icmp-proto-unreachable
 
 # Populate chains of FILTER table
 ## Add default values for loopback and IPSec
@@ -223,9 +245,16 @@ iptables -t filter -A FILTER_PREEMPTIVE -m set --match-set $WHITELIST_IPSET src 
 ## Filter fragmented packets
 iptables -t filter -A FILTER_PREEMPTIVE -f -j DROP -m comment --comment "Fragmented packets"
 
+## Force TCP SYN checks for new connections
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp ! --syn -m conntrack --ctstate NEW  -j DROP -m comment --comment "Invalid TCP SYN packet"
+## Force TCP flag checks for all connections
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL ALL                 -j DROP -m comment --comment "Invalid TCP flags / Christmas in July"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL NONE                -j DROP -m comment --comment "Invalid TCP flags / Nothing to See Here"
+
 ## Accept established traffic after initial filtering
-iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "Accept established traffic"
-iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate INVALID             -j DROP   -m comment --comment "Drop invalid traffic"
+### Modified to match TCP protocol to process ESTABLISHED,RELATED UDP traffic through all chains and filters
+iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate ESTABLISHED,RELATED -p tcp -j ACCEPT -m comment --comment "Accept TCP established traffic"
+iptables -t filter -A FILTER_PREEMPTIVE -m conntrack --ctstate INVALID                    -j DROP   -m comment --comment "Drop invalid traffic"
 
 ## Linux Iptables Avoid IP Spoofing And Bad Addresses Attacks
 ## http://www.cyberciti.biz/tips/linux-iptables-8-how-to-avoid-spoofing-and-bad-addresses-attack.html
@@ -236,18 +265,12 @@ iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m set 
 ### Filter vulnerable TCP services
 ### http://howtonixnux.blogspot.fi/2008/03/iptables-using-multiport.html
 TCP_MULTIPORTS_BLOCKED="135,137,138,139"
-iptables -t filter -A FILTER_PREEMPTIVE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j doREJECT -m comment --comment "Reject vulnerable multiport TCP services"
-iptables -t filter -A FILTER_PREEMPTIVE -p tcp                            -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j DROP     -m comment --comment "Drop vulnerable multiport TCP services"
-
-### Force TCP SYN checks for new connections
-iptables -t filter -A FILTER_PREEMPTIVE -p tcp ! --syn -m conntrack --ctstate NEW  -j DROP -m comment --comment "Invalid TCP SYN packet"
-iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL ALL                 -j DROP -m comment --comment "Invalid TCP flags / Christmas in July"
-iptables -t filter -A FILTER_PREEMPTIVE -p tcp --tcp-flags ALL NONE                -j DROP -m comment --comment "Invalid TCP flags / Nothing to See Here"
+iptables -t filter -A FILTER_PREEMPTIVE -p tcp -m conntrack --ctstate NEW -m multiport --dports $TCP_MULTIPORTS_BLOCKED -j _REJECT  -m comment --comment "Reject vulnerable multiport TCP services"
 
 ### Set upper bound for potentially accepting new connections
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
-iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above 100/sec --hashlimit-burst 120 --hashlimit-name new_connection -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_LAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_WAN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
+iptables -t filter -A FILTER_PREEMPTIVE -m mark --mark $MASK_TUN_INGRESS -m conntrack --ctstate NEW -m hashlimit --hashlimit-above $LIMIT_GLOBAL_NEW_CONN --hashlimit-burst $LIMIT_GLOBAL_NEW_CONN_BURST --hashlimit-name global_new_conn -j DROP -m comment --comment "New connection"
 
 
 ## Apply HOST specific policy
@@ -263,6 +286,7 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_SELF_POLICY -m comment
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
 iptables -t nat -F POSTROUTING
+## Analyze address allocation algorithm to determine host address
 iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source $CPOOL_SNAT --persistent -m comment --comment "SNAT to $CPOOL_SNAT"
 
 
@@ -297,6 +321,7 @@ iptables -t filter -F CES_DNS_TUN
 iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p udp              --dport 67      -g CES_DHCP -m comment --comment "Jump to DHCP local chain"
 iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p tcp -m multiport --dports 80,443 -g CES_HTTP -m comment --comment "Jump to HTTP local chain"
 iptables -t filter -A FILTER_SELF_POLICY -m mark --mark $MASK_LOCAL -p udp              --dport 53      -g CES_DNS  -m comment --comment "Jump to DNS  local chain"
+## Accept at last
 iptables -t filter -A FILTER_SELF_POLICY                                                                -j ACCEPT   -m comment --comment "Accept"
 
 # Set policy for DHCP traffic
@@ -364,29 +389,29 @@ iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -m string --algo bm --hex-string 
 iptables -t filter -A CES_DNS_WAN_DOMAIN_LIMIT -j DROP -m comment --comment "Drop \!SOA allowed records"
 
 ## Accept whitelisted servers up to threshold else goto wellknown greylist chain
-iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto 10/sec --hashlimit-burst 10 --hashlimit-name wan_dns_wl   --hashlimit-mode srcip -j ACCEPT -m comment --comment "SLA Whitelist"
-iptables -t filter -A CES_DNS_WAN_WHITELIST                                                             -g CES_DNS_WAN_WKGREYLIST -m comment --comment "Continue as WK-Greylist"
+iptables -t filter -A CES_DNS_WAN_WHITELIST  -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WL --hashlimit-burst $LIMIT_WAN_DNS_WL_BURST --hashlimit-name wan_dns_wl --hashlimit-mode srcip -j ACCEPT   -m comment --comment "SLA Whitelist"
+iptables -t filter -A CES_DNS_WAN_WHITELIST  -g CES_DNS_WAN_WKGREYLIST -m comment --comment "Continue as WK-Greylist"
 ## Pseudo-acccept wellknown greylist servers up to threshold else goto greylist chain
-iptables -t filter -A CES_DNS_WAN_WKGREYLIST -m hashlimit --hashlimit-upto 20/sec --hashlimit-burst 20 --hashlimit-name wan_dns_wkgl                        -g CES_DNS_WAN_GLOBAL_LIMIT -m comment --comment "Preferred WK-Greylist"
-iptables -t filter -A CES_DNS_WAN_WKGREYLIST                                                            -g CES_DNS_WAN_GREYLIST   -m comment --comment "Continue as Greylist"
+iptables -t filter -A CES_DNS_WAN_WKGREYLIST -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_WKGL --hashlimit-burst $LIMIT_WAN_DNS_WKGL_BURST --hashlimit-name wan_dns_wkgl -g CES_DNS_WAN_GLOBAL_LIMIT  -m comment --comment "Preferred WK-Greylist"
+iptables -t filter -A CES_DNS_WAN_WKGREYLIST -g CES_DNS_WAN_GREYLIST -m comment --comment "Continue as Greylist"
 ## Pseudo-acccept greylist servers up to threshold else DROP
-iptables -t filter -A CES_DNS_WAN_GREYLIST   -m hashlimit --hashlimit-upto 15/sec --hashlimit-burst 15 --hashlimit-name wan_dns_gl                          -g CES_DNS_WAN_GLOBAL_LIMIT -m comment --comment "Best effort Greylist"
-iptables -t filter -A CES_DNS_WAN_GREYLIST                                                              -j DROP                   -m comment --comment "Drop excess in Greylist"
+iptables -t filter -A CES_DNS_WAN_GREYLIST   -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_GL --hashlimit-burst $LIMIT_WAN_DNS_GL_BURST --hashlimit-name wan_dns_gl -g CES_DNS_WAN_GLOBAL_LIMIT        -m comment --comment "Best effort Greylist"
+iptables -t filter -A CES_DNS_WAN_GREYLIST   -j DROP -m comment --comment "Drop excess in Greylist"
 ## Apply global limit to WK-Greylist and Greylist
-iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT  -m hashlimit --hashlimit-upto 25/sec --hashlimit-burst 25 --hashlimit-name wan_dns_gl                       -j ACCEPT -m comment --comment "Accept Non-SLA traffic"
-iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT                                                          -j DROP                   -m comment --comment "Drop excess"
+iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_WAN_DNS_SHARED  --hashlimit-burst $LIMIT_WAN_DNS_SHARED_BURST --hashlimit-name wan_dns_gl -j ACCEPT               -m comment --comment "Accept Non-SLA traffic"
+iptables -t filter -A CES_DNS_WAN_GLOBAL_LIMIT -j DROP -m comment --comment "Drop excess"
 
 
 # Populate custom chain CES_DNS_LAN of FILTER table
-iptables -t filter -A CES_DNS_LAN                                                                       -j CES_DNS_LAN_BLACKLIST    -m comment --comment "Apply blacklist"
-iptables -t filter -A CES_DNS_LAN                                                                       -j CES_DNS_LAN_GLOBAL_LIMIT -m comment --comment "Apply global limitation"
-iptables -t filter -A CES_DNS_LAN                                                                       -j DROP                     -m comment --comment "Should not be here"
+iptables -t filter -A CES_DNS_LAN  -j CES_DNS_LAN_BLACKLIST    -m comment --comment "Apply blacklist"
+iptables -t filter -A CES_DNS_LAN  -j CES_DNS_LAN_GLOBAL_LIMIT -m comment --comment "Apply global limitation"
+iptables -t filter -A CES_DNS_LAN  -j DROP                     -m comment --comment "Should not be here"
 ## Drop blacklisted IP addresses or matching domains
 ## Example:
 ## iptables -t filter -A CES_DNS_LAN_BLACKLIST -m string --algo bm ! --hex-string "|07|youtube|03|com|00|" -j DROP -m comment --comment "Drop not SOA record"
 ## Apply global limit to WK-Greylist and Greylist
-iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT  -m hashlimit --hashlimit-upto 25/sec --hashlimit-burst 25 --hashlimit-name lan_dns  -j ACCEPT -m comment --comment "Accept LAN traffic"
-iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT                                                                                      -j DROP   -m comment --comment "Drop excess"
+iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT -m hashlimit --hashlimit-upto $LIMIT_LAN_DNS_HOSTS  --hashlimit-burst $LIMIT_LAN_DNS_HOSTS_BURST --hashlimit-name lan_dns -j ACCEPT -m comment --comment "Accept LAN traffic"
+iptables -t filter -A CES_DNS_LAN_GLOBAL_LIMIT -j DROP   -m comment --comment "Drop excess"
 
 # Populate custom chain CES_DNS_TUN of FILTER table
-iptables -t filter -A CES_DNS_TUN                                                                       -j DROP                     -m comment --comment "Drop DNS @TUN"
+iptables -t filter -A CES_DNS_TUN -j DROP   -m comment --comment "Drop DNS @TUN"
