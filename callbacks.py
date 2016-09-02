@@ -285,7 +285,7 @@ class DNSCallbacks(object):
         conn_param = {'private_ip': host_obj.ipv4, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
                       'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0],
-                      'loose_packet': service_data['loose_packet']}
+                      'loose_packet': service_data.setdefault('loose_packet',0)}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
@@ -332,7 +332,7 @@ class DNSCallbacks(object):
             self._logger.info('Cannot release IP address to Circular Pool: {} still in use'.format(ipaddr))
             return
         ap_cpool.release(ipaddr)
-        self._logger.warning('Released IP address to Circular Pool: {}'.format(ipaddr))
+        self._logger.info('Released IP address to Circular Pool: {}'.format(ipaddr))
 
     def _do_callback(self, query, addr, response=None):
         try:
@@ -394,7 +394,7 @@ class PacketCallbacks(object):
         conn = None
         for key in [key2, key3, key4, key5, key6]:
             if self.connectiontable.has(key):
-                self._logger.info('Connection found for n-tuple*: {} from {}'.format(key,sender))
+                self._logger.debug('Connection found for n-tuple*: {} from {}'.format(key,sender))
                 conn = self.connectiontable.get(key)
                 break
 
@@ -404,7 +404,7 @@ class PacketCallbacks(object):
             return
 
         # DNAT to private host
-        self._logger.warning('DNAT to {}'.format(conn.private_ip))
+        self._logger.info('DNAT to {}'.format(conn.private_ip))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):
