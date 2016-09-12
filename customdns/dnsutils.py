@@ -64,3 +64,9 @@ def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
 #    response.flags |= dns.flags.CD
     response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
     return response
+
+def get_first_record(response):
+    try:
+        return '{}'.format(response.answer[0][0].to_text())
+    except Exception as e:
+        return None

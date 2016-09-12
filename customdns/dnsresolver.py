@@ -159,7 +159,8 @@ class DNSResolver(asyncio.DatagramProtocol):
 class uDNSResolver():
     '''
     # Instantiated as follows
-    response = yield from uDNSResolver(query, raddr, timeouts=[0.100,0.200])
+    resolver = uDNSResolver()
+    response = yield from resolver.do_resolve(query, raddr, timeouts=[1, 1, 1])
     '''
 
     @asyncio.coroutine

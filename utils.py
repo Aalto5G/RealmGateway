@@ -3,9 +3,9 @@ import sys
 import traceback
 
 # For Scapy packet parsing
-from scapy.all import *
-from scapy.layers.inet import *
-from scapy.layers.inet6 import *
+#from scapy.all import *
+#from scapy.layers.inet import *
+#from scapy.layers.inet6 import *
 # For custom packet parsing
 import struct
 
@@ -50,7 +50,7 @@ def is_ipv4(ipaddr):
         return True
     except:
         return False
-    
+
 def is_ipv6(ipaddr):
     try:
         assert(socket.inet_pton(socket.AF_INET6, ipaddr))

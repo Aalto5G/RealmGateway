@@ -10,6 +10,7 @@ KEY_HOST = 0
 KEY_HOST_FQDN = 1
 KEY_HOST_IPV4 = 2
 KEY_HOST_SERVICE = 3
+KEY_HOST_NS = 4
 KEY_SERVICE_SFQDN = 'SFQDN'
 KEY_SERVICE_CIRCULARPOOL = 'CIRCULARPOOL'
 KEY_SERVICE_FIREWALL = 'FIREWALL'
@@ -19,6 +20,38 @@ class HostTable(container3.Container):
         """ Initialize as a Container """
         super().__init__(name, LOGLEVELHOSTTABLE)
 
+    def has_carriergrade(self, fqdn):
+        """ Return True if a matching host is defined as carrier grade """
+        # 1. Check if the host exists for the given FQDN and supports carriergrade
+        ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
+        host = self.lookup((KEY_HOST_FQDN, fqdn))
+        if host and host.carriergrade:
+            return True
+        # 2. Check host list and assume fqdn as a subdomain of one of our hosts
+        for host in self.getall():
+            if not host.carriergrade:
+                continue
+            nstoken = '.{}'.format(host.fqdn)
+            if fqdn.endswith(nstoken):
+                return True
+        return False
+
+    def get_carriergrade(self, fqdn):
+        """ Return the host object if a matching host is defined as carrier grade """
+        # 1. Check if the host exists for the given FQDN and supports carriergrade
+        ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
+        host = self.lookup((KEY_HOST_FQDN, fqdn))
+        if host and host.carriergrade:
+            return host
+        # 2. Check host list and assume fqdn as a subdomain of one of our hosts
+        for host in self.getall():
+            if not host.carriergrade:
+                continue
+            nstoken = '.{}'.format(host.fqdn)
+            if fqdn.endswith(nstoken):
+                return host
+        return None
+
     def show(self):
         for node in self._list:
             node.show()
@@ -27,7 +60,9 @@ class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVELHOSTENTRY)
-        attrlist = ['ipv4','fqdn']
+        attrlist = ['ipv4','fqdn','carriergrade']
+        # Initialize services dictionary
+        self.services = {}
         utils.set_default_attributes(self, attrlist, None)
         utils.set_attributes(self, **kwargs)
         # Sanitize key in dictionary for lookupkeys()
@@ -39,16 +74,13 @@ class HostEntry(container3.ContainerNode):
         """ Return the lookup keys """
         # Create list of keys
         keys = []
-        # Add fqdn key entry
+        # Add FQDN key entry
         keys.append(((KEY_HOST_FQDN, self.fqdn), True))
-        # Add ipv4 key entry
+        # Add IPv4 key entry
         keys.append(((KEY_HOST_IPV4, self.ipv4), True))
         # Add SFQDN key(s)
         for data in self.services[KEY_SERVICE_SFQDN]:
             keys.append(((KEY_HOST_SERVICE, data['fqdn']), True))
-        # Register FQDN/SFQDN index keys
-        #keys.append((KEY_FQDN, True))
-        #keys.append((KEY_SFQDN, True))
         return keys
 
     def get_service_sfqdn(self, fqdn):
@@ -100,9 +132,9 @@ class HostEntry(container3.ContainerNode):
 
 if __name__ == "__main__":
     table = HostTable()
-    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw.'}
+    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw.', 'carriergrade':True}
     h1 = HostEntry(name='host100', **d1)
-    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw.'}
+    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw.', 'carriergrade':False}
     h2 = HostEntry(name='host101', **d2)
     table.add(h1)
     table.add(h2)
@@ -129,3 +161,13 @@ if __name__ == "__main__":
 
     print('table')
     table.show()
+
+    # Check carrier grade functions
+    print("table.has_carriergrade('host100.rgw.')")
+    print(table.has_carriergrade('host100.rgw.'))
+    print("table.has_carriergrade('subdomain.host100.rgw.')")
+    print(table.has_carriergrade('subdomain.host100.rgw.'))
+    print("table.has_carriergrade('host101.rgw.')")
+    print(table.has_carriergrade('host101.rgw.'))
+    print("table.has_carriergrade('subdomain.host101.rgw.')")
+    print(table.has_carriergrade('subdomain.host101.rgw.'))

@@ -172,44 +172,39 @@ class RealmGateway(object):
 
         # Initiate specific DNS servers
 
-        ## DDNS Server for DHCP Server with forwarding to BIND9 server
-        '''
-        addr = self._config['DNS']['ddnsproxy']['ip'], self._config['DNS']['ddnsproxy']['port']
-        ddnsserver_addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
-        self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        obj_ddns = DDNSProxy(dns_addr = ddnsserver_addr, cb_default = self.dnscb.ddns_process)
-        self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
-        '''
         ## DDNS Server for DHCP Server
         addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
         self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        obj_ddns = DDNSServer(cb_default = self.dnscb.ddns_process)
+        cb_ddns_default = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
+        obj_ddns = DDNSServer(cb_default = cb_ddns_default)
         self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
 
         ## DNS Server for WAN
         addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
         self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
-        obj_serverwan = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_wan_soa, cb_nosoa = self.dnscb.dns_process_rgw_wan_nosoa)
+        cb_wan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
+        cb_wan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+        obj_serverwan = DNSProxy(soa_list = soa_list, cb_soa = cb_wan_soa, cb_nosoa = cb_wan_nosoa)
         self.dnscb.register_object('DNS_Server_WAN', obj_serverwan)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_serverwan, local_addr=addr))
 
-
-        '''# This is only required for CES - RGW does not perform DNS QUERY MANGLING!'''
         # Create DNS Proxy as forwarders to local resolver for LAN and Local
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
         self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
-        cb_nosoa = cb = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_lan_soa, cb_nosoa = cb_nosoa)
+        cb_lan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
+        cb_lan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = cb_lan_soa, cb_nosoa = cb_lan_nosoa)
         self.dnscb.register_object('DNS_Proxy_LAN', obj_proxylan)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylan, local_addr=addr))
 
         ## DNS Proxy for Local
         addr = self._config['DNS']['proxylocal']['ip'], self._config['DNS']['proxylocal']['port']
         self._logger.warning('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
-        obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = self.dnscb.dns_process_rgw_lan_soa, cb_nosoa = self.dnscb.dns_process_rgw_lan_nosoa)
+        cb_local_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
+        cb_local_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+        obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = cb_local_soa, cb_nosoa = cb_local_nosoa)
         self.dnscb.register_object('DNS_Proxy_Local', obj_proxylocal)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
 
