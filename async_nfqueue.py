@@ -1,14 +1,15 @@
-#!/usr/bin/python3.5
+#!/usr/bin/env python3
 
 from netfilterqueue import NetfilterQueue
-import functools
 import asyncio
+import functools
 import logging
+import sys
 
 class AsyncNFQueue(object):
     def __init__(self, queue, callback = None):
-        self.logger = logging.getLogger('AsyncNFQueue')
-        self.logger.info('Binding to NFQueue #{}'.format(queue))
+        self.logger = logging.getLogger('AsyncNFQueue#{}'.format(queue))
+        self.logger.info('Bind queue')
         self._loop = asyncio.get_event_loop()
         self.queue = queue
         # Create NetfilterQueue object
@@ -25,13 +26,33 @@ class AsyncNFQueue(object):
 
     def _nfcallback(self, pkt):
         data = pkt.get_payload()
-        self.logger.info('#{}: {}'.format(self.queue, data))
+        self.logger.info('Received ({} bytes): {}'.format(len(data), data))
         pkt.drop()
 
     def set_callback(self, callback):
+        self.logger.info('Set callback to {}'.format(callback))
         self._nfqueue.unbind()
         self._nfqueue.bind(self.queue, callback)
 
     def terminate(self):
+        self.logger.info('Unbind queue')
         self._loop.remove_reader(self._nfqueue_fd)
         self._nfqueue.unbind()
+
+if __name__ == '__main__':
+    # Configure logging
+    log = logging.getLogger('')
+    format = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(format)
+    log.addHandler(ch)
+    log.setLevel(logging.DEBUG)
+    # Instantiate loop
+    loop = asyncio.get_event_loop()
+    # Create AsyncNFQueue object
+    nfqueue = AsyncNFQueue(int(sys.argv[1]))
+    try:
+        loop.run_forever()
+    except:
+        nfqueue.terminate()
+    loop.close()
