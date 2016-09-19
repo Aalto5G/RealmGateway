@@ -166,19 +166,19 @@ class uDNSResolver():
     @asyncio.coroutine
     def do_resolve(self, query, addr, timeouts=[0]):
         logger = logging.getLogger('DNSResolver #{}'.format(id(self)))
-        logger.debug('Resolving with timeouts {}'.format(id(self), timeouts))
+        logger.debug('Resolving to {} with timeouts {}'.format(addr, timeouts))
         loop = asyncio.get_event_loop()
-        self._sock = sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        sock.setblocking(False)
-        yield from loop.sock_connect(sock, addr)
+        self.sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        self.sock.setblocking(False)
+        yield from loop.sock_connect(self.sock, addr)
         response = None
         i = 0
         for tout in timeouts:
             i += 1
             try:
-                yield from loop.sock_sendall(sock, query.to_wire())
-                dataresponse = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
-                sock.close()
+                yield from loop.sock_sendall(self.sock, query.to_wire())
+                dataresponse = yield from asyncio.wait_for(loop.sock_recv(self.sock, 1024), timeout=tout)
+                self.sock.close()
                 return dns.message.from_wire(dataresponse)
             except asyncio.TimeoutError:
                 logger.info('#{} timeout expired: {:.4f} sec'.format(i, tout))
