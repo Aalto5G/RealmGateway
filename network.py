@@ -24,8 +24,6 @@ class Network(object):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVELNETWORK)
         utils.set_attributes(self, **kwargs)
-        # Map packetmark to DNAT ipaddr for CircularPool
-        self._pktmark_cpool = {}
         # Initialize nfqueue object to None
         self._nfqueue = None
         # Flush critical chains
@@ -78,7 +76,7 @@ class Network(object):
         self._nfqueue.terminate()
 
     def ipt_nfpacket_dnat(self, packet, ipaddr):
-        mark = self._pktmark_cpool[ipaddr]
+        mark = self._gen_pktmark_cpool(ipaddr)
         # New version of NetfilterQueue does htonl(mark)
         ## We want to undo it - BUG & HACK
         packet.set_mark(socket.htonl(mark))
@@ -94,20 +92,15 @@ class Network(object):
         return packet.get_payload()
 
     def _add_circularpool(self, ipaddr):
-        # Generate packet mark
-        mark = self._gen_pktmark_cpool(ipaddr)
-        # Add mark to dictionary
-        self._pktmark_cpool[ipaddr] = mark
-        self._pktmark_cpool[mark] = ipaddr
         # Add rule to iptables
         chain = self.iptables['circularpool']['chain']
+        mark = self._gen_pktmark_cpool(ipaddr)
         self._do_subprocess_call('iptables -t nat -I {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
 
     def _remove_circularpool(self, ipaddr):
-        # Remove mark from dictionary
-        mark = self._pktmark_cpool.pop(ipaddr)
         # Remove rule from iptables
         chain = self.iptables['circularpool']['chain']
+        mark = self._gen_pktmark_cpool(ipaddr)
         self._do_subprocess_call('iptables -t nat -D {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
 
     def _add_basic_hostpolicy(self, ipaddr):
