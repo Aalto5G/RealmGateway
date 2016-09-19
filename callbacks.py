@@ -24,8 +24,8 @@ from host import HostEntry
 import connection
 from connection import ConnectionLegacy
 
-LOGLEVELCALLBACK = logging.WARNING
-#LOGLEVELCALLBACK = logging.INFO
+#LOGLEVELCALLBACK = logging.WARNING
+LOGLEVELCALLBACK = logging.DEBUG
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
@@ -70,20 +70,22 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
-        self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
+        print('Register new user {} @ {}'.format(fqdn, ipaddr))
+        self._logger.debug('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
+        user_data     = self.datarepository.get_subscriber_data(fqdn).items()
         user_services = self.datarepository.get_subscriber_service(fqdn, None)
-        #DEBUG
-        #print(user_services)
-        user_data = {'ipv4':ipaddr, 'fqdn': fqdn, 'services': user_services}
-        host_obj = HostEntry(name=fqdn, **user_data)
+        # Create host entry arguments as a dictionary
+        host_data = dict(user_data)
+        host_data['services'] = dict(user_services)
+        host_obj = HostEntry(name=fqdn, **host_data)
         self.hosttable.add(host_obj)
         # Create network resources
         self.network.ipt_add_user(ipaddr)
         ## Add all firewall rules
-        admin_fw  = host_obj.get_service('FIREWALL_ADMIN', [])
-        parental_fw  = host_obj.get_service('FIREWALL_PARENTAL', [])
-        legacy_fw = host_obj.get_service('FIREWALL_LEGACY', [])
+        admin_fw    = host_obj.get_service('FIREWALL_ADMIN', [])
+        parental_fw = host_obj.get_service('FIREWALL_PARENTAL', [])
+        legacy_fw   = host_obj.get_service('FIREWALL_LEGACY', [])
         self.network.ipt_add_user_fwrules(ipaddr, 'admin', admin_fw)
         self.network.ipt_add_user_fwrules(ipaddr, 'parental', parental_fw)
         self.network.ipt_add_user_fwrules(ipaddr, 'legacy', legacy_fw)
@@ -169,23 +171,27 @@ class DNSCallbacks(object):
         self._logger.debug('dns_process_rgw_wan_soa {}'.format(fqdn))
         rdtype = query.question[0].rdtype
         # The service exists in RGW
-        if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+        if self.hosttable.has_carriergrade(fqdn):
+            self._logger.debug('Process {} with CarrierGrade'.format(fqdn))
+            yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback)
+        elif self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+            self._logger.debug('Process {} with KEY_HOST_SERVICE'.format(fqdn))
             if rdtype == 1:
                 # Resolve A type via Circular Pool
                 yield from self._dns_process_rgw_wan_soa_a(query, addr, cback)
             else:
                 # Answer with empty records for other types
+                self._logger.debug('Answer {} with no records'.format(fqdn))
                 response = dnsutils.make_response_rcode(query)
                 cback(query, addr, response)
-        elif self.hosttable.has_carriergrade(fqdn):
-            yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback)
         else:
             # FQDN not found! Answer NXDOMAIN
+            self._logger.debug('Answer {} with NXDOMAIN'.format(fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
             cback(query, addr, response)
 
     @asyncio.coroutine
-    def _dns_process_rgw_wan_soa_carriergrade(query, addr, cback):
+    def _dns_process_rgw_wan_soa_carriergrade(self, query, addr, cback):
         fqdn = format(query.question[0].name)
         self._logger.warning('_dns_process_rgw_wan_soa_carriergrade {}'.format(fqdn))
         rdtype = query.question[0].rdtype
@@ -193,6 +199,7 @@ class DNSCallbacks(object):
         # Process according to rdtype
         if rdtype != 1:
             # Answer with empty records for other types
+            self._logger.debug('Answer {} with no records'.format(fqdn))
             response = dnsutils.make_response_rcode(query)
             cback(query, addr, response)
             return
@@ -203,15 +210,16 @@ class DNSCallbacks(object):
             return
 
         # Resolve A type via Carrier Grade Circular Pool
+        self._logger.debug('CarrierGrade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
-        cgresponse = yield from cgresolver.do_resolve(query, host_obj.ipv4, timeouts=[0.5])
-        host_cgaddr = get_first_record(cgresponse)
+        cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
+        host_cgaddr = dnsutils.get_first_record(cgresponse)
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
             return
 
-        self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
+        self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
         allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn)
 
         if not allocated_ipv4:
@@ -228,7 +236,7 @@ class DNSCallbacks(object):
     def _dns_process_rgw_wan_soa_a(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
         # TODO: Check allocation policy is not exceeded for neither CES and HOST
-        self._logger.debug('_dns_process_rgw_wan_soa_a')
+        self._logger.debug('enter')
         allocated_ipv4 = None
 
         # Get host object
@@ -252,11 +260,12 @@ class DNSCallbacks(object):
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to allocate an address for {}'.format(fqdn))
             return
-
-        # Create DNS Response
-        response = dnsutils.make_response_answer_rr(query, fqdn, 1, allocated_ipv4, rdclass=1, ttl=0)
-        self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
-        cback(query, addr, response)
+        else:
+            # Create DNS Response
+            response = dnsutils.make_response_answer_rr(query, fqdn, 1, allocated_ipv4, rdclass=1, ttl=0)
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
+        self._logger.debug('leave')
 
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
@@ -313,7 +322,6 @@ class DNSCallbacks(object):
         """ Return the allocated IPv4 address """
         allocated_ipv4 = None
         # Get host object
-        fqdn = format(query.question[0].name)
         host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
         # Get data service from FQDN
         service_data = host_obj.get_service_sfqdn(fqdn)
@@ -330,12 +338,12 @@ class DNSCallbacks(object):
             allocated_ipv4 = ap_cpool.allocate()
             if allocated_ipv4 is None:
                 return None
-            self._logger.info('Allocated IP address from Circular Pool: {} @ {}'.format(fqdn, allocated_ipv4))
+            self._logger.info('Allocated IP address from Circular Pool: {} @ {} via {} '.format(fqdn, host_ipaddr, allocated_ipv4))
 
         # Create RealmGateway connection
         conn_param = {'private_ip': host_ipaddr, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
-                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': addr[0],
+                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': dns_server_ip,
                       'loose_packet': service_data.setdefault('loose_packet',0), 'id':fqdn}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
