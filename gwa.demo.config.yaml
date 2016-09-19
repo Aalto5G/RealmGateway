@@ -7,7 +7,7 @@ DNS:
     soa:
         - gwa.demo.
         - 0.168.192.in-addr.arpa.
-        - 0.18.198.in-addr.arpa.
+        - 1.18.198.in-addr.arpa.
 #    ddnsproxy:
 #        ip: 127.0.0.2
 #        port: 53
