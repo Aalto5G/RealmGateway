@@ -1,6 +1,6 @@
 SUBSCRIBER_ID:
     gwa.demo.:        {fqdn: 'gwa.demo.',        ipv4: '198.18.1.130',  msisdn: '0000000000' }
-    foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100', carriergrade: true }
+    foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100' }
     foo101.gwa.demo.: {fqdn: 'foo101.gwa.demo.', ipv4: '192.168.0.101', msisdn: '0000000101' }
 
 SUBSCRIBER_SERVICES:
@@ -22,9 +22,35 @@ SUBSCRIBER_SERVICES:
         CIRCULARPOOL:
             - {max: 1000 }
         SFQDN:
-            - {fqdn: 'foo100.gwa.demo.',                                       proxy_required: false}
+            - {fqdn: 'foo100.gwa.demo.'                                      , proxy_required: false}
+            - {fqdn: 'iperf.foo100.gwa.demo.'    , protocol: 6,    port: 5001, proxy_required: false}
+            - {fqdn: 'ssh.foo100.gwa.demo.'      , protocol: 6,    port: 22  , proxy_required: false}
+            - {fqdn: 'tcp.foo100.gwa.demo.'      , protocol: 6,    port: 0   , proxy_required: false}
+            - {fqdn: 'udp.foo100.gwa.demo.'      , protocol: 17,   port: 0   , proxy_required: false}
+            - {fqdn: 'p22.foo100.gwa.demo.'      , protocol: 0,    port: 22  , proxy_required: false}
+            - {fqdn: 'vnc.foo100.gwa.demo.'      , protocol: 6,    port: 5900, proxy_required: false}
             - {fqdn: 'www.foo100.gwa.demo.'      , protocol: 6,    port: 80  , proxy_required: true }
             - {fqdn: 'sip.foo100.gwa.demo.'      , protocol: 17,   port: 5060, proxy_required: true }
+            - {fqdn: 'udp2000.foo100.gwa.demo.'  , protocol: 17,   port: 2000, proxy_required: false, loose_packet: 2}
+            - {fqdn: 'udp2001.foo100.gwa.demo.'  , protocol: 17,   port: 2001, proxy_required: false}
+            - {fqdn: 'udp2002.foo100.gwa.demo.'  , protocol: 17,   port: 2002, proxy_required: false}
+            - {fqdn: 'udp2003.foo100.gwa.demo.'  , protocol: 17,   port: 2003, proxy_required: false}
+            - {fqdn: 'udp2004.foo100.gwa.demo.'  , protocol: 17,   port: 2004, proxy_required: false}
+            - {fqdn: 'udp2005.foo100.gwa.demo.'  , protocol: 17,   port: 2005, proxy_required: false}
+            - {fqdn: 'udp2006.foo100.gwa.demo.'  , protocol: 17,   port: 2006, proxy_required: false}
+            - {fqdn: 'udp2007.foo100.gwa.demo.'  , protocol: 17,   port: 2007, proxy_required: false}
+            - {fqdn: 'udp2008.foo100.gwa.demo.'  , protocol: 17,   port: 2008, proxy_required: false}
+            - {fqdn: 'udp2009.foo100.gwa.demo.'  , protocol: 17,   port: 2009, proxy_required: false}
+            - {fqdn: 'udp2010.foo100.gwa.demo.'  , protocol: 17,   port: 2010, proxy_required: false}
+            - {fqdn: 'udp2011.foo100.gwa.demo.'  , protocol: 17,   port: 2011, proxy_required: false}
+            - {fqdn: 'udp2012.foo100.gwa.demo.'  , protocol: 17,   port: 2012, proxy_required: false}
+            - {fqdn: 'udp2013.foo100.gwa.demo.'  , protocol: 17,   port: 2013, proxy_required: false}
+            - {fqdn: 'udp2014.foo100.gwa.demo.'  , protocol: 17,   port: 2014, proxy_required: false}
+            - {fqdn: 'udp2015.foo100.gwa.demo.'  , protocol: 17,   port: 2015, proxy_required: false}
+            - {fqdn: 'udp2016.foo100.gwa.demo.'  , protocol: 17,   port: 2016, proxy_required: false}
+            - {fqdn: 'udp2017.foo100.gwa.demo.'  , protocol: 17,   port: 2017, proxy_required: false}
+            - {fqdn: 'udp2018.foo100.gwa.demo.'  , protocol: 17,   port: 2018, proxy_required: false}
+            - {fqdn: 'udp2019.foo100.gwa.demo.'  , protocol: 17,   port: 2019, proxy_required: false}
 
         FIREWALL_ADMIN:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'REJECT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns_hosts --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
