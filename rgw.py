@@ -27,7 +27,8 @@ from customdns.dnsproxy import DNSProxy
 
 from utils import is_ipv4, is_ipv6, trace
 
-LOGLEVELMAIN = logging.WARNING
+#LOGLEVELMAIN = logging.WARNING
+LOGLEVELMAIN = logging.DEBUG
 
 class RetCodes(object):
     POLICY_OK  = 0
@@ -83,8 +84,8 @@ class RealmGateway(object):
         # Initialize DNS
         self._init_dns()
 
-        # Initialize configured subscriber data
-        self._init_subscriberdata()
+        # Initialize configured subscriber data wrapped as a corutine
+        self._loop.create_task(self._init_subscriberdata())
 
         # Do debugging
         '''
@@ -207,13 +208,14 @@ class RealmGateway(object):
         self.dnscb.register_object('DNS_Proxy_Local', obj_proxylocal)
         self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
 
+    @asyncio.coroutine
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
         for subscriber_id, subscriber_data in self._datarepository.get_subscriber_data(None).items():
             ipaddr = subscriber_data['ipv4']
             fqdn = subscriber_data['fqdn']
             self._logger.info('Registering subscriber {} / {}@{}'.format(subscriber_id, fqdn, ipaddr))
-            self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
+            yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
 
     def _init_network(self):
         kwargs = self._config['NETWORK']
@@ -252,6 +254,8 @@ if __name__ == '__main__':
     log = logging.getLogger('')
     log.setLevel(LOGLEVELMAIN)
     format = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
+    if LOGLEVELMAIN == logging.DEBUG:
+        format = logging.Formatter('[%(levelname)s %(filename)s:%(lineno)s %(funcName)20s()] %(message)s')
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(format)
     log.addHandler(ch)
