@@ -7,7 +7,6 @@ import pool
 import configparser
 import dns
 import network
-import mydns
 import logging
 import logging.handlers
 import signal
@@ -50,7 +49,7 @@ class RetCodes(object):
 
 
 class RealmGateway(object):
-    def __init__(self, name='RealmGateway'):
+    def __init__(self, configfile, name='RealmGateway'):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVELMAIN)
 
@@ -64,7 +63,7 @@ class RealmGateway(object):
         self._capture_signal()
 
         # Read configuration
-        self._config = self._load_configuration('gwa.demo.config.yaml')
+        self._config = self._load_configuration(configfile)
 
         # Initialize Data Repository
         self._init_datarepository()
@@ -261,7 +260,7 @@ if __name__ == '__main__':
     log.addHandler(fh)
     try:
         loop = asyncio.get_event_loop()
-        rgw = RealmGateway()
+        rgw = RealmGateway(sys.argv[1])
         rgw.begin()
     except Exception as e:
         print(e)
@@ -269,4 +268,3 @@ if __name__ == '__main__':
     finally:
         loop.close()
     print('Bye!')
-
