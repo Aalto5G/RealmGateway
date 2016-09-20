@@ -24,7 +24,6 @@ from host import HostEntry
 import connection
 from connection import ConnectionLegacy
 
-#LOGLEVELCALLBACK = logging.WARNING
 LOGLEVELCALLBACK = logging.DEBUG
 
 class DNSCallbacks(object):
@@ -70,7 +69,6 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
-        print('Register new user {} @ {}'.format(fqdn, ipaddr))
         self._logger.debug('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
         user_data     = self.datarepository.get_subscriber_data(fqdn).items()
@@ -81,14 +79,19 @@ class DNSCallbacks(object):
         host_obj = HostEntry(name=fqdn, **host_data)
         self.hosttable.add(host_obj)
         # Create network resources
-        self.network.ipt_add_user(ipaddr)
+        hostname = ipaddr
+        self.network.ipt_add_user(hostname, ipaddr)
         ## Add all firewall rules
         admin_fw    = host_obj.get_service('FIREWALL_ADMIN', [])
         parental_fw = host_obj.get_service('FIREWALL_PARENTAL', [])
         legacy_fw   = host_obj.get_service('FIREWALL_LEGACY', [])
-        self.network.ipt_add_user_fwrules(ipaddr, 'admin', admin_fw)
-        self.network.ipt_add_user_fwrules(ipaddr, 'parental', parental_fw)
-        self.network.ipt_add_user_fwrules(ipaddr, 'legacy', legacy_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin', admin_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'parental', parental_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'legacy', legacy_fw)
+        ## Carrier Grade services if available
+        if host_obj.has_service('CARRIERGRADE'):
+            carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
+            self.network.ipt_add_user_carriergrade(hostname, carriergrade_ipt)
 
     @asyncio.coroutine
     def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
@@ -99,7 +102,12 @@ class DNSCallbacks(object):
         host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
         self.hosttable.remove(host_obj)
         # Remove network resources
-        self.network.ipt_remove_user(ipaddr)
+        hostname = ipaddr
+        self.network.ipt_remove_user(hostname, ipaddr)
+        ## Carrier Grade services if available
+        if host_obj.has_service('CARRIERGRADE'):
+            carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
+            self.network.ipt_remove_user_fwrules(hostname, carriergrade_ipt)
 
     @asyncio.coroutine
     def ddns_process(self, query, addr, cback):
@@ -172,7 +180,7 @@ class DNSCallbacks(object):
         rdtype = query.question[0].rdtype
         # The service exists in RGW
         if self.hosttable.has_carriergrade(fqdn):
-            self._logger.debug('Process {} with CarrierGrade'.format(fqdn))
+            self._logger.debug('Process {} with KEY_SERVICE_CARRIERGRADE'.format(fqdn))
             yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback)
         elif self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             self._logger.debug('Process {} with KEY_HOST_SERVICE'.format(fqdn))
@@ -210,17 +218,20 @@ class DNSCallbacks(object):
             return
 
         # Resolve A type via Carrier Grade Circular Pool
-        self._logger.debug('CarrierGrade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
+        self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
         cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
         host_cgaddr = dnsutils.get_first_record(cgresponse)
+        #TODO: Check host_cgaddr exists in service KEY_SERVICE_CARRIERGRADE
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
             return
 
         self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
-        allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn)
+        # Get service data based on host FQDN
+        service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+        allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn, service_data)
 
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query
@@ -254,6 +265,8 @@ class DNSCallbacks(object):
             allocated_ipv4 = host_obj.ipv4
         elif self._check_policyrgw(host_obj, addr[0], None):
             self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
+            # Get service data based on queried FQDN
+            service_data = host_obj.get_service_sfqdn(fqdn)
             allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn)
 
         if not allocated_ipv4:
@@ -318,13 +331,9 @@ class DNSCallbacks(object):
         # No policy has been exceeded
         return True
 
-    def _create_connectionentryrgw(self, host_obj, host_ipaddr, dns_server_ip, dns_client_ip, fqdn):
+    def _create_connectionentryrgw(self, host_obj, host_ipaddr, dns_server_ip, dns_client_ip, fqdn, service_data):
         """ Return the allocated IPv4 address """
         allocated_ipv4 = None
-        # Get host object
-        host_obj = self.hosttable.lookup((host.KEY_HOST_SERVICE, fqdn))
-        # Get data service from FQDN
-        service_data = host_obj.get_service_sfqdn(fqdn)
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         # Check if existing connections can be overloaded

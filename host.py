@@ -3,8 +3,7 @@ import logging
 import utils
 import pprint
 
-LOGLEVELHOSTTABLE = logging.WARNING
-LOGLEVELHOSTENTRY = logging.WARNING
+LOGLEVELHOST = logging.INFO
 
 KEY_HOST = 0
 KEY_HOST_FQDN = 1
@@ -14,25 +13,28 @@ KEY_HOST_NS = 4
 KEY_SERVICE_SFQDN = 'SFQDN'
 KEY_SERVICE_CIRCULARPOOL = 'CIRCULARPOOL'
 KEY_SERVICE_FIREWALL = 'FIREWALL'
+KEY_SERVICE_CARRIERGRADE = 'CARRIERGRADE'
 
 class HostTable(container3.Container):
     def __init__(self, name='HostTable'):
         """ Initialize as a Container """
-        super().__init__(name, LOGLEVELHOSTTABLE)
+        super().__init__(name, LOGLEVELHOST)
 
     def has_carriergrade(self, fqdn):
         """ Return True if a matching host is defined as carrier grade """
         # 1. Check if the host exists for the given FQDN and supports carriergrade
         ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
         host = self.lookup((KEY_HOST_FQDN, fqdn))
-        if host and host.carriergrade:
+        if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
+            self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
             return True
         # 2. Check host list and assume fqdn as a subdomain of one of our hosts
         for host in self.getall():
-            if not host.carriergrade:
+            if not host.has_service(KEY_SERVICE_CARRIERGRADE):
                 continue
             nstoken = '.{}'.format(host.fqdn)
             if fqdn.endswith(nstoken):
+                self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
                 return True
         return False
 
@@ -41,14 +43,16 @@ class HostTable(container3.Container):
         # 1. Check if the host exists for the given FQDN and supports carriergrade
         ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
         host = self.lookup((KEY_HOST_FQDN, fqdn))
-        if host and host.carriergrade:
+        if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
+            self._logger.debug('Get host KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
             return host
         # 2. Check host list and assume fqdn as a subdomain of one of our hosts
         for host in self.getall():
-            if not host.carriergrade:
+            if not host.has_service(KEY_SERVICE_CARRIERGRADE):
                 continue
             nstoken = '.{}'.format(host.fqdn)
             if fqdn.endswith(nstoken):
+                self._logger.debug('Get host KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
                 return host
         return None
 
@@ -59,8 +63,8 @@ class HostTable(container3.Container):
 class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
-        super().__init__(name, LOGLEVELHOSTENTRY)
-        attrlist = ['ipv4','fqdn','carriergrade']
+        super().__init__(name, LOGLEVELHOST)
+        attrlist = ['ipv4','fqdn']
         # Initialize services dictionary
         self.services = {}
         utils.set_default_attributes(self, attrlist, None)
@@ -132,9 +136,9 @@ class HostEntry(container3.ContainerNode):
 
 if __name__ == "__main__":
     table = HostTable()
-    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw.', 'carriergrade':True}
+    d1 = {'ipv4':'192.168.0.100','fqdn':'host100.rgw.'}
     h1 = HostEntry(name='host100', **d1)
-    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw.', 'carriergrade':False}
+    d2 = {'ipv4':'192.168.0.101','fqdn':'host101.rgw.'}
     h2 = HostEntry(name='host101', **d2)
     table.add(h1)
     table.add(h2)
