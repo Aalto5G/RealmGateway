@@ -13,8 +13,7 @@ import container3
 from async_nfqueue import AsyncNFQueue
 
 
-LOGLEVELNETWORK = logging.WARNING
-LOGLEVELCONNECTION = logging.WARNING
+LOGLEVELNETWORK = logging.INFO
 
 KEY_CESLOCAL = 1
 KEY_CESPUBLIC = 2
@@ -47,20 +46,43 @@ class Network(object):
     def ipt_flush_chain(self, table, chain):
         self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
 
-    def ipt_add_user(self, ipaddr):
+    def ipt_add_user(self, hostname, ipaddr):
+        self._logger.debug('Add user {}/{}'.format(hostname, ipaddr))
+        # Remove previous user data
+        self.ipt_remove_user(hostname, ipaddr)
         # Add user to Circular Pool ipt_chain
-        self._add_circularpool(ipaddr)
+        self._add_circularpool(hostname, ipaddr)
         # Add user's firewall rules and register in global host policy chain
-        self._add_basic_hostpolicy(ipaddr)
+        self._add_basic_hostpolicy(hostname, ipaddr)
 
-    def ipt_remove_user(self, ipaddr):
+    def ipt_remove_user(self, hostname, ipaddr):
+        self._logger.debug('Remove user {}/{}'.format(hostname, ipaddr))
         # Remove user from Circular Pool ipt_chain
-        self._remove_circularpool(ipaddr)
+        self._remove_circularpool(hostname, ipaddr)
         # Remove user's firewall rules and deregister in global host policy chain
-        self._remove_basic_hostpolicy(ipaddr)
+        self._remove_basic_hostpolicy(hostname, ipaddr)
 
-    def ipt_add_user_fwrules(self, ipaddr, chain, fwrules):
-        host_chain = 'HOST_{}_{}'.format(ipaddr, chain.upper())
+    def ipt_add_user_carriergrade(self, hostname, cgaddrs):
+        self._logger.debug('Add carrier grade user {}/{}'.format(hostname, cgaddrs))
+        for item in cgaddrs:
+            ipaddr = item['ipv4']
+            self._logger.debug('Add carrier grade user address {}/{}'.format(hostname, ipaddr))
+            # Add carriergrade user to Circular Pool ipt_chain
+            self._add_circularpool(hostname, ipaddr)
+            # Add user's firewall rules and register in global host policy chain
+            self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
+
+    def ipt_remove_user_carriergrade(self, hostname, cgaddrs):
+        self._logger.debug('Remove carrier grade user {}/{}'.format(hostname, cgaddrs))
+        for item in cgaddrs:
+            ipaddr = item['ipv4']
+            # Remove carriergrade user to Circular Pool ipt_chain
+            self._remove_circularpool(hostname, ipaddr)
+            # Remove user's firewall rules and register in global host policy chain
+            self._remove_basic_hostpolicy_carriergrade(hostname, ipaddr)
+
+    def ipt_add_user_fwrules(self, hostname, ipaddr, chain, fwrules):
+        host_chain = 'HOST_{}_{}'.format(hostname, chain.upper())
         # Sort list by priority of the rules
         sorted_fwrules = sorted(fwrules, key=lambda rule: rule['priority'])
         for rule in sorted_fwrules:
@@ -91,25 +113,25 @@ class Network(object):
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
-    def _add_circularpool(self, ipaddr):
+    def _add_circularpool(self, hostname, ipaddr):
         # Add rule to iptables
         chain = self.iptables['circularpool']['chain']
         mark = self._gen_pktmark_cpool(ipaddr)
         self._do_subprocess_call('iptables -t nat -I {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
 
-    def _remove_circularpool(self, ipaddr):
+    def _remove_circularpool(self, hostname, ipaddr):
         # Remove rule from iptables
         chain = self.iptables['circularpool']['chain']
         mark = self._gen_pktmark_cpool(ipaddr)
         self._do_subprocess_call('iptables -t nat -D {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
 
-    def _add_basic_hostpolicy(self, ipaddr):
+    def _add_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
-        host_chain          = 'HOST_{}'.format(ipaddr)
-        host_chain_admin    = 'HOST_{}_ADMIN'.format(ipaddr)
-        host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
-        host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
-        host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
+        host_chain          = 'HOST_{}'.format(hostname)
+        host_chain_admin    = 'HOST_{}_ADMIN'.format(hostname)
+        host_chain_parental = 'HOST_{}_PARENTAL'.format(hostname)
+        host_chain_legacy   = 'HOST_{}_LEGACY'.format(hostname)
+        host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
         # Create basic chains for host policy
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
@@ -135,14 +157,13 @@ class Network(object):
         self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_ces, host_chain_ces))
         self._do_subprocess_call('iptables -t filter -A {}                   -j DROP'.format(host_chain))
 
-
-    def _remove_basic_hostpolicy(self, ipaddr):
+    def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
-        host_chain          = 'HOST_{}'.format(ipaddr)
-        host_chain_admin    = 'HOST_{}_ADMIN'.format(ipaddr)
-        host_chain_parental = 'HOST_{}_PARENTAL'.format(ipaddr)
-        host_chain_legacy   = 'HOST_{}_LEGACY'.format(ipaddr)
-        host_chain_ces      = 'HOST_{}_CES'.format(ipaddr)
+        host_chain          = 'HOST_{}'.format(hostname)
+        host_chain_admin    = 'HOST_{}_ADMIN'.format(hostname)
+        host_chain_parental = 'HOST_{}_PARENTAL'.format(hostname)
+        host_chain_legacy   = 'HOST_{}_LEGACY'.format(hostname)
+        host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
         # 1. Remove triggers in global host policy chain
         ## Get packet marks based on traffic direction
@@ -157,10 +178,35 @@ class Network(object):
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
             self._ipt_remove_chain('filter', chain)
 
-    def _ipt_create_chain(self, table, chain):
+    def _add_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
+        # Define host tables
+        host_chain          = 'HOST_{}'.format(hostname)
+        # 1. Register triggers in global host policy chain
+        ## Get packet marks based on traffic direction
+        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
+        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        ## Add rules to iptables
+        chain = self.iptables['hostpolicy']['chain']
+        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
+        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+
+    def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
+        # Define host tables
+        host_chain          = 'HOST_{}'.format(hostname)
+        # 1. Register triggers in global host policy chain
+        ## Get packet marks based on traffic direction
+        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
+        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        ## Add rules to iptables
+        chain = self.iptables['hostpolicy']['chain']
+        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
+        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+
+    def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
         self._do_subprocess_call('iptables -t {} -N {}'.format(table, chain))
-        self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
+        if flush:
+            self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
 
     def _ipt_remove_chain(self, table, chain):
         # Flush and delete to ensure the table is removed
@@ -253,7 +299,7 @@ class Network(object):
             else:
                 subprocess.check_call(command, shell=True)
         except Exception as e:
-            self._logger.warning(e)
+            self._logger.info(e)
             if raise_exc:
                 raise e
 
