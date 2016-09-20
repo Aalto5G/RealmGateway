@@ -138,7 +138,8 @@ class ConnectionLegacy(container3.ContainerNode):
 
     def __repr__(self):
         ret = ''
-        ret += '[{}]'.format(self.protocol)
+        ret += '({})'.format(self.id)
+        ret += ' [{}]'.format(self.protocol)
 
         if self.private_port:
             ret += ' {}:{} <- {}:{}'.format(self.private_ip, self.private_port, self.outbound_ip, self.outbound_port)

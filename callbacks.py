@@ -178,39 +178,40 @@ class DNSCallbacks(object):
         fqdn = format(query.question[0].name)
         self._logger.debug('dns_process_rgw_wan_soa {}'.format(fqdn))
         rdtype = query.question[0].rdtype
+        host_obj = None
         # The service exists in RGW
-        if self.hosttable.has_carriergrade(fqdn):
-            self._logger.debug('Process {} with KEY_SERVICE_CARRIERGRADE'.format(fqdn))
-            yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback)
-        elif self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
-            self._logger.debug('Process {} with KEY_HOST_SERVICE'.format(fqdn))
-            if rdtype == 1:
-                # Resolve A type via Circular Pool
-                yield from self._dns_process_rgw_wan_soa_a(query, addr, cback)
-            else:
-                # Answer with empty records for other types
-                self._logger.debug('Answer {} with no records'.format(fqdn))
-                response = dnsutils.make_response_rcode(query)
-                cback(query, addr, response)
+        if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+            host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
+            service_data = host_obj.get_service_sfqdn(fqdn)
+        elif self.hosttable.has_carriergrade(fqdn):
+            host_obj = self.hosttable.get_carriergrade(fqdn)
+            service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
         else:
             # FQDN not found! Answer NXDOMAIN
             self._logger.debug('Answer {} with NXDOMAIN'.format(fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
             cback(query, addr, response)
+            return
 
-    @asyncio.coroutine
-    def _dns_process_rgw_wan_soa_carriergrade(self, query, addr, cback):
-        fqdn = format(query.question[0].name)
-        self._logger.warning('_dns_process_rgw_wan_soa_carriergrade {}'.format(fqdn))
-        rdtype = query.question[0].rdtype
-        host_obj =  self.hosttable.get_carriergrade(fqdn)
-        # Process according to rdtype
-        if rdtype != 1:
+        # Evaluate host and service
+        if service_data.setdefault('carriergrade', False) and rdtype == 1:
+            self._logger.debug('Process {} with CircularPool CarrierGrade'.format(fqdn))
+            yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback, host_obj, service_data)
+        elif rdtype == 1:
+            # Resolve A type via Circular Pool
+            self._logger.debug('Process {} with CircularPool'.format(fqdn))
+            yield from self._dns_process_rgw_wan_soa_a(query, addr, cback, host_obj, service_data)
+        else:
             # Answer with empty records for other types
             self._logger.debug('Answer {} with no records'.format(fqdn))
             response = dnsutils.make_response_rcode(query)
             cback(query, addr, response)
-            return
+
+    @asyncio.coroutine
+    def _dns_process_rgw_wan_soa_carriergrade(self, query, addr, cback, host_obj, service_data):
+        fqdn = format(query.question[0].name)
+        self._logger.warning('_dns_process_rgw_wan_soa_carriergrade {}'.format(fqdn))
+        rdtype = query.question[0].rdtype
 
         if not self._check_policyrgw(host_obj, addr[0], None):
             # Failed to allocate an address - Drop DNS Query
@@ -230,7 +231,7 @@ class DNSCallbacks(object):
 
         self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
         # Get service data based on host FQDN
-        service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+        #service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
         allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn, service_data)
 
         if not allocated_ipv4:
@@ -244,17 +245,11 @@ class DNSCallbacks(object):
         cback(query, addr, response)
 
     @asyncio.coroutine
-    def _dns_process_rgw_wan_soa_a(self, query, addr, cback):
+    def _dns_process_rgw_wan_soa_a(self, query, addr, cback, host_obj, service_data):
         """ Process DNS query from public network of a name in a SOA zone """
-        # TODO: Check allocation policy is not exceeded for neither CES and HOST
-        self._logger.debug('enter')
         allocated_ipv4 = None
-
         # Get host object
         fqdn = format(query.question[0].name)
-        host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
-        # Get data service from FQDN
-        service_data = host_obj.get_service_sfqdn(fqdn)
         if service_data['proxy_required']:
             self._logger.debug('Use servicepool address pool for {}'.format(fqdn))
             ap_spool = self.pooltable.get('servicepool')
@@ -265,9 +260,7 @@ class DNSCallbacks(object):
             allocated_ipv4 = host_obj.ipv4
         elif self._check_policyrgw(host_obj, addr[0], None):
             self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
-            # Get service data based on queried FQDN
-            service_data = host_obj.get_service_sfqdn(fqdn)
-            allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn)
+            allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
 
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query
@@ -353,7 +346,7 @@ class DNSCallbacks(object):
         conn_param = {'private_ip': host_ipaddr, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
                       'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': dns_server_ip,
-                      'loose_packet': service_data.setdefault('loose_packet',0), 'id':fqdn}
+                      'loose_packet': service_data.setdefault('loose_packet',0), 'id':host_obj.fqdn}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
