@@ -1,8 +1,8 @@
 SUBSCRIBER_ID:
     gwa.demo.:        {fqdn: 'gwa.demo.',        ipv4: '198.18.1.130',  msisdn: '0000000000' }
-    foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100', carriergrade: true }
+    foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100' }
     foo101.gwa.demo.: {fqdn: 'foo101.gwa.demo.', ipv4: '192.168.0.101', msisdn: '0000000101' }
-
+    
 SUBSCRIBER_SERVICES:
     gwa.demo.:
         CIRCULARPOOL:
@@ -22,10 +22,13 @@ SUBSCRIBER_SERVICES:
         CIRCULARPOOL:
             - {max: 1000 }
         SFQDN:
-            - {fqdn: 'foo100.gwa.demo.',                                       proxy_required: false}
-            - {fqdn: 'www.foo100.gwa.demo.'      , protocol: 6,    port: 80  , proxy_required: true }
-            - {fqdn: 'sip.foo100.gwa.demo.'      , protocol: 17,   port: 5060, proxy_required: true }
-
+            - {fqdn: 'foo100.gwa.demo.',                                       proxy_required: false, carriergrade: true}
+            - {fqdn: 'www.foo100.gwa.demo.'      , protocol: 6,    port: 80  , proxy_required: true , carriergrade: false}
+            - {fqdn: 'sip.foo100.gwa.demo.'      , protocol: 17,   port: 5060, proxy_required: true , carriergrade: false}
+        CARRIERGRADE:
+            - {ipv4: 192.168.0.200}
+            - {ipv4: 192.168.0.201}
+            - {ipv4: 192.168.0.202}
         FIREWALL_ADMIN:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'REJECT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns_hosts --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
         FIREWALL_PARENTAL:
