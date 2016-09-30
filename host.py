@@ -144,6 +144,9 @@ if __name__ == "__main__":
     table.add(h2)
     h1.add_service(KEY_SERVICE_SFQDN, {'fqdn': 'iperf.foo100.rgw.', 'port': 5001, 'protocol': 6 })
     h1.add_service(KEY_SERVICE_SFQDN, {'fqdn': 'ssh.foo100.rgw.',   'port': 22,   'protocol': 6 })
+    h1.add_service(KEY_SERVICE_CARRIERGRADE, {'ipv4': '1.1.1.1'})
+    h1.add_service(KEY_SERVICE_CARRIERGRADE, {'ipv4': '1.1.1.2'})
+    h1.add_service(KEY_SERVICE_CARRIERGRADE, {'ipv4': '1.1.1.3'})
     table.updatekeys(h1)
 
     print('h1.services')
@@ -175,3 +178,5 @@ if __name__ == "__main__":
     print(table.has_carriergrade('host101.rgw.'))
     print("table.has_carriergrade('subdomain.host101.rgw.')")
     print(table.has_carriergrade('subdomain.host101.rgw.'))
+    print("h1.get_service(KEY_SERVICE_CARRIERGRADE)")
+    print(h1.get_service(KEY_SERVICE_CARRIERGRADE))

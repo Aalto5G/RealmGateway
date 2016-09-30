@@ -4,6 +4,7 @@ import logging
 import random
 import pprint
 from functools import partial
+from operator import getitem
 
 import customdns
 from customdns import dnsutils
@@ -223,15 +224,21 @@ class DNSCallbacks(object):
         cgresolver = uDNSResolver()
         cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
         host_cgaddr = dnsutils.get_first_record(cgresponse)
-        #TODO: Check host_cgaddr exists in service KEY_SERVICE_CARRIERGRADE
+
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
             return
 
+        # Get service carriergrade and verify the IP address
+        host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
+        if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
+            # Failed to verify carrier address in host pool - Drop DNS Query
+            self._logger.warning('Failed to verify Carrier Grage IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
+            return
+
         self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
         # Get service data based on host FQDN
-        #service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
         allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn, service_data)
 
         if not allocated_ipv4:
