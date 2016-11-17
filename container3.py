@@ -156,7 +156,7 @@ class Container(object):
 
     def removeall(self, callback=True):
         # Iterate all nodes in the set and remove them
-        for node in self._list:
+        for node in self.getall():
             self.remove(node, callback)
         # Sanity clear
         self._dict_id2keys.clear()
