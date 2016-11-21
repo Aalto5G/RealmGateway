@@ -77,4 +77,4 @@ module_exit(markdnat_tg_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jesus Llorente Santos <jesus.llorente.santos@aalto.fi>");
 MODULE_DESCRIPTION("Xtables: packet mark operations");
-MODULE_ALIAS("ipt_MARKDNAT");
+MODULE_ALIAS("xt_MARKDNAT");
