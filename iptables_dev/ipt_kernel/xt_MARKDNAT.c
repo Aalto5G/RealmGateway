@@ -8,6 +8,8 @@
  *	published by the Free Software Foundation.
  */
 
+/* Implementation based on xt_mark - Netfilter module to match NFMARK value. */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netfilter.h>
@@ -37,7 +39,7 @@ markdnat_tg_v2(struct sk_buff *skb, const struct xt_action_param *par)
 	ct = nf_ct_get(skb, &ctinfo);
 	NF_CT_ASSERT(ct != NULL &&
 				 (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));
-	/* Mangle packet MARK according */
+	/* Mangle skb->mark same as in xt_mark */
 	ipaddr = (skb->mark & ~info->mask) ^ info->mark;
 	memset(&range.min_addr, 0, sizeof(range.min_addr));
 	memset(&range.max_addr, 0, sizeof(range.max_addr));
