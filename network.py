@@ -25,8 +25,9 @@ class Network(object):
         utils.set_attributes(self, **kwargs)
         # Initialize nfqueue object to None
         self._nfqueue = None
+        # Zero Circular Pool chain for counters
+        self.ipt_zero_chain('nat', self.iptables['circularpool']['chain'])
         # Flush critical chains
-        self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
         self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
         '''
         #This is for CES
@@ -46,19 +47,18 @@ class Network(object):
     def ipt_flush_chain(self, table, chain):
         self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
 
+    def ipt_zero_chain(self, table, chain):
+        self._do_subprocess_call('iptables -t {} -Z {}'.format(table, chain))
+
     def ipt_add_user(self, hostname, ipaddr):
         self._logger.debug('Add user {}/{}'.format(hostname, ipaddr))
         # Remove previous user data
         self.ipt_remove_user(hostname, ipaddr)
-        # Add user to Circular Pool ipt_chain
-        self._add_circularpool(hostname, ipaddr)
         # Add user's firewall rules and register in global host policy chain
         self._add_basic_hostpolicy(hostname, ipaddr)
 
     def ipt_remove_user(self, hostname, ipaddr):
         self._logger.debug('Remove user {}/{}'.format(hostname, ipaddr))
-        # Remove user from Circular Pool ipt_chain
-        self._remove_circularpool(hostname, ipaddr)
         # Remove user's firewall rules and deregister in global host policy chain
         self._remove_basic_hostpolicy(hostname, ipaddr)
 
@@ -67,8 +67,6 @@ class Network(object):
         for item in cgaddrs:
             ipaddr = item['ipv4']
             self._logger.debug('Add carrier grade user address {}/{}'.format(hostname, ipaddr))
-            # Add carriergrade user to Circular Pool ipt_chain
-            self._add_circularpool(hostname, ipaddr)
             # Add user's firewall rules and register in global host policy chain
             self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
 
@@ -76,8 +74,6 @@ class Network(object):
         self._logger.debug('Remove carrier grade user {}/{}'.format(hostname, cgaddrs))
         for item in cgaddrs:
             ipaddr = item['ipv4']
-            # Remove carriergrade user to Circular Pool ipt_chain
-            self._remove_circularpool(hostname, ipaddr)
             # Remove user's firewall rules and register in global host policy chain
             self._remove_basic_hostpolicy_carriergrade(hostname, ipaddr)
 
@@ -101,6 +97,7 @@ class Network(object):
         mark = self._gen_pktmark_cpool(ipaddr)
         # New version of NetfilterQueue does htonl(mark)
         ## We want to undo it - BUG & HACK
+        ## https://github.com/kti/python-netfilterqueue/issues/21
         packet.set_mark(socket.htonl(mark))
         packet.accept()
 
@@ -112,18 +109,6 @@ class Network(object):
 
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
-
-    def _add_circularpool(self, hostname, ipaddr):
-        # Add rule to iptables
-        chain = self.iptables['circularpool']['chain']
-        mark = self._gen_pktmark_cpool(ipaddr)
-        self._do_subprocess_call('iptables -t nat -I {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
-
-    def _remove_circularpool(self, hostname, ipaddr):
-        # Remove rule from iptables
-        chain = self.iptables['circularpool']['chain']
-        mark = self._gen_pktmark_cpool(ipaddr)
-        self._do_subprocess_call('iptables -t nat -D {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
 
     def _add_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
