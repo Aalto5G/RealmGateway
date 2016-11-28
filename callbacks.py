@@ -222,9 +222,19 @@ class DNSCallbacks(object):
         # Resolve A type via Carrier Grade Circular Pool
         self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
-        cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
-        host_cgaddr = dnsutils.get_first_record(cgresponse)
+        try:
+            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
+        except ConnectionRefusedError:
+            # Refused to allocate an address - Drop DNS Query
+            self._logger.warning('Refused to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
+            return
 
+        if not cgresponse:
+            # Failed to allocate an address - Drop DNS Query
+            self._logger.warning('Failed to resolve address from {} for {}'.format(host_obj.ipv4, fqdn))
+            return
+
+        host_cgaddr = dnsutils.get_first_record(cgresponse)
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
