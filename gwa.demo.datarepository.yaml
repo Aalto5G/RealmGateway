@@ -26,6 +26,7 @@ SUBSCRIBER_SERVICES:
             - {fqdn: 'www.foo100.gwa.demo.'      , protocol: 6,    port: 80  , proxy_required: true , carriergrade: false}
             - {fqdn: 'sip.foo100.gwa.demo.'      , protocol: 17,   port: 5060, proxy_required: true , carriergrade: false}
             - {fqdn: 'icmp.foo100.gwa.demo.'     , protocol: 1,    port: 0,    proxy_required: false, carriergrade: true}
+            - {fqdn: 'ping.foo100.gwa.demo.'     , protocol: 1,    port: 0,    proxy_required: false, carriergrade: false}
             - {fqdn: 'tcp.foo100.gwa.demo.'      , protocol: 6,    port: 0,    proxy_required: false, carriergrade: true}
             - {fqdn: 'udp.foo100.gwa.demo.'      , protocol: 17,   port: 0,    proxy_required: false, carriergrade: true}
             - {fqdn: 'ssh.foo100.gwa.demo.'      , protocol: 6 ,   port: 22,   proxy_required: false, carriergrade: true}
