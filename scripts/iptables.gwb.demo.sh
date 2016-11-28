@@ -151,7 +151,7 @@ iptables -t nat -F PREROUTING
 iptables -t nat -A PREROUTING -i $WAN_L3 -m mark ! --mark 0x00 -j NAT_PRE_CPOOL -m comment --comment "[CircularPool] Send to DNAT chain"
 ## Do DNAT towards private host @L3-WAN - Add 1 rule per private host
 iptables -t nat -A NAT_PRE_CPOOL -m hashlimit --hashlimit-upto 1/sec --hashlimit-name cpool_dnat -j NFLOG --nflog-prefix "NAT.PRE.CPOOL " -m comment --comment "DNAT to private host"
-
+iptables -t nat -A NAT_PRE_CPOOL -j MARKDNAT --or-mark 0 -m comment --comment "DNAT to private host"
 
 
 ## Trace traffic for debugging
@@ -213,7 +213,8 @@ iptables -t filter -A _REJECT        -j REJECT --reject-with icmp-proto-unreacha
 
 # Populate chains of FILTER table
 ## Add default values for loopback and IPSec
-iptables -t filter -A INPUT -i lo -j ACCEPT
+iptables -t filter -A INPUT -i lo    -j ACCEPT
+iptables -t filter -A INPUT -i mgmt0 -j ACCEPT
 #iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
 #iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
 ## Apply basic filtering policy in CES

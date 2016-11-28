@@ -77,13 +77,11 @@ ip link add link br-wan0 dev wan0 type macvlan mode bridge
 ip link add link br-wan1 dev wan1 type macvlan mode bridge
 ip link set wan0 netns router
 ip link set wan1 netns router
-ip netns exec router ip link set dev wan0 name eth0
-ip netns exec router ip link set dev wan1 name eth1
-ip netns exec router ip link set dev eth0 up
-ip netns exec router ip link set dev eth1 up
-ip netns exec router ip address add 198.18.0.1/24 dev eth0
-ip netns exec router ip address add 198.18.1.1/24 dev eth1
-ip netns exec router ip route add default via 198.18.0.254 dev eth0
+ip netns exec router ip link set dev wan0 up
+ip netns exec router ip link set dev wan1 up
+ip netns exec router ip address add 198.18.0.1/24 dev wan0
+ip netns exec router ip address add 198.18.1.1/24 dev wan1
+ip netns exec router ip route add default via 198.18.0.254 dev wan0
 ip netns exec router bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 
 # Setting up TCP SYNPROXY in router - ipt_SYNPROXY
@@ -93,9 +91,9 @@ ip netns exec router sysctl -w net.ipv4.tcp_timestamps=1 # This is not available
 ip netns exec router sysctl -w net.netfilter.nf_conntrack_tcp_loose=0
 # Configure iptables for SYNPROXY - Protect wan1 from incoming SYNs from wan0
 ip netns exec router iptables -t raw    -F
-ip netns exec router iptables -t raw    -A PREROUTING -i eth0 -p tcp -m tcp --syn -j CT --notrack
+ip netns exec router iptables -t raw    -A PREROUTING -i wan0 -p tcp -m tcp --syn -j CT --notrack
 ip netns exec router iptables -t filter -F
-ip netns exec router iptables -t filter -A FORWARD -i eth0 -o eth1 -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+ip netns exec router iptables -t filter -A FORWARD -i wan0 -o wan1 -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
 ip netns exec router iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
 
 
@@ -108,28 +106,26 @@ ip link add link br-wan1  dev wan0 type macvlan mode bridge
 ip link add link br-lan0a dev lan0 type macvlan mode bridge
 ip link set wan0 netns gwa
 ip link set lan0 netns gwa
-ip netns exec gwa ip link set dev lan0 name eth0
-ip netns exec gwa ip link set dev wan0 name eth1
-ip netns exec gwa ip link set dev eth0 up
-ip netns exec gwa ip link set dev eth1 up
-ip netns exec gwa ip address add 192.168.0.1/24  dev eth0
-ip netns exec gwa ip address add 198.18.1.130/24 dev eth1
-ip netns exec gwa ip route add default via 198.18.1.1 dev eth1
+ip netns exec gwa ip link set dev lan0 up
+ip netns exec gwa ip link set dev wan0 up
+ip netns exec gwa ip address add 192.168.0.1/24  dev lan0
+ip netns exec gwa ip address add 198.18.1.130/24 dev wan0
+ip netns exec gwa ip route add default via 198.18.1.1 dev wan0
 ip netns exec gwa bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 
 # Add Circular Pool address for ARP responses
-ip netns exec gwa ip address add 198.18.1.131/32 dev eth1 # Reserved for CES
-ip netns exec gwa ip address add 198.18.1.132/32 dev eth1 # Reserved for CES
-ip netns exec gwa ip address add 198.18.1.133/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.134/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.135/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.136/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.137/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.138/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.139/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.140/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.141/32 dev eth1
-ip netns exec gwa ip address add 198.18.1.142/32 dev eth1
+ip netns exec gwa ip address add 198.18.1.131/32 dev wan0 # Reserved for CES
+ip netns exec gwa ip address add 198.18.1.132/32 dev wan0 # Reserved for CES
+ip netns exec gwa ip address add 198.18.1.133/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.134/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.135/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.136/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.137/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.138/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.139/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.140/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.141/32 dev wan0
+ip netns exec gwa ip address add 198.18.1.142/32 dev wan0
 # Configure SNAT in Realm Gateway - Done in the init script
 #ip netns exec gwa iptables -t nat -F POSTROUTING
 #ip netns exec gwa iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o wan0 -j SNAT --to-source 198.18.0.133-198.18.0.135 --persistent
@@ -141,10 +137,9 @@ ip netns exec gwa ip address add 198.18.1.142/32 dev eth1
 
 ip link add link br-lan0a dev lan0 type macvlan mode bridge
 ip link set lan0 netns hosta
-ip netns exec hosta ip link set dev lan0 name eth0
-ip netns exec hosta ip link set dev eth0 up
-ip netns exec hosta ip address add 192.168.0.100/24 dev eth0
-ip netns exec hosta ip route add default via 192.168.0.1 dev eth0
+ip netns exec hosta ip link set dev lan0 up
+ip netns exec hosta ip address add 192.168.0.100/24 dev lan0
+ip netns exec hosta ip route add default via 192.168.0.1 dev lan0
 ip netns exec hosta bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
 
 
@@ -153,10 +148,9 @@ ip netns exec hosta bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
 ###############################################################################
 
 ## Assign and configure namespace interface
-ip link add link br-wan1 dev wan0 type macvlan mode bridge
+ip link add link br-wan0 dev wan0 type macvlan mode bridge
 ip link set wan0 netns public
-ip netns exec public ip link set dev wan0 name eth0
-ip netns exec public ip link set dev eth0 up
-ip netns exec public ip address add 198.18.0.100/24 dev eth0
-ip netns exec public ip route add default via 198.18.0.1 dev eth0
-ip netns exec public bash -c 'echo "nameserver 198.18.0.1" > /etc/resolv.conf'
+ip netns exec public ip link set dev wan0 up
+ip netns exec public ip address add 198.18.0.100/24 dev wan0
+ip netns exec public ip route add default via 198.18.0.1 dev wan0
+ip netns exec public bash -c 'echo "nameserver 198.18.1.130" > /etc/resolv.conf'
