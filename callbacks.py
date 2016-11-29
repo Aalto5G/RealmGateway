@@ -227,17 +227,23 @@ class DNSCallbacks(object):
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('Refused to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
+            response = dnsutils.make_response_rcode(query, dns.rcode.REFUSED)
+            cback(query, addr, response)
             return
 
         if not cgresponse:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to resolve address from {} for {}'.format(host_obj.ipv4, fqdn))
+            response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+            cback(query, addr, response)
             return
 
         host_cgaddr = dnsutils.get_first_record(cgresponse)
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
             self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
+            response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+            cback(query, addr, response)
             return
 
         # Get service carriergrade and verify the IP address
@@ -245,6 +251,8 @@ class DNSCallbacks(object):
         if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
             # Failed to verify carrier address in host pool - Drop DNS Query
             self._logger.warning('Failed to verify Carrier Grage IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
+            response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+            cback(query, addr, response)
             return
 
         self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
