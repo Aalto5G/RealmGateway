@@ -214,7 +214,7 @@ iptables -t filter -A _REJECT        -j REJECT --reject-with icmp-proto-unreacha
 # Populate chains of FILTER table
 ## Add default values for loopback and IPSec
 iptables -t filter -A INPUT -i lo    -j ACCEPT
-iptables -t filter -A INPUT -i mgmt0 -j ACCEPT
+iptables -t filter -A INPUT -i mgt0  -j ACCEPT
 #iptables -t filter -A INPUT -p esp -j MARK --set-xmark 0x1/0x1
 #iptables -t filter -A INPUT -p udp -m udp --dport 4500 -j MARK --set-xmark 0x1/0x1
 ## Apply basic filtering policy in CES
