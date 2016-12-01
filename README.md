@@ -6,7 +6,7 @@ This version of Customer Edge Switching v2.0 has been developed under
 Ubuntu 16.04 and python3 for asynchronous calls.
 
 
-## Install dependencies
+## Install package dependencies
 
 The following dependencies are required:
 
@@ -22,6 +22,30 @@ The following python dependencies are required:
 ```
 $ pip3 install --upgrade pip setuptools 
 $ pip3 install --upgrade ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu --user
+```
+
+## Build & install the iptables modules
+
+The Realm Gateway uses a tailor made module for an iptables extension target, MARKDNAT, which requires both a user space and a kernel module.
+This extension can only be used in table nat and PREROUTING chain. The target implements the normal actions
+of MARK, regarding the skb->mark mangling and DNAT --to-destination A.B.C.D with the resulting mark.
+
+This extension allows performing the DNAT operation based on the packet mark. 
+The packet mark can be controlled as well from a user space application via NFQUEUE target.
+
+Installing the kernel module
+
+```
+$ cd ./iptables_devel/kernel
+$ make
+# make install_MARKDNAT 
+```
+
+Installing the user space module
+
+```
+# cp ./iptables_devel/userspace/libxt_MARKDNAT.so /lib/xtables/
+$ iptables -j MARKDNAT --help
 ```
 
 
