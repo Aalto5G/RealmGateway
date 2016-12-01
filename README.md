@@ -2,52 +2,62 @@
 
 ## Requirements
 
-Customer Edge Switching v.0.2 requires Ubuntu 16.04 and Python3
+This version of Customer Edge Switching v2.0 has been developed under 
+Ubuntu 16.04 and python3 for asynchronous calls.
 
 
-## Package dependencies
+## Install dependencies
 
-Install the following packages with apt-get install under Ubuntu 16.04:
+The following dependencies are required:
 
-ipset libipset3 ebtables bridge-utils
-ipsec-tools openvswitch-common openvswitch-ipsec openvswitch-switch python-openvswitch racoon
-python-pip python3-pip
+```
+# apt-get install build-essential python3-dev libnetfilter-queue-dev python3-pip
+# apt-get install ipset libipset3 iptables ebtables bridge-utils
+# apt-get install ipsec-tools openvswitch-common openvswitch-ipsec openvswitch-switch python-openvswitch racoon
+```
+
+
+The following python dependencies are required:
+
+```
+# pip3 install --upgrade pip setuptools
+# pip3 install pip-review ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu
+# pip-review --auto -v # Update all pip packages
+
+```
+
+
+## Useful information
 
 ### Create python virtual environment
 
-Create a virtualenv for python3 using the following guide: 
+If you don't want to populute your system with extra libraries and modules, you can can create a python virtual environment using the following guide:
+
 http://askubuntu.com/questions/244641/how-to-set-up-and-use-a-virtual-python-environment-in-ubuntu
 
+Remember that the virtual environment shortcuts are not available when doing ```sudo``` per se, but you can achieve admin rights for your python interpreter with the following:
 
-Install the packages for python3 within the virtualenv
-pip install --upgrade PyYAML
-pip install --upgrade dnspython3
-pip install --upgrade pycrypto
-pip install --upgrade python-iptables
-pip install --upgrade aiohttp
+```
+$ sudo /root/to/.virtualenvs/your_virtual_environment/bin/python
+```
 
+### Linux bridged & iptables
 
-Install python-netfilterqueue in virtualenv from github repository
-URL: https://github.com/kti/python-netfilterqueue
-Applied patch 12 for Python3 support
-Requires: libnetfilter-queue-dev
-python3 setup.py install
+It is very common to deploy Linux bridges to trigger iptables packet processing to that traffic.
+However, additional kernel modules need to be loaded.
 
-Install python-scapy in virtualenv from github repository
-URL: https://github.com/phaethon/scapy
-python3 setup.py install
+```
+# modprobe br_netfilter
+# modprobe xt_physdev
+```
 
+In order to send traffic from the linux bridge to iptables modify your ```/etc/sysctl.conf``` to include the following:
 
-
-## How to load the iptables kernel modules
-sudo modprobe br_netfilter
-sudo modprobe xt_physdev
-
-## Modifying sysctl.conf configuration for bridge
+```
 net.bridge.bridge-nf-call-arptables=1
 net.bridge.bridge-nf-call-ip6tables=1
 net.bridge.bridge-nf-call-iptables=1
 net.bridge.bridge-nf-filter-pppoe-tagged=0
-net.bridge.bridge-nf-filter-vlan-tagged=0
-net.bridge.bridge-nf-pass-vlan-input-dev=0
-
+net.bridge.bridge-nf-filter-vlan-tagged=1
+net.bridge.bridge-nf-pass-vlan-input-dev=1
+```
