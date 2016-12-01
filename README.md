@@ -20,10 +20,8 @@ The following dependencies are required:
 The following python dependencies are required:
 
 ```
-# pip3 install --upgrade pip setuptools
-# pip3 install pip-review ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu
-# pip-review --auto -v # Update all pip packages
-
+$ pip3 install --upgrade pip setuptools 
+$ pip3 install --upgrade ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu --user
 ```
 
 
