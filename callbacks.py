@@ -88,9 +88,9 @@ class DNSCallbacks(object):
         admin_fw    = host_obj.get_service('FIREWALL_ADMIN', [])
         parental_fw = host_obj.get_service('FIREWALL_PARENTAL', [])
         legacy_fw   = host_obj.get_service('FIREWALL_LEGACY', [])
-        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin', admin_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin',    admin_fw)
         self.network.ipt_add_user_fwrules(hostname, ipaddr, 'parental', parental_fw)
-        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'legacy', legacy_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'legacy',   legacy_fw)
         ## Carrier Grade services if available
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
@@ -298,7 +298,6 @@ class DNSCallbacks(object):
             response = dnsutils.make_response_answer_rr(query, fqdn, 1, allocated_ipv4, rdclass=1, ttl=0)
             self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
-        self._logger.debug('leave')
 
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
@@ -492,7 +491,7 @@ class PacketCallbacks(object):
             return
 
         # DNAT to private host
-        self._logger.info('DNAT to {}'.format(conn.private_ip))
+        self._logger.info('DNAT to {} to {}'.format(dst, conn.private_ip))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):

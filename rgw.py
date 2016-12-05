@@ -28,7 +28,8 @@ from customdns.dnsproxy import DNSProxy
 from aalto_helpers import utils3
 
 #LOGLEVELMAIN = logging.WARNING
-LOGLEVELMAIN = logging.DEBUG
+#LOGLEVELMAIN = logging.DEBUG
+LOGLEVELMAIN = logging.INFO
 
 class RetCodes(object):
     POLICY_OK  = 0
@@ -123,16 +124,6 @@ class RealmGateway(object):
     def _init_pools(self):
         # Create container of Address Pools
         self._pooltable = PoolContainer()
-
-        '''
-        This is not required anymore for RealmGateway as the flow
-        is configured to proxy_required=True/False
-        # Create specific Name Pools
-        for k,v in self._config['NETWORK']['namepool'].items():
-            ap = NamePool(k)
-            self._logger.warning('Created Name Pool - "{}"'.format(k))
-            self._pooltable.add(ap)
-        '''
         # Create specific Address Pools
         for k,v in self._config['NETWORK']['addresspool'].items():
             if k == 'circularpool':
@@ -145,9 +136,9 @@ class RealmGateway(object):
                 self._logger.warning('AddressPool {} not supported'.format(k))
                 continue
 
-            self._logger.warning('Created Address Pool - "{}"'.format(k))
+            self._logger.info('Created Address Pool <{}>'.format(k))
             for net in v:
-                self._logger.warning('Adding resource(s) to pool "{}": {}'.format(k, net))
+                self._logger.debug('Adding resource(s) to pool {}@<{}>'.format(net, k))
                 ap.add_to_pool(net)
             self._pooltable.add(ap)
 
@@ -162,7 +153,7 @@ class RealmGateway(object):
 
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
-            self._logger.warning('Registering DNS SOA {}'.format(name))
+            self._logger.info('Registering DNS SOA {}'.format(name))
             self.dnscb.dns_register_soa(name)
         soa_list = self.dnscb.dns_get_soa()
 
@@ -174,7 +165,7 @@ class RealmGateway(object):
 
         ## DDNS Server for DHCP Server
         addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
-        self._logger.warning('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
+        self._logger.info('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
         cb_ddns_default = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
         obj_ddns = DDNSServer(cb_default = cb_ddns_default)
         self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
@@ -182,7 +173,7 @@ class RealmGateway(object):
 
         ## DNS Server for WAN
         addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
-        self._logger.warning('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
+        self._logger.info('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
         cb_wan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
         cb_wan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
         obj_serverwan = DNSProxy(soa_list = soa_list, cb_soa = cb_wan_soa, cb_nosoa = cb_wan_nosoa)
@@ -192,7 +183,7 @@ class RealmGateway(object):
         # Create DNS Proxy as forwarders to local resolver for LAN and Local
         ## DNS Proxy for LAN
         addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
-        self._logger.warning('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
+        self._logger.info('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
         cb_lan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
         cb_lan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
         obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = cb_lan_soa, cb_nosoa = cb_lan_nosoa)
@@ -201,7 +192,7 @@ class RealmGateway(object):
 
         ## DNS Proxy for Local
         addr = self._config['DNS']['proxylocal']['ip'], self._config['DNS']['proxylocal']['port']
-        self._logger.warning('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
+        self._logger.info('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
         cb_local_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
         cb_local_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
         obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = cb_local_soa, cb_nosoa = cb_local_nosoa)
@@ -210,7 +201,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
-        self._logger.warning('Initializing subscriber data')
+        self._logger.info('Initializing subscriber data')
         for subscriber_id, subscriber_data in self._datarepository.get_subscriber_data(None).items():
             ipaddr = subscriber_data['ipv4']
             fqdn = subscriber_data['fqdn']

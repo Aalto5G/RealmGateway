@@ -2,19 +2,15 @@ import asyncio
 import aiohttp
 import json
 import logging
-import socket
-import subprocess
-import struct
-import os
+import socket, struct
+import os, subprocess
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
+from aalto_helpers import iptc_helper3
 from async_nfqueue import AsyncNFQueue
 
 LOGLEVELNETWORK = logging.INFO
-
-KEY_CESLOCAL = 1
-KEY_CESPUBLIC = 2
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
@@ -28,12 +24,16 @@ class Network(object):
         # Flush critical chains
         self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
         self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
+        # Test if MARKDNAT is available in the system
+        self.MARKDNAT = iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'})
+        if self.MARKDNAT:
+            self._add_MARKDNAT('nat', self.iptables['circularpool']['chain'])
 
     def ipt_flush_chain(self, table, chain):
-        self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
+        iptc_helper3.flush_chain(table, chain)
 
     def ipt_zero_chain(self, table, chain):
-        self._do_subprocess_call('iptables -t {} -Z {}'.format(table, chain))
+        iptc_helper3.zero_chain(table, chain)
 
     def ipt_add_user(self, hostname, ipaddr):
         self._logger.debug('Add user {}/{}'.format(hostname, ipaddr))
@@ -73,11 +73,12 @@ class Network(object):
 
     def ipt_add_user_fwrules(self, hostname, ipaddr, chain, fwrules):
         host_chain = 'HOST_{}_{}'.format(hostname, chain.upper())
+        self._logger.debug('Add fwrules for user {}/{} to chain <{}> ({})'.format(hostname, ipaddr, host_chain, len(fwrules)))
         # Sort list by priority of the rules
         sorted_fwrules = sorted(fwrules, key=lambda rule: rule['priority'])
         for rule in sorted_fwrules:
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
-            self._do_subprocess_call(xlat_rule)
+            iptc_helper3.add_rule('filter', host_chain, xlat_rule)
 
     def ipt_register_nfqueue(self, queue, cb):
         assert (self._nfqueue is None)
@@ -104,17 +105,33 @@ class Network(object):
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
+    def _add_MARKDNAT(self, table, chain):
+        # Insert rule on the top of the chain
+        rule = {'target':{'MARKDNAT': {'or-mark':'0'}},
+                'comment':{'comment':'Realm Gateway NAT Traversal'}}
+        iptc_helper3.add_rule(table, chain, rule, 0)
+
     def _add_circularpool(self, hostname, ipaddr):
+        # Do not add specific rule if MARKDNAT is enabled
+        if self.MARKDNAT:
+            return
         # Add rule to iptables
+        table = 'nat'
         chain = self.iptables['circularpool']['chain']
         mark = self._gen_pktmark_cpool(ipaddr)
-        self._do_subprocess_call('iptables -t nat -I {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
+        rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
+        iptc_helper3.add_rule(table, chain, rule)
 
     def _remove_circularpool(self, hostname, ipaddr):
+        # Do not delete specific rule if MARKDNAT is enabled
+        if self.MARKDNAT:
+            return
         # Remove rule from iptables
+        table = 'nat'
         chain = self.iptables['circularpool']['chain']
         mark = self._gen_pktmark_cpool(ipaddr)
-        self._do_subprocess_call('iptables -t nat -D {} -m mark --mark 0x{:x} -j DNAT --to-destination {}'.format(chain, mark, ipaddr))
+        rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
+        iptc_helper3.delete_rule(table, chain, rule, True)
 
     def _add_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -134,19 +151,19 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
-        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain})
 
         # 2. Register triggers in host chain
         ## Get packet marks based on traffic direction
         mark_legacy = self.iptables['pktmark']['MASK_HOST_LEGACY']
         mark_ces = self.iptables['pktmark']['MASK_HOST_CES']
         ## Add rules to iptables
-        self._do_subprocess_call('iptables -t filter -A {}                   -j {}'.format(host_chain, host_chain_admin))
-        self._do_subprocess_call('iptables -t filter -A {}                   -j {}'.format(host_chain, host_chain_parental))
-        self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_legacy, host_chain_legacy))
-        self._do_subprocess_call('iptables -t filter -A {} -m mark --mark {} -j {}'.format(host_chain, mark_ces, host_chain_ces))
-        self._do_subprocess_call('iptables -t filter -A {}                   -j DROP'.format(host_chain))
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_admin})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_parental})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_legacy, 'mark':{'mark':mark_legacy}})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces, 'mark':{'mark':mark_ces}})
+        iptc_helper3.add_rule('filter', host_chain, {'target':'DROP'})
 
     def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -162,8 +179,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
-        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain}, True)
 
         # 2. Remove host chains
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
@@ -178,8 +195,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
-        self._do_subprocess_call('iptables -t filter -I {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain})
 
     def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
@@ -190,77 +207,38 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -d {} -g {}'.format(chain, mark_in, ipaddr, host_chain))
-        self._do_subprocess_call('iptables -t filter -D {} -m mark --mark {} -s {} -g {}'.format(chain, mark_eg, ipaddr, host_chain))
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain}, True)
 
     def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
-        self._do_subprocess_call('iptables -t {} -N {}'.format(table, chain))
+        iptc_helper3.add_chain(table, chain)
         if flush:
-            self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
+            iptc_helper3.flush_chain(table, chain, silent=True)
 
     def _ipt_remove_chain(self, table, chain):
         # Flush and delete to ensure the table is removed
-        self._do_subprocess_call('iptables -t {} -F {}'.format(table, chain))
-        self._do_subprocess_call('iptables -t {} -X {}'.format(table, chain))
+        iptc_helper3.flush_chain(table, chain, silent=True)
+        iptc_helper3.delete_chain(table, chain, silent=True)
 
     def _ipt_xlat_rule(self, chain, rule):
-        ret = ''
-        # Append to chain
-        ret += 'iptables -t filter -A {}'.format(chain)
-        # Rule direction
-        if rule['direction'] == 'EGRESS':
-            ret += ' -m mark --mark {}'.format(self.iptables['pktmark']['MASK_HOST_EGRESS'])
-        elif rule['direction'] == 'INGRESS':
-            ret += ' -m mark --mark {}'.format(self.iptables['pktmark']['MASK_HOST_INGRESS'])
-        elif rule['direction'] == 'ANY':
+        ret = dict(rule)
+        # Translate direction value into packet mark
+        if ret['direction'] == 'EGRESS':
+            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_EGRESS']}
+        elif ret['direction'] == 'INGRESS':
+            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_INGRESS']}
+        elif ret['direction'] == 'ANY':
             pass
         else:
-            self.logger.error('Unknown direction: {}'.format(rule['direction']))
-            return
-
-        # IP addresses
-        if 'destination-ip' in rule:
-            ret += ' -d {}'.format(rule['destination-ip'])
-        if 'source-ip' in rule:
-            ret += ' -s {}'.format(rule['source-ip'])
-        # IP protocol
-        if 'protocol' in rule:
-            ret += ' -p {}'.format(rule['protocol'])
-        # Transport protocol
-        if 'destination-port' in rule:
-            ret += ' --dport {}'.format(rule['destination-port'])
-        if 'source-port' in rule:
-            ret += ' --sport {}'.format(rule['source-port'])
-        if 'icmp-type' in rule and 'icmp-code' in rule:
-            ret += ' --icmp-type {}/{}'.format(rule['icmp-type'], rule['icmp-code'])
-        elif 'icmp-type' in rule:
-            ret += ' --icmp-type {}'.format(rule['icmp-type'])
-        # Action
-        if rule['action'] == 'ACCEPT':
-            chain_accept = self.iptables['hostpolicy']['accept']
-            ret += ' -g {}'.format(chain_accept)
-        elif rule['action'] == 'DROP':
-            ret += ' -j DROP'
-        elif rule['action'] == 'REJECT':
-            # Modify REJECT to custom target
-            ret += ' -j _REJECT'
-        else:
-            self.logger.error('Unknown action: {}'.format(rule['action']))
-            return
-        # Metadata
-        if 'comment' in rule:
-            ret += ' -m comment --comment "{}" '.format(rule['comment'])
-        # Additional features
-        if 'metadata' in rule:
-            for k,v in rule['metadata'].items():
-                if k.startswith('ipt_'):
-                    ret += ' {}'.format(v)
-                else:
-                    self._logger.warning('Metadata {} not supported for rule {}'.format(k, rule))
-                    return ''
+            raise AttributeError('Unknown direction: {}'.format(ret['direction']))
         return ret
 
+    def _gen_pktmark_cpool(self, ipaddr):
+        """ Return the integer representation of an IPv4 address """
+        return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
+
+    '''
     def _ipt_chain_trigger(self, table, chain, action, mark, source, destination, jump_table, goto_table):
         #TOBEUSED
         ret = ''
@@ -276,11 +254,8 @@ class Network(object):
         if goto_table:
             ret += ' -g {}'.format(goto_table)
         return ret
-
-    def _gen_pktmark_cpool(self, ipaddr):
-        """ Return the integer representation of an IPv4 address """
-        return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
-
+    
+    
     def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
         try:
             self._logger.debug('System call: {}'.format(command))
@@ -294,7 +269,6 @@ class Network(object):
             if raise_exc:
                 raise e
 
-    '''
     # This is for CES
 
     def create_tunnel(self):

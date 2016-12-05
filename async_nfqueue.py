@@ -9,7 +9,7 @@ import sys
 class AsyncNFQueue(object):
     def __init__(self, queue, callback = None):
         self.logger = logging.getLogger('AsyncNFQueue#{}'.format(queue))
-        self.logger.info('Bind queue')
+        self.logger.info('Bind queue #{}'.format(queue))
         self._loop = asyncio.get_event_loop()
         self.queue = queue
         # Create NetfilterQueue object
@@ -35,7 +35,7 @@ class AsyncNFQueue(object):
         self._nfqueue.bind(self.queue, callback)
 
     def terminate(self):
-        self.logger.info('Unbind queue')
+        self.logger.info('Unind queue #{}'.format(self.queue))
         self._loop.remove_reader(self._nfqueue_fd)
         self._nfqueue.unbind()
 
