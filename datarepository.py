@@ -1,7 +1,8 @@
 import logging
-import utils
 import yaml
 import pprint
+
+from aalto_helpers import utils3
 
 LOGLEVELDATAREPOSITORY = logging.WARNING
 
@@ -14,8 +15,8 @@ class DataRepository(object):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVELDATAREPOSITORY)
         attrlist = ['url','file','subscriberdata','servicedata','policydata']
-        utils.set_default_attributes(self, attrlist, None)
-        utils.set_attributes(self, **kwargs)
+        utils3.set_default_attributes(self, attrlist, None)
+        utils3.set_attributes(self, **kwargs)
 
     def get_subscriber_data(self, subscriber_id):
         try:

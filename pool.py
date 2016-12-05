@@ -1,7 +1,8 @@
-import container3
 import ipaddress
 import logging
 import random
+
+from aalto_helpers import container3
 
 #TODO: Optimize memory by having the pool and then a bytearray per host (1/0)
 

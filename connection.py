@@ -1,8 +1,9 @@
-import container3
 import logging
-import utils
 import time
 import pprint
+
+from aalto_helpers import container3
+from aalto_helpers import utils3
 
 LOGLEVELCONNECTIONTABLE = logging.INFO
 LOGLEVELCONNECTIONENTRY = logging.INFO
@@ -73,13 +74,13 @@ class ConnectionLegacy(container3.ContainerNode):
         """
         super().__init__(name, LOGLEVELCONNECTIONENTRY)
         # Set attributes
-        utils.set_attributes(self, **kwargs)
+        utils3.set_attributes(self, **kwargs)
         # Set default unset attributes
         attrlist_zero = ['private_ip', 'private_port', 'outbound_ip', 'outbound_port',
                          'remote_ip', 'remote_port', 'protocol', 'loose_packet']
         attrlist_none = ['fqdn', 'dns_server', 'dns_client', 'id']
-        utils.set_default_attributes(self, attrlist_zero, 0)
-        utils.set_default_attributes(self, attrlist_none, None)
+        utils3.set_default_attributes(self, attrlist_zero, 0)
+        utils3.set_default_attributes(self, attrlist_none, None)
         self.timeout = ConnectionLegacy.TIMEOUT
         # Take creation timestamp
         self.timestamp_zero = time.time()

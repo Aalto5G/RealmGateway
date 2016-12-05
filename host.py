@@ -1,7 +1,8 @@
-import container3
 import logging
-import utils
 import pprint
+
+from aalto_helpers import container3
+from aalto_helpers import utils3
 
 LOGLEVELHOST = logging.INFO
 
@@ -67,8 +68,8 @@ class HostEntry(container3.ContainerNode):
         attrlist = ['ipv4','fqdn']
         # Initialize services dictionary
         self.services = {}
-        utils.set_default_attributes(self, attrlist, None)
-        utils.set_attributes(self, **kwargs)
+        utils3.set_default_attributes(self, attrlist, None)
+        utils3.set_attributes(self, **kwargs)
         # Sanitize key in dictionary for lookupkeys()
         self.services.setdefault(KEY_SERVICE_SFQDN, [])
         # Normalize SFQDN service definition

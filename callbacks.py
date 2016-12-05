@@ -1,10 +1,12 @@
 import asyncio
-import utils
 import logging
 import random
 import pprint
 from functools import partial
 from operator import getitem
+
+import utils
+from aalto_helpers import utils3
 
 import customdns
 from customdns import dnsutils
@@ -31,7 +33,7 @@ class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
         self._logger.setLevel(LOGLEVELCALLBACK)
-        utils.set_attributes(self, **kwargs)
+        utils3.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.state = {}
         self.soa_list = []
@@ -442,7 +444,7 @@ class PacketCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('PacketCallbacks')
         self._logger.setLevel(LOGLEVELCALLBACK)
-        utils.set_attributes(self, **kwargs)
+        utils3.set_attributes(self, **kwargs)
 
     def packet_in_circularpool(self, packet):
         # Get IP data
