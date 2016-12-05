@@ -25,7 +25,7 @@ import customdns
 from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy
 
-from utils import is_ipv4, is_ipv6, trace
+from aalto_helpers import utils3
 
 #LOGLEVELMAIN = logging.WARNING
 LOGLEVELMAIN = logging.DEBUG
@@ -242,7 +242,7 @@ class RealmGateway(object):
             # Close NFQUEUE
             self._network.ipt_deregister_nfqueue()
         except:
-            trace()
+            utils3.trace()
         finally:
             self._loop.stop()
 
@@ -268,7 +268,7 @@ if __name__ == '__main__':
         rgw.begin()
     except Exception as e:
         print(e)
-        trace()
+        utils3.trace()
     finally:
         loop.close()
     print('Bye!')

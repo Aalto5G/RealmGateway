@@ -14,9 +14,9 @@ class DataRepository(object):
         """ Initialize """
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVELDATAREPOSITORY)
-        attrlist = ['url','file','subscriberdata','servicedata','policydata']
-        utils3.set_default_attributes(self, attrlist, None)
-        utils3.set_attributes(self, **kwargs)
+        utils3.set_attributes(self, override=True, **kwargs)
+        attrlist_none = ['url','file','subscriberdata','servicedata','policydata']
+        utils3.set_default_attributes(self, attrlist_none, None)
 
     def get_subscriber_data(self, subscriber_id):
         try:

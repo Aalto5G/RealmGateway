@@ -5,8 +5,8 @@ import pprint
 from functools import partial
 from operator import getitem
 
-import utils
 from aalto_helpers import utils3
+from aalto_helpers import network_helper3
 
 import customdns
 from customdns import dnsutils
@@ -450,7 +450,7 @@ class PacketCallbacks(object):
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
         # Parse packet
-        packet_fields = utils.parse_packet_custom(data)
+        packet_fields = network_helper3.parse_packet_custom(data)
         # Select appropriate values for building the keys
         src, dst, proto = packet_fields['src'], packet_fields['dst'], packet_fields['proto']
         sport, dport =  (0,0)
