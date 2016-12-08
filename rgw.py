@@ -7,8 +7,13 @@ import pool
 import configparser
 import dns
 import network
+
 import logging
+import logging.config
 import logging.handlers
+import yaml
+import os
+
 import signal
 import sys
 import traceback
@@ -26,77 +31,50 @@ from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy
 
 from aalto_helpers import utils3
+from loglevel import LOGLEVEL_MAIN
 
-#LOGLEVELMAIN = logging.WARNING
-#LOGLEVELMAIN = logging.DEBUG
-LOGLEVELMAIN = logging.INFO
-
-class RetCodes(object):
-    POLICY_OK  = 0
-    POLICY_NOK = 1
-
-    APOOL_AVAILABLE = 0
-    APOOL_DEPLETED = 1
-
-    DNS_NOERROR  = 0    # DNS Query completed successfully
-    DNS_FORMERR  = 1    # DNS Query Format Error
-    DNS_SERVFAIL = 2    # Server failed to complete the DNS request
-    DNS_NXDOMAIN = 3    # Domain name does not exist.  For help resolving this error, read here.
-    DNS_NOTIMP   = 4    # Function not implemented
-    DNS_REFUSED  = 5    # The server refused to answer for the query
-    DNS_YXDOMAIN = 6    # Name that should not exist, does exist
-    DNS_XRRSET   = 7    # RRset that should not exist, does exist
-    DNS_NOTAUTH  = 8    # Server not authoritative for the zone
-    DNS_NOTZONE  = 9    # Name not in zone
-
+def setup_logging_yaml(default_path='logging.yaml',
+                       default_level=logging.INFO,
+                       env_key='LOG_CFG'):
+    """Setup logging configuration"""
+    path = default_path
+    value = os.getenv(env_key, None)
+    if value:
+        path = value
+    if os.path.exists(path):
+        with open(path, 'rt') as f:
+            config = yaml.safe_load(f.read())
+        logging.config.dictConfig(config)
+    else:
+        logging.basicConfig(level=default_level)
 
 class RealmGateway(object):
     def __init__(self, configfile, name='RealmGateway'):
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVELMAIN)
+        self._logger.setLevel(LOGLEVEL_MAIN)
 
         # Get event loop
         self._loop = asyncio.get_event_loop()
-
         # Enable debugging
         self._set_verbose()
-
         # Capture signals
         self._capture_signal()
-
         # Read configuration
         self._config = self._load_configuration(configfile)
-
         # Initialize Data Repository
         self._init_datarepository()
-
         # Initialize Host table
         self._init_hosttable()
-
         # Initialize Connection table
         self._init_connectiontable()
-
         # Initialize Network
         self._init_network()
-
         # Initialize Address Pools
         self._init_pools()
-
         # Initialize DNS
         self._init_dns()
-
         # Initialize configured subscriber data wrapped as a corutine
         self._loop.create_task(self._init_subscriberdata())
-
-        # Do debugging
-        '''
-        print('\nHostTable')
-        print(self._hosttable)
-        print('\nPoolTable')
-        print(self._pooltable)
-        print('\nConnectionTable')
-        print(self._connectiontable)
-        '''
 
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -107,7 +85,7 @@ class RealmGateway(object):
 
     def _init_datarepository(self):
         # Initialize Data Repository
-        self._logger.warning('Initializing data repository')
+        self._logger.info('Initializing data repository')
         subscriberdata = self._config['DATAREPOSITORY']['subscriberdata']
         servicedata = self._config['DATAREPOSITORY']['servicedata']
         policydata = self._config['DATAREPOSITORY']['policydata']
@@ -217,8 +195,7 @@ class RealmGateway(object):
         queue = self._config['NETWORK']['iptables']['circularpool']['nfqueue']
         self._network.ipt_register_nfqueue(queue, self.packetcb.packet_in_circularpool)
 
-
-    def _set_verbose(self, loglevel = LOGLEVELMAIN):
+    def _set_verbose(self, loglevel = LOGLEVEL_MAIN):
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
         logging.basicConfig(level=loglevel)
         if loglevel <= logging.DEBUG:
@@ -233,7 +210,7 @@ class RealmGateway(object):
             # Close NFQUEUE
             self._network.ipt_deregister_nfqueue()
         except:
-            utils3.trace()
+            log.exception()
         finally:
             self._loop.stop()
 
@@ -242,24 +219,37 @@ class RealmGateway(object):
         self._loop.run_forever()
 
 if __name__ == '__main__':
-    log = logging.getLogger('')
-    log.setLevel(LOGLEVELMAIN)
-    format = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
-    if LOGLEVELMAIN == logging.DEBUG:
-        format = logging.Formatter('[%(levelname)s %(filename)s:%(lineno)s %(funcName)20s()] %(message)s')
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setFormatter(format)
-    log.addHandler(ch)
-    fh = logging.handlers.RotatingFileHandler('rgw.log', maxBytes=(1048576*5), backupCount=7)
-    fh.setFormatter(format)
-    log.addHandler(fh)
+    # Use function to configure logging from file
+    setup_logging_yaml()
+
+    # Change logging dynamically
+    # logging.getLogger().setLevel(logging.DEBUG)
     try:
         loop = asyncio.get_event_loop()
         rgw = RealmGateway(sys.argv[1])
         rgw.begin()
     except Exception as e:
-        print(e)
-        utils3.trace()
+        log.exception("Exception!")
     finally:
         loop.close()
-    print('Bye!')
+
+'''
+class RetCodes(object):
+    POLICY_OK  = 0
+    POLICY_NOK = 1
+
+    APOOL_AVAILABLE = 0
+    APOOL_DEPLETED = 1
+
+    DNS_NOERROR  = 0    # DNS Query completed successfully
+    DNS_FORMERR  = 1    # DNS Query Format Error
+    DNS_SERVFAIL = 2    # Server failed to complete the DNS request
+    DNS_NXDOMAIN = 3    # Domain name does not exist.  For help resolving this error, read here.
+    DNS_NOTIMP   = 4    # Function not implemented
+    DNS_REFUSED  = 5    # The server refused to answer for the query
+    DNS_YXDOMAIN = 6    # Name that should not exist, does exist
+    DNS_XRRSET   = 7    # RRset that should not exist, does exist
+    DNS_NOTAUTH  = 8    # Server not authoritative for the zone
+    DNS_NOTZONE  = 9    # Name not in zone
+
+'''
