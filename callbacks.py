@@ -27,12 +27,12 @@ from host import HostEntry
 import connection
 from connection import ConnectionLegacy
 
-LOGLEVELCALLBACK = logging.DEBUG
+from loglevel import LOGLEVEL_DNSCALLBACK, LOGLEVEL_PACKETCALLBACK
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
-        self._logger.setLevel(LOGLEVELCALLBACK)
+        self._logger.setLevel(LOGLEVEL_DNSCALLBACK)
         utils3.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.state = {}
@@ -442,7 +442,7 @@ class DNSCallbacks(object):
 class PacketCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('PacketCallbacks')
-        self._logger.setLevel(LOGLEVELCALLBACK)
+        self._logger.setLevel(LOGLEVEL_PACKETCALLBACK)
         utils3.set_attributes(self, **kwargs)
 
     def packet_in_circularpool(self, packet):

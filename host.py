@@ -3,8 +3,7 @@ import pprint
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
-
-LOGLEVELHOST = logging.INFO
+from loglevel import LOGLEVEL_HOST
 
 KEY_HOST = 0
 KEY_HOST_FQDN = 1
@@ -19,7 +18,7 @@ KEY_SERVICE_CARRIERGRADE = 'CARRIERGRADE'
 class HostTable(container3.Container):
     def __init__(self, name='HostTable'):
         """ Initialize as a Container """
-        super().__init__(name, LOGLEVELHOST)
+        super().__init__(name, LOGLEVEL_HOST)
 
     def has_carriergrade(self, fqdn):
         """ Return True if a matching host is defined as carrier grade """
@@ -64,7 +63,7 @@ class HostTable(container3.Container):
 class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
-        super().__init__(name, LOGLEVELHOST)
+        super().__init__(name, LOGLEVEL_HOST)
         attrlist_none = ['ipv4','fqdn']
         # Initialize services dictionary
         self.services = {}

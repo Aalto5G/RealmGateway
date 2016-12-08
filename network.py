@@ -9,13 +9,12 @@ from aalto_helpers import container3
 from aalto_helpers import utils3
 from aalto_helpers import iptc_helper3
 from async_nfqueue import AsyncNFQueue
-
-LOGLEVELNETWORK = logging.INFO
+from loglevel import LOGLEVEL_NETWORK
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVELNETWORK)
+        self._logger.setLevel(LOGLEVEL_NETWORK)
         utils3.set_attributes(self, **kwargs)
         # Initialize nfqueue object to None
         self._nfqueue = None
