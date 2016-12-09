@@ -5,8 +5,6 @@ import socket
 
 from customdns.dnsutils import *
 
-LOGLEVEL = logging.INFO
-
 class DNSResolver(asyncio.DatagramProtocol):
     '''
     # Instantiated as follows
@@ -17,7 +15,6 @@ class DNSResolver(asyncio.DatagramProtocol):
     '''
     def __init__(self, host_query, host_addr, cb_function, host_rtx=True, timeouts=None):
         self._logger = logging.getLogger('DNSResolver #{}'.format(id(self)))
-        self._logger.setLevel(LOGLEVEL)
         self._loop = asyncio.get_event_loop()
         self._query = host_query
         self._addr = host_addr

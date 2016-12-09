@@ -2,12 +2,9 @@ import asyncio
 import logging
 from customdns.dnsutils import *
 
-LOGLEVEL = logging.INFO
-
 class DNSProxy(asyncio.DatagramProtocol):
     def __init__(self, soa_list = [], cb_soa = None, cb_nosoa = None):
         self._logger = logging.getLogger('DNSProxy')
-        self._logger.setLevel(LOGLEVEL)
         self.soa_list = soa_list
         self.cb_soa = cb_soa
         self.cb_nosoa = cb_nosoa
@@ -16,7 +13,7 @@ class DNSProxy(asyncio.DatagramProtocol):
         self._transport = transport
 
     def error_received(self, exc):
-        addr = transport.get_extra_info('sockname')
+        addr = self._transport.get_extra_info('sockname')
         self._logger.warning('Error received @{0}:{1} {2}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):

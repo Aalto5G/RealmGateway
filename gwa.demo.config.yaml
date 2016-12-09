@@ -9,23 +9,20 @@ DNS:
         - 0.168.192.in-addr.arpa.
         - 1.18.198.in-addr.arpa.
 #    ddnsproxy:
+#        - [127.0.0.2, 53]
 #        ip: 127.0.0.2
 #        port: 53
     ddnsserver:
-        ip: 127.0.0.2
-        port: 53
+        - [127.0.0.2, 53]
+        - [127.0.0.3, 53]
     proxylan:
-        ip: 192.168.0.1
-        port: 53
+        - [192.168.0.1, 53]
     proxylocal:
-        ip: 127.0.0.1
-        port: 53
+        - [127.0.0.1, 53]
     server:
-        ip: 198.18.1.130
-        port: 53
+        - [198.18.1.130, 53]
     resolver:
-        ip: 127.0.0.1
-        port: 54
+        - [127.0.0.1, 54]
     timeouts:
         naptr:
             - 0.010

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# TODO: Read DNS timeouts from file and use them in DNSCallbacks
-
 import asyncio
 import pool
 import configparser
@@ -136,46 +134,45 @@ class RealmGateway(object):
         soa_list = self.dnscb.dns_get_soa()
 
         # Register DNS resolvers
-        addr = self._config['DNS']['resolver']['ip'], self._config['DNS']['resolver']['port']
-        self.dnscb.dns_register_resolver(addr)
+        for addr in self._config['DNS']['resolver']:
+            self._logger.info('Creating DNS Resolver endpoint @{}:{}'.format(addr[0],addr[1]))
+            self.dnscb.dns_register_resolver(addr)
 
-        # Initiate specific DNS servers
+        # Dynamic DNS Server for DNS update messages
+        for addr in self._config['DNS']['ddnsserver']:
+            cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=tuple(addr))
+            transport, protocol = self._loop.run_until_complete(listen_obj)
+            self._logger.info('Creating DNS DDNS endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
+            self.dnscb.register_object('DDNS@{}:{}'.format(addr[0],addr[1]), protocol)
 
-        ## DDNS Server for DHCP Server
-        addr = self._config['DNS']['ddnsserver']['ip'], self._config['DNS']['ddnsserver']['port']
-        self._logger.info('Creating DDNS Server Local @{}:{}'.format(addr[0],addr[1]))
-        cb_ddns_default = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
-        obj_ddns = DDNSServer(cb_default = cb_ddns_default)
-        self.dnscb.register_object('DDNS_Server_Local', obj_ddns)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_ddns, local_addr=addr))
+        # DNS Server for WAN
+        for addr in self._config['DNS']['server']:
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            transport, protocol = self._loop.run_until_complete(listen_obj)
+            self._logger.info('Creating DNS Server endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
+            self.dnscb.register_object('DNSServer@{}:{}'.format(addr[0],addr[1]), protocol)
 
-        ## DNS Server for WAN
-        addr = self._config['DNS']['server']['ip'], self._config['DNS']['server']['port']
-        self._logger.info('Creating DNS Server WAN @{}:{}'.format(addr[0],addr[1]))
-        cb_wan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
-        cb_wan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
-        obj_serverwan = DNSProxy(soa_list = soa_list, cb_soa = cb_wan_soa, cb_nosoa = cb_wan_nosoa)
-        self.dnscb.register_object('DNS_Server_WAN', obj_serverwan)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_serverwan, local_addr=addr))
-
-        # Create DNS Proxy as forwarders to local resolver for LAN and Local
-        ## DNS Proxy for LAN
-        addr = self._config['DNS']['proxylan']['ip'], self._config['DNS']['proxylan']['port']
-        self._logger.info('Creating DNS Proxy LAN @{}:{}'.format(addr[0],addr[1]))
-        cb_lan_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-        cb_lan_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-        obj_proxylan = DNSProxy(soa_list = soa_list, cb_soa = cb_lan_soa, cb_nosoa = cb_lan_nosoa)
-        self.dnscb.register_object('DNS_Proxy_LAN', obj_proxylan)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylan, local_addr=addr))
+        # DNS Proxy for LAN
+        for addr in self._config['DNS']['proxylan']:
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            transport, protocol = self._loop.run_until_complete(listen_obj)
+            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
+            self.dnscb.register_object('DNSProxy@{}:{}'.format(addr[0],addr[1]), protocol)
 
         ## DNS Proxy for Local
-        addr = self._config['DNS']['proxylocal']['ip'], self._config['DNS']['proxylocal']['port']
-        self._logger.info('Creating DNS Proxy Local @{}:{}'.format(addr[0],addr[1]))
-        cb_local_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-        cb_local_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-        obj_proxylocal = DNSProxy(soa_list = soa_list, cb_soa = cb_local_soa, cb_nosoa = cb_local_nosoa)
-        self.dnscb.register_object('DNS_Proxy_Local', obj_proxylocal)
-        self._loop.create_task(self._loop.create_datagram_endpoint(lambda: obj_proxylocal, local_addr=addr))
+        for addr in self._config['DNS']['proxylocal']:
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            transport, protocol = self._loop.run_until_complete(listen_obj)
+            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
+            self.dnscb.register_object('DNSProxy@{}:{}'.format(addr[0],addr[1]), protocol)
+
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
@@ -210,7 +207,7 @@ class RealmGateway(object):
             # Close NFQUEUE
             self._network.ipt_deregister_nfqueue()
         except:
-            log.exception()
+            self._logger.exception()
         finally:
             self._loop.stop()
 
@@ -223,13 +220,14 @@ if __name__ == '__main__':
     setup_logging_yaml()
 
     # Change logging dynamically
-    # logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.DEBUG)
     try:
         loop = asyncio.get_event_loop()
         rgw = RealmGateway(sys.argv[1])
         rgw.begin()
     except Exception as e:
-        log.exception("Exception!")
+        logger = logging.getLogger(__name__)
+        logger.exception("Exception!")
     finally:
         loop.close()
 

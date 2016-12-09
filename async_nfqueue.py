@@ -35,7 +35,7 @@ class AsyncNFQueue(object):
         self._nfqueue.bind(self.queue, callback)
 
     def terminate(self):
-        self.logger.info('Unind queue #{}'.format(self.queue))
+        self.logger.info('Unbind queue #{}'.format(self.queue))
         self._loop.remove_reader(self._nfqueue_fd)
         self._nfqueue.unbind()
 

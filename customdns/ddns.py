@@ -3,12 +3,9 @@ import logging
 
 from customdns.dnsutils import *
 
-LOGLEVELDNS = logging.INFO
-
 class DDNSProxy(asyncio.DatagramProtocol):
     def __init__(self, dns_addr = None, cb_add=None, cb_delete=None, cb_default=None):
         self._logger = logging.getLogger('DDNSProxy')
-        self._logger.setLevel(LOGLEVELDNS)
         # Set default functions
         self._do_add = self._do_add_default
         self._do_delete = self._do_delete_default
@@ -27,7 +24,7 @@ class DDNSProxy(asyncio.DatagramProtocol):
         self._transport = transport
 
     def error_received(self, exc):
-        addr = transport.get_extra_info('sockname')
+        addr = self._transport.get_extra_info('sockname')
         self._logger.error('Error received @{}:{} {}'.format(addr[0], addr[1], exc))
 
     def datagram_received(self, data, addr):
@@ -113,7 +110,6 @@ class DDNSProxy(asyncio.DatagramProtocol):
 class DDNSServer(asyncio.DatagramProtocol):
     def __init__(self, cb_add=None, cb_delete=None, cb_default=None):
         self._logger = logging.getLogger('DDNSProxy')
-        self._logger.setLevel(LOGLEVELDNS)
         # Set default functions
         self._do_add = self._do_add_default
         self._do_delete = self._do_delete_default
