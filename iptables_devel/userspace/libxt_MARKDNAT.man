@@ -1,6 +1,6 @@
 This target is used to mangle the Netfilter mark value associated with the 
 packet and perform the DNAT operation with the resulting value.
-This target is only valid in the nat table, in the PREROUTING chain.
+This target is only valid in the nat table, in the PREROUTING and OUTPUT chains.
 If you plan on doing so, note that a mark needs to be set in the
 PREROUTING chain of the raw or mangle table to affect routing.
 The mark field is 32 bits wide.

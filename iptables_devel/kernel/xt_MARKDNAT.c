@@ -68,9 +68,10 @@ static struct xt_target markdnat_tg_reg __read_mostly = {
 	.target			= markdnat_tg,
 	.targetsize		= sizeof(struct xt_mark_tginfo2),
 	.table			= "nat",
-	.hooks			= (1 << NF_INET_PRE_ROUTING),
+	.hooks			= (1 << NF_INET_PRE_ROUTING) |
+                                  (1 << NF_INET_LOCAL_OUT),
 	.destroy		= markdnat_tg_destroy,
-	.me				= THIS_MODULE,
+	.me			= THIS_MODULE,
 };
 
 static int __init markdnat_tg_init(void)
