@@ -21,7 +21,7 @@ The following python dependencies are required:
 
 ```
 $ pip3 install --upgrade pip setuptools 
-$ pip3 install --upgrade ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu --user
+$ pip3 install --upgrade ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu python-iptables --user
 ```
 
 ## Build & install the iptables modules
