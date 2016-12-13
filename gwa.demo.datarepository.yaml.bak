@@ -1,5 +1,5 @@
 SUBSCRIBER_ID:
-    gwa.demo.:        {fqdn: 'gwa.demo.',        ipv4: '198.18.1.130',  msisdn: '0000000000' }
+    gwa.demo.:        {fqdn: 'gwa.demo.',        ipv4: '100.64.1.130',  msisdn: '0000000000' }
     foo100.gwa.demo.: {fqdn: 'foo100.gwa.demo.', ipv4: '192.168.0.100', msisdn: '0000000100' }
     foo101.gwa.demo.: {fqdn: 'foo101.gwa.demo.', ipv4: '192.168.0.101', msisdn: '0000000101' }
 
@@ -12,8 +12,8 @@ SUBSCRIBER_SERVICES:
         FIREWALL_EXAMPLE:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'REJECT', 'metadata': {'ipt_hashlimit': '-m hashlimit --hashlimit-above 1/sec --hashlimit-burst 1 --hashlimit-name lan_dns_hosts --hashlimit-mode srcip'}, 'comment':'Host DNS limit'}
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'REJECT', 'metadata': {'ipt_string': '-m string --algo bm --hex-string "|04|nsfw"'}, 'comment':'Forbidden DNS domain'}
-            - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '198.18.0.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'DROP', 'comment':'Deny incoming ICMP'}
-            - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '198.18.1.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow incoming ICMP'}
+            - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '100.64.0.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'DROP', 'comment':'Deny incoming ICMP'}
+            - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '100.64.1.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow incoming ICMP'}
             - {'priority': 10, 'direction': 'INGRESS', 'source-ip': '0.0.0.0/0', 'protocol': 1, 'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow all incoming ICMP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 132, 'action': 'DROP', 'comment':'Deny outgoing SCTP'}
             - {'priority': 10, 'direction': 'EGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6, 'destination-port': 22, 'action': 'DROP', 'comment':'Deny outgoing SSH'}
@@ -57,8 +57,8 @@ SUBSCRIBER_SERVICES:
         FIREWALL_PARENTAL:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': 17, 'destination-port': 53, 'action': 'REJECT', 'metadata': {'ipt_string': '-m string --algo bm --hex-string "|04|nsfw"'}, 'comment':'Forbidden DNS domain'}
         FIREWALL_LEGACY:
-            - {'priority': 10,  'direction': 'INGRESS', 'source-ip': '198.18.0.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'DROP', 'comment':'Deny incoming ICMP'}
-            - {'priority': 10,  'direction': 'INGRESS', 'source-ip': '198.18.1.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow incoming ICMP'}
+            - {'priority': 10,  'direction': 'INGRESS', 'source-ip': '100.64.0.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'DROP', 'comment':'Deny incoming ICMP'}
+            - {'priority': 10,  'direction': 'INGRESS', 'source-ip': '100.64.1.1/32', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Allow incoming ICMP'}
             - {'priority': 10,  'direction': 'INGRESS', 'protocol': 1,  'icmp-type':8, 'icmp-code':0, 'action': 'ACCEPT', 'comment':'Deny incoming ICMP'}
             - {'priority': 10,  'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 17, 'destination-port': 5900, 'action': 'DROP', 'comment':'Deny incoming VNC over UDP'}
             - {'priority': 10,  'direction': 'INGRESS', 'destination-ip': '0.0.0.0/0', 'protocol': 6,  'destination-port': 5900, 'action': 'DROP', 'comment':'Deny incoming VNC over TCP'}

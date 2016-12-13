@@ -138,12 +138,12 @@ brctl setageing qbf-tuna 0
 
 # Set IP configuration
 ip address add 192.168.0.1/24 dev l3-lana
-ip address add 198.18.0.11/24 dev l3-wana
+ip address add 100.64.0.11/24 dev l3-wana
 ip address add 1.1.1.1/32     dev l3-tuna
 ip link set dev l3-tuna arp off
 ip route add 172.16.0.0/24 dev l3-tuna
 
-ovs-vsctl --may-exist add-port qbi-tuna tuna-gre0 -- set interface tuna-gre0 type=gre options:local_ip=198.18.0.11 options:remote_ip=198.18.0.12 options:in_key=flow options:out_key=flow \
+ovs-vsctl --may-exist add-port qbi-tuna tuna-gre0 -- set interface tuna-gre0 type=gre options:local_ip=100.64.0.11 options:remote_ip=100.64.0.12 options:in_key=flow options:out_key=flow \
                                                   -- set interface tuna-gre0 ofport_request=10
 
 
@@ -192,12 +192,12 @@ brctl setageing qbf-tunb 0
 
 # Set IP configuration
 ip address add 192.168.1.1/24 dev l3-lanb
-ip address add 198.18.0.12/24 dev l3-wanb
+ip address add 100.64.0.12/24 dev l3-wanb
 ip address add 1.1.1.2/32     dev l3-tunb
 ip link set dev l3-tunb arp off
 ip route add 172.16.1.0/24 dev l3-tunb
 
-ovs-vsctl --may-exist add-port qbi-tunb tunb-gre0 -- set interface tunb-gre0 type=gre options:local_ip=198.18.0.12 options:remote_ip=198.18.0.11 options:in_key=flow options:out_key=flow \
+ovs-vsctl --may-exist add-port qbi-tunb tunb-gre0 -- set interface tunb-gre0 type=gre options:local_ip=100.64.0.12 options:remote_ip=100.64.0.11 options:in_key=flow options:out_key=flow \
                                                   -- set interface tunb-gre0 ofport_request=10
 
 
@@ -242,5 +242,5 @@ ip link set wan0 netns nswan
 ip netns exec nswan ip link set dev wan0 mtu 1500
 ip netns exec nswan ip link set dev wan0 address 00:00:C6:12:00:65
 ip netns exec nswan ip link set dev wan0 up
-ip netns exec nswan ip address add 198.18.0.101/24 dev wan0
-ip netns exec nswan ip route add default via 198.18.0.1
+ip netns exec nswan ip address add 100.64.0.101/24 dev wan0
+ip netns exec nswan ip route add default via 100.64.0.1

@@ -51,7 +51,7 @@ PHY_TUN="phy-$CESNAME-tun"
 
 # IP address allocation for interfaces 
 QVB_LAN_ADDR=( 00:00:00:00:01:AA 192.168.0.1 24 192.168.0.0 )           #(IpAddr, netmask, NetAddr, GwAddr)  #CHANGEME#
-QVB_WAN_ADDR=( 00:00:00:00:01:BB 198.18.0.11 24 198.18.0.0 198.18.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)  #CHANGEME#
+QVB_WAN_ADDR=( 00:00:00:00:01:BB 100.64.0.11 24 100.64.0.0 100.64.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)  #CHANGEME#
 QVB_TUN_ADDR=( 00:00:00:00:01:CC 1.1.1.1 32 1.1.1.1 )                   #(IpAddr, netmask, NetAddr, GwAddr)  #CHANGEME#
 # IP network allocated for proxy addresses
 PROXYNETWORK="172.16.0.0/24"  #CHANGEME#

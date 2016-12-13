@@ -68,7 +68,7 @@ done
 NAT_NIC="eth1"
 ip link add link br-wan0 dev tap-wan0 type macvlan mode bridge
 ip link set dev tap-wan0 up
-ip address add 198.18.0.254/24 dev tap-wan0
+ip address add 100.64.0.254/24 dev tap-wan0
 iptables -t nat -A POSTROUTING -o $NAT_NIC -j MASQUERADE
 
 
@@ -83,8 +83,8 @@ ip link set wan0 netns router0
 ip link set wan1 netns router0
 ip netns exec router0 ip link set dev wan0 up
 ip netns exec router0 ip link set dev wan1 up
-ip netns exec router0 ip address add 198.18.0.1/24 dev wan0
-ip netns exec router0 ip address add 198.18.1.1/24 dev wan1
+ip netns exec router0 ip address add 100.64.0.1/24 dev wan0
+ip netns exec router0 ip address add 100.64.1.1/24 dev wan1
 
 
 ###############################################################################
@@ -98,9 +98,9 @@ ip link set wan0  netns proxy0a
 ip link set wan0a netns proxy0a
 ip netns exec proxy0a ip link set dev wan0  up
 ip netns exec proxy0a ip link set dev wan0a up
-ip netns exec proxy0a ip address add 198.18.0.8/24 dev wan0
-ip netns exec proxy0a ip address add 198.18.0.9/29 dev wan0a #Longest match prefix for routing
-ip netns exec proxy0a ip route add default via 198.18.0.1 dev wan0
+ip netns exec proxy0a ip address add 100.64.0.8/24 dev wan0
+ip netns exec proxy0a ip address add 100.64.0.9/29 dev wan0a #Longest match prefix for routing
+ip netns exec proxy0a ip route add default via 100.64.0.1 dev wan0
 
 # Setting up TCP SYNPROXY in NS-PROXY - ipt_SYNPROXY
 # https://r00t-services.net/knowledgebase/14/Homemade-DDoS-Protection-Using-IPTables-SYNPROXY.html
@@ -134,18 +134,18 @@ ip link set wan0 netns rgw0a
 ip link set lan0 netns rgw0a
 ip netns exec rgw0a ip link set dev wan0 up
 ip netns exec rgw0a ip link set dev lan0 up
-ip netns exec rgw0a ip address add 198.18.0.10/24 dev wan0
+ip netns exec rgw0a ip address add 100.64.0.10/24 dev wan0
 ip netns exec rgw0a ip address add 192.168.0.1/24 dev lan0
-ip netns exec rgw0a ip route add default via 198.18.0.1 dev wan0
+ip netns exec rgw0a ip route add default via 100.64.0.1 dev wan0
 
 # Add Circular Pool address for ARP responses
-ip netns exec rgw0a ip address add 198.18.0.11/32 dev wan0
-ip netns exec rgw0a ip address add 198.18.0.12/32 dev wan0
-ip netns exec rgw0a ip address add 198.18.0.13/32 dev wan0
-ip netns exec rgw0a ip address add 198.18.0.14/32 dev wan0
+ip netns exec rgw0a ip address add 100.64.0.11/32 dev wan0
+ip netns exec rgw0a ip address add 100.64.0.12/32 dev wan0
+ip netns exec rgw0a ip address add 100.64.0.13/32 dev wan0
+ip netns exec rgw0a ip address add 100.64.0.14/32 dev wan0
 # Configure SNAT in Realm Gateway
 ip netns exec rgw0a iptables -t nat -F POSTROUTING
-ip netns exec rgw0a iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o wan0 -j SNAT --to-source 198.18.0.11-198.18.0.14 --persistent
+ip netns exec rgw0a iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o wan0 -j SNAT --to-source 100.64.0.11-100.64.0.14 --persistent
 
 
 ###############################################################################
@@ -168,6 +168,6 @@ ip netns exec lan0a echo "nameserver 192.168.0.1" > /etc/resolv.conf
 ip link add link br-wan1 dev wan0 type macvlan mode bridge
 ip link set wan0 netns public0
 ip netns exec public0 ip link set dev wan0 up
-ip netns exec public0 ip address add 198.18.1.100/24 dev wan0
-ip netns exec public0 ip route add default via 198.18.1.1 dev wan0
-ip netns exec public0 echo "nameserver 198.18.1.1" > /etc/resolv.conf
+ip netns exec public0 ip address add 100.64.1.100/24 dev wan0
+ip netns exec public0 ip route add default via 100.64.1.1 dev wan0
+ip netns exec public0 echo "nameserver 100.64.1.1" > /etc/resolv.conf

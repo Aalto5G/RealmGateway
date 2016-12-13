@@ -1,7 +1,7 @@
 server {
      # Listen on ports 80 and 443
-     listen 198.18.0.11:80;
-     listen 198.18.0.11:443 ssl;
+     listen 100.64.0.11:80;
+     listen 100.64.0.11:443 ssl;
      
      # Set the server name matching the SSL certificate
      #server_name  _;

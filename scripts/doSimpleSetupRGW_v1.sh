@@ -64,8 +64,8 @@ done
 ## Create a macvlan interface to provide NAT and communicate with the other virtual hosts
 ip link add link br-wan0 dev tap-wan0 type macvlan mode bridge
 ip link set dev tap-wan0 up
-ip address add 198.18.0.254/24 dev tap-wan0
-ip route add 198.18.0.0/22 via 198.18.0.1
+ip address add 100.64.0.254/24 dev tap-wan0
+ip route add 100.64.0.0/22 via 100.64.0.1
 
 
 ###############################################################################
@@ -79,9 +79,9 @@ ip link set wan0 netns router
 ip link set wan1 netns router
 ip netns exec router ip link set dev wan0 up
 ip netns exec router ip link set dev wan1 up
-ip netns exec router ip address add 198.18.0.1/24 dev wan0
-ip netns exec router ip address add 198.18.1.1/24 dev wan1
-ip netns exec router ip route add default via 198.18.0.254 dev wan0
+ip netns exec router ip address add 100.64.0.1/24 dev wan0
+ip netns exec router ip address add 100.64.1.1/24 dev wan1
+ip netns exec router ip route add default via 100.64.0.254 dev wan0
 ip netns exec router bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 
 # Setting up TCP SYNPROXY in router - ipt_SYNPROXY
@@ -109,26 +109,26 @@ ip link set lan0 netns gwa
 ip netns exec gwa ip link set dev lan0 up
 ip netns exec gwa ip link set dev wan0 up
 ip netns exec gwa ip address add 192.168.0.1/24  dev lan0
-ip netns exec gwa ip address add 198.18.1.130/24 dev wan0
-ip netns exec gwa ip route add default via 198.18.1.1 dev wan0
+ip netns exec gwa ip address add 100.64.1.130/24 dev wan0
+ip netns exec gwa ip route add default via 100.64.1.1 dev wan0
 ip netns exec gwa bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 
 # Add Circular Pool address for ARP responses
-ip netns exec gwa ip address add 198.18.1.131/32 dev wan0 # Reserved for CES
-ip netns exec gwa ip address add 198.18.1.132/32 dev wan0 # Reserved for CES
-ip netns exec gwa ip address add 198.18.1.133/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.134/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.135/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.136/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.137/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.138/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.139/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.140/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.141/32 dev wan0
-ip netns exec gwa ip address add 198.18.1.142/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.131/32 dev wan0 # Reserved for CES
+ip netns exec gwa ip address add 100.64.1.132/32 dev wan0 # Reserved for CES
+ip netns exec gwa ip address add 100.64.1.133/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.134/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.135/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.136/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.137/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.138/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.139/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.140/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.141/32 dev wan0
+ip netns exec gwa ip address add 100.64.1.142/32 dev wan0
 # Configure SNAT in Realm Gateway - Done in the init script
 #ip netns exec gwa iptables -t nat -F POSTROUTING
-#ip netns exec gwa iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o wan0 -j SNAT --to-source 198.18.0.133-198.18.0.135 --persistent
+#ip netns exec gwa iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o wan0 -j SNAT --to-source 100.64.0.133-100.64.0.135 --persistent
 
 
 ###############################################################################
@@ -151,6 +151,6 @@ ip netns exec hosta bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
 ip link add link br-wan0 dev wan0 type macvlan mode bridge
 ip link set wan0 netns public
 ip netns exec public ip link set dev wan0 up
-ip netns exec public ip address add 198.18.0.100/24 dev wan0
-ip netns exec public ip route add default via 198.18.0.1 dev wan0
-ip netns exec public bash -c 'echo "nameserver 198.18.1.130" > /etc/resolv.conf'
+ip netns exec public ip address add 100.64.0.100/24 dev wan0
+ip netns exec public ip route add default via 100.64.0.1 dev wan0
+ip netns exec public bash -c 'echo "nameserver 100.64.1.130" > /etc/resolv.conf'

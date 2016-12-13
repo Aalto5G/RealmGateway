@@ -64,7 +64,7 @@ MTU_NS_WAN_CES="1500"
 
 HOST_NS_LAN_CES1=( 00:00:C0:A8:00:65 192.168.0.101 24 192.168.0.0 192.168.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
 HOST_NS_LAN_CES2=( 00:00:C0:A8:01:65 192.168.1.101 24 192.168.1.0 192.168.1.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
-HOST_NS_WAN_CES=( 00:00:C6:12:00:65 198.18.0.101 24 198.18.1.0 198.18.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
+HOST_NS_WAN_CES=( 00:00:C6:12:00:65 100.64.0.101 24 100.64.1.0 100.64.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
 
 
 #Define array for iterations

@@ -14,4 +14,4 @@ devel			A	192.168.0.100
 			DHCID	( AAABOEfUCkYXCWuFvCOmvWmCJr9GMEt8dnBHUYiQ0fuA
 				ugQ= ) ; 48704 65 32
 $TTL 10	; 10 seconds
-ns			A	198.18.0.11
+ns			A	100.64.0.11

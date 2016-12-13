@@ -68,7 +68,7 @@ if __name__ == '__main__':
         validate_mac(args.mac)
         validate_ip(args.ip)
     except AssertionError:
-        print('Run as: ./arpResponder.py --nic l3-wana --mac 00:00:00:00:01:bb --ip 198.18.0.21 198.18.0.22')
+        print('Run as: ./arpResponder.py --nic l3-wana --mac 00:00:00:00:01:bb --ip 100.64.0.21 100.64.0.22')
         exit()
     
     arp_responder = ArpResponder(args.nic, args.mac, args.ip)

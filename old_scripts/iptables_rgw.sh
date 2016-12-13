@@ -20,7 +20,7 @@ TUN_L3="l3-tuna"
 PREFIX_L3="l3-+"
 ## Networks
 LAN_NET="192.168.0.0/24"
-CPOOL_NET="198.18.0.12/32 198.18.0.13/32 198.18.0.14/32"
+CPOOL_NET="100.64.0.12/32 100.64.0.13/32 100.64.0.14/32"
 CPOOL_MAC="00:00:00:00:01:bb"
 PROXY_NET="172.16.0.0/24"
 SPOOF_LAN_NET="0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 224.0.0.0/3"
@@ -271,7 +271,7 @@ iptables -t filter -A FILTER_HOST_POLICY_ACCEPT -g FILTER_SELF_POLICY -m comment
 
 # Populate POSTROUTING chain of NAT table with specific Source NAT for the LAN network
 iptables -t nat -F POSTROUTING
-iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 198.18.0.12-198.18.0.14 --persistent -m comment --comment "SNAT to 198.18.0.[12,13,14]"
+iptables -t nat -A POSTROUTING -s $LAN_NET -o $WAN_L3 -j SNAT --to-source 100.64.0.12-100.64.0.14 --persistent -m comment --comment "SNAT to 100.64.0.[12,13,14]"
 
 
 # Populate custom chain FILTER_HOST_POLICY of FILTER table - 2 entries per host / 1 entry per traffic direction

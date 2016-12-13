@@ -49,8 +49,8 @@ The model uses 3 different network interfaces with routing (Layer-3) capabilitie
        e.g. 192.168.0.1/24
        e.g. 192.168.1.1/24
 * WAN: Connects to the public network - Internet.
-       e.g. 198.18.0.11/24 gateway: 198.18.0.1 - Circular Pool 198.18.0.[12-14]
-       e.g. 198.18.0.21/24 gateway: 198.18.0.1 - Circular Pool 198.18.0.[22-24]
+       e.g. 100.64.0.11/24 gateway: 100.64.0.1 - Circular Pool 100.64.0.[12-14]
+       e.g. 100.64.0.21/24 gateway: 100.64.0.1 - Circular Pool 100.64.0.[22-24]
 * TUN: Connects to the tunnel terminator (OpenvSwitch) for CES to CES communications.
        e.g. 1.1.1.1/32 NO ARP. Proxy Network 172.16.0.0/24 via tun-interface
        e.g. 1.1.1.2/32 NO ARP. Proxy Network 172.16.1.0/24 via tun-interface
@@ -281,9 +281,9 @@ ebtables -t nat -A PREROUTING -p arp --arp-opcode Request -j arpreply \
 --arpreply-mac 10:11:12:13:14:15 --arpreply-target ACCEPT
 
 # If we want to let the packet go all the way
-ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.27 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target ACCEPT
+ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 100.64.0.27 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target ACCEPT
 # If we want to stop the packet at the given interface
-ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 198.18.0.28 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target DROP
+ebtables -t nat -A PREROUTING -p arp --arp-opcode 1 --arp-ip-dst 100.64.0.28 -j arpreply --arpreply-mac 10:11:12:13:14:15 --arpreply-target DROP
 
 
 # Banning hosts with ipset ?

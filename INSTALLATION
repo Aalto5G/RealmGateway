@@ -24,7 +24,7 @@ rgw. IN SOA ns.rgw. admin.rgw.(
 ; Name servers 
 rgw.        IN      NS      ns.rgw. 
 ; Addresses for the hosts 
-ns.rgw.     IN      A       198.18.0.11 
+ns.rgw.     IN      A       100.64.0.11 
 EOF
 
 1.3 Restart BIND
@@ -99,8 +99,8 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/
 cat > /etc/nginx/sites-available/default << EOF
 server {
      # Listen on ports 80 and 443
-     listen 198.18.0.11:80;
-     listen 198.18.0.11:443 ssl;
+     listen 100.64.0.11:80;
+     listen 100.64.0.11:443 ssl;
      
      # Set the server name matching the SSL certificate
      #server_name  _;
@@ -235,48 +235,48 @@ lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan0
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.0.1/24
+lxc.network.ipv4 = 100.64.0.1/24
 ##
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan1
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.1.1/24
+lxc.network.ipv4 = 100.64.1.1/24
 ##
 EOF
 
 ### proxya
 cat <<EOF >> /var/lib/lxc/proxya/config
 # Network configuration
-## Inline SYN proxy for 198.18.0.8/29 - 198.18.0.[8-15]
+## Inline SYN proxy for 100.64.0.8/29 - 100.64.0.[8-15]
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan0
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.0.8/24
-lxc.network.ipv4.gateway = 198.18.0.1
+lxc.network.ipv4 = 100.64.0.8/24
+lxc.network.ipv4.gateway = 100.64.0.1
 ##
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan0a
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.0.9/29
+lxc.network.ipv4 = 100.64.0.9/29
 EOF
 
 ### cesa
 cat <<EOF >> /var/lib/lxc/cesa/config
 # Network configuration
-## Inline SYN proxy for 198.18.0.8/29 - 198.18.0.[8-15]
+## Inline SYN proxy for 100.64.0.8/29 - 100.64.0.[8-15]
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan0a
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.0.10/24
-lxc.network.ipv4 = 198.18.0.11/32
-lxc.network.ipv4 = 198.18.0.12/32
-lxc.network.ipv4 = 198.18.0.13/32
-lxc.network.ipv4 = 198.18.0.14/32
-lxc.network.ipv4.gateway = 198.18.0.1
+lxc.network.ipv4 = 100.64.0.10/24
+lxc.network.ipv4 = 100.64.0.11/32
+lxc.network.ipv4 = 100.64.0.12/32
+lxc.network.ipv4 = 100.64.0.13/32
+lxc.network.ipv4 = 100.64.0.14/32
+lxc.network.ipv4.gateway = 100.64.0.1
 ##
 lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
@@ -305,7 +305,7 @@ lxc.network.type = macvlan
 lxc.network.macvlan.mode = bridge
 lxc.network.link = br-wan1
 lxc.network.flags = up
-lxc.network.ipv4 = 198.18.1.100/24
+lxc.network.ipv4 = 100.64.1.100/24
 EOF
 
 
@@ -340,7 +340,7 @@ ovs-vsctl add-br insecure
 ip link set dev insecure up
 ip link set dev insecure mtu 1360
 ip addr add 10.255.255.1/24 dev insecure
-ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=198.18.0.2 options:in_key=flow options:out_key=flow
+ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=100.64.0.2 options:in_key=flow options:out_key=flow
 ### Endpoint B
 ovs-vsctl del-br insecure
 ovs-vsctl del-br secure
@@ -348,7 +348,7 @@ ovs-vsctl add-br insecure
 ip link set dev insecure up
 ip link set dev insecure mtu 1360
 ip addr add 10.255.255.2/24 dev insecure
-ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=198.18.0.1 options:in_key=flow options:out_key=flow
+ovs-vsctl add-port insecure gre0 -- set interface gre0 type=gre options:remote_ip=100.64.0.1 options:in_key=flow options:out_key=flow
 
 ## Secured GRE tunnel
 ### Endpoint A
@@ -358,7 +358,7 @@ ovs-vsctl add-br secure
 ip link set dev secure up
 ip link set dev secure mtu 1360
 ip addr add 10.255.255.1/24 dev secure
-ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=198.18.0.1 options:remote_ip=198.18.0.2 options:psk=secret options:in_key=flow options:out_key=flow
+ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=100.64.0.1 options:remote_ip=100.64.0.2 options:psk=secret options:in_key=flow options:out_key=flow
 ### Endpoint B
 ovs-vsctl del-br insecure
 ovs-vsctl del-br secure
@@ -366,4 +366,4 @@ ovs-vsctl add-br secure
 ip link set dev secure up
 ip link set dev secure mtu 1360
 ip addr add 10.255.255.2/24 dev secure
-ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=198.18.0.2 options:remote_ip=198.18.0.1 options:psk=secret options:in_key=flow options:out_key=flow
+ovs-vsctl add-port secure gre0 -- set interface gre0 type=ipsec_gre options:local_ip=100.64.0.2 options:remote_ip=100.64.0.1 options:psk=secret options:in_key=flow options:out_key=flow

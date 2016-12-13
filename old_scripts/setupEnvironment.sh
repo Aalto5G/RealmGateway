@@ -22,11 +22,11 @@ OVS_BR2_WAN="cesb-wan"
 OVS_BR2_VTEP="cesb-vtep"
 
 OVS_BR1_LAN_IPADDR=( 192.168.0.1 24 192.168.0.0 )           #(IpAddr, netmask, NetAddr, GwAddr)
-OVS_BR1_WAN_IPADDR=( 198.18.0.11 24 198.18.0.0 198.18.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
+OVS_BR1_WAN_IPADDR=( 100.64.0.11 24 100.64.0.0 100.64.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
 OVS_BR1_VTEP_IPADDR=( 1.1.1.1 32 1.1.1.1 )                  #(IpAddr, netmask, NetAddr, GwAddr)
 
 OVS_BR2_LAN_IPADDR=( 192.168.1.1 24 192.168.1.0 )           #(IpAddr, netmask, NetAddr, GwAddr)
-OVS_BR2_WAN_IPADDR=( 198.18.0.12 24 198.18.0.0 198.18.0.1)  #(IpAddr, netmask, NetAddr, GwAddr)
+OVS_BR2_WAN_IPADDR=( 100.64.0.12 24 100.64.0.0 100.64.0.1)  #(IpAddr, netmask, NetAddr, GwAddr)
 OVS_BR2_VTEP_IPADDR=( 1.1.1.1 32 1.1.1.1 )                  #(IpAddr, netmask, NetAddr, GwAddr)
 
 OVS_BR1_PROXYNETWORK="172.16.0.0/24"
@@ -76,7 +76,7 @@ PATCH1_HOST3="wan0"
 #Definition of hosts networking in namespaces
 IPADDR_HOST1=( 192.168.0.101 24 192.168.0.0 192.168.0.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
 IPADDR_HOST2=( 192.168.1.101 24 192.168.1.0 192.168.1.1 ) #(IpAddr, netmask, NetAddr, GwAddr)
-IPADDR_HOST3=( 198.18.0.100  24 198.18.0.0  198.18.0.1 )  #(IpAddr, netmask, NetAddr, GwAddr)
+IPADDR_HOST3=( 100.64.0.100  24 100.64.0.0  100.64.0.1 )  #(IpAddr, netmask, NetAddr, GwAddr)
 
 #Delete OVS bridges
 for i in $OVS_BR1 $OVS_BR2; do
@@ -282,7 +282,7 @@ echo ""
 echo "Enabling NAT via iptables..."
 
 for i in "${array[@]}"; do IFS=","; set $i
-    #/sbin/iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o cesa-wan -j SNAT --to 198.18.0.11
+    #/sbin/iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o cesa-wan -j SNAT --to 100.64.0.11
     #/sbin/iptables -A FORWARD -i cesb-wan -o cesa-lan -m state --state RELATED,ESTABLISHED -j ACCEPT
     /sbin/iptables -t nat -A POSTROUTING -s $2/$3 -o $4 -j SNAT --to $5
     /sbin/iptables -A FORWARD -i $4 -o $1 -m state --state RELATED,ESTABLISHED -j ACCEPT

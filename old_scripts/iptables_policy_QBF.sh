@@ -19,7 +19,7 @@ TUN_NIC="l3-tuna"
 BRIDGE_INTERFACES="qbf-lana qbf-wana qbf-tuna"
 
 LAN_NET="192.168.0.0/24"
-CPOOL_NET="198.18.0.21/32 198.18.0.22/32 198.18.0.23/32"
+CPOOL_NET="100.64.0.21/32 100.64.0.22/32 100.64.0.23/32"
 PROXY_NET="172.16.0.0/24"
 
 # Packet marks per interface
@@ -228,7 +228,7 @@ iptables -A FORWARD -j ACCEPT                                    # Accept traffi
 
 #iptables -t nat -A POSTROUTING -m mark ! --mark 0x00 -j LOG --log-level 7 --log-prefix "nat.POST: mark!=0 "
 #iptables -t nat -A POSTROUTING -m mark   --mark 0x00 -j LOG --log-level 7 --log-prefix "nat.POST: mark==0 "
-iptables -t nat -A POSTROUTING -m mark --mark $hMARK_EGRESS_to_WAN -s $LAN_NET -j SNAT --to-source 198.18.0.11 -m comment --comment "Outgoing SNAT to 198.18.0.11"
+iptables -t nat -A POSTROUTING -m mark --mark $hMARK_EGRESS_to_WAN -s $LAN_NET -j SNAT --to-source 100.64.0.11 -m comment --comment "Outgoing SNAT to 100.64.0.11"
 
 
 

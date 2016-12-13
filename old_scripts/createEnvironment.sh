@@ -73,11 +73,11 @@ ovs-vsctl --may-exist add-port qbi-tuna ovs-l3-tuna
 
 # Set IP configuration
 ip address add 192.168.0.1/24 dev l3-lana
-ip address add 198.18.0.11/24 dev l3-wana
+ip address add 100.64.0.11/24 dev l3-wana
 ip address add 1.1.1.1/32     dev l3-tuna
 ip route add 172.16.0.0/24    dev l3-tuna
 
-ovs-vsctl --may-exist add-port qbi-tuna tuna-gre0 -- set interface tuna-gre0 type=gre options:local_ip=198.18.0.11 options:remote_ip=198.18.0.12 options:in_key=flow options:out_key=flow \
+ovs-vsctl --may-exist add-port qbi-tuna tuna-gre0 -- set interface tuna-gre0 type=gre options:local_ip=100.64.0.11 options:remote_ip=100.64.0.12 options:in_key=flow options:out_key=flow \
                                                   -- set interface tuna-gre0 ofport_request=10
 
 
@@ -114,11 +114,11 @@ ovs-vsctl --may-exist add-port qbi-tunb ovs-l3-tunb
 
 # Set IP configuration
 ip address add 192.168.1.1/24 dev l3-lanb
-ip address add 198.18.0.12/24 dev l3-wanb
+ip address add 100.64.0.12/24 dev l3-wanb
 ip address add 1.1.1.2/32     dev l3-tunb
 ip route add 172.16.1.0/24    dev l3-tunb
 
-ovs-vsctl --may-exist add-port qbi-tunb tunb-gre0 -- set interface tunb-gre0 type=gre options:local_ip=198.18.0.12 options:remote_ip=198.18.0.11 options:in_key=flow options:out_key=flow \
+ovs-vsctl --may-exist add-port qbi-tunb tunb-gre0 -- set interface tunb-gre0 type=gre options:local_ip=100.64.0.12 options:remote_ip=100.64.0.11 options:in_key=flow options:out_key=flow \
                                                   -- set interface tunb-gre0 ofport_request=10
 
 
@@ -163,7 +163,7 @@ ip link set wan0 netns nswan
 ip netns exec nswan ip link set dev wan0 mtu 1500
 ip netns exec nswan ip link set dev wan0 address 00:00:C6:12:00:01
 ip netns exec nswan ip link set dev wan0 up
-ip netns exec nswan ip address add 198.18.0.1/24 dev wan0
+ip netns exec nswan ip address add 100.64.0.1/24 dev wan0
 # Add new interface for inter-routing
 ip link add link qbi-wan dev wan1 type macvlan mode bridge
 ip link set wan1 netns nswan
@@ -171,7 +171,7 @@ ip netns exec nswan ip link set dev wan1 mtu 1500
 ip netns exec nswan ip link set dev wan1 address 00:00:C6:12:01:01
 ip netns exec nswan ip link set dev wan1 up
 ip netns exec nswan ip address flush dev wan1
-ip netns exec nswan ip address add 198.18.1.1/24 dev wan1
+ip netns exec nswan ip address add 100.64.1.1/24 dev wan1
 
 ### [NS-WAN2]
 ip link add link qbi-wan dev wan1 type macvlan mode bridge
@@ -180,11 +180,11 @@ ip netns exec nswan2 ip link set dev wan1 mtu 1500
 ip netns exec nswan2 ip link set dev wan1 address 00:00:C6:12:01:65
 ip netns exec nswan2 ip link set dev wan1 up
 ip netns exec nswan2 ip address flush dev wan1
-ip netns exec nswan2 ip address add 198.18.1.101/24 dev wan1
-ip netns exec nswan2 ip route add default via 198.18.1.1
+ip netns exec nswan2 ip address add 100.64.1.101/24 dev wan1
+ip netns exec nswan2 ip route add default via 100.64.1.1
 
 # Add route in CES-A to reach NS-WAN2
-ip route add 198.18.1.0/24 via 198.18.0.1
+ip route add 100.64.1.0/24 via 100.64.0.1
 
 
 # Setting up TCP SYNPROXY in NS-WAN2 - ipt_SYNPROXY
@@ -194,5 +194,5 @@ ip netns exec nswan2 sysctl -w net/ipv4/tcp_timestamps=1 # This is not available
 ip netns exec nswan2 sysctl -w net/netfilter/nf_conntrack_tcp_loose=0
 
 ip netns exec nswan2 iptables -t raw    -I PREROUTING -p tcp -m tcp --syn -j CT --notrack                                                    
-ip netns exec nswan2 iptables -t filter -I FORWARD -p tcp -m tcp -d 198.18.0.0/24 -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+ip netns exec nswan2 iptables -t filter -I FORWARD -p tcp -m tcp -d 100.64.0.0/24 -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
 ip netns exec nswan2 iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP

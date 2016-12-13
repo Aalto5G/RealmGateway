@@ -63,16 +63,16 @@ ip link set dev wan1    arp off
 
 # Set IP configuration
 ip address add 192.168.0.1/24 dev l3-lana
-ip address add 198.18.0.11/32 dev l3-wana
-ip address add 198.18.0.12/32 dev l3-wana
-ip address add 198.18.0.13/32 dev l3-wana
-ip address add 198.18.0.14/32 dev l3-wana
+ip address add 100.64.0.11/32 dev l3-wana
+ip address add 100.64.0.12/32 dev l3-wana
+ip address add 100.64.0.13/32 dev l3-wana
+ip address add 100.64.0.14/32 dev l3-wana
 # Add route in CES-A to reach NS-WAN2
-ip route add 198.18.0.0/16 dev l3-wana
+ip route add 100.64.0.0/16 dev l3-wana
 
 # Configure SNAT in Realm Gateway
 iptables -t nat -F POSTROUTING
-iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o l3-wana -j SNAT --to-source 198.18.0.12-198.18.0.14 -m comment --comment "SNAT to 198.18.0.[12,13,14]"
+iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o l3-wana -j SNAT --to-source 100.64.0.12-100.64.0.14 -m comment --comment "SNAT to 100.64.0.[12,13,14]"
 
 
 ###############################################################################
@@ -116,12 +116,12 @@ ip netns exec nsproxy ip link set dev wan0 mtu 1500
 ip netns exec nsproxy ip link set dev wan0 address 00:00:C6:12:00:0A
 ip netns exec nsproxy ip link set dev wan0 up
 ip netns exec nsproxy ip link set dev wan1 up
-ip netns exec nsproxy ip address add 198.18.0.10/24 dev wan0
-ip netns exec nsproxy ip route add default via 198.18.0.1
-ip netns exec nsproxy ip route add 198.18.0.11/32 dev wan1
-ip netns exec nsproxy ip route add 198.18.0.12/32 dev wan1
-ip netns exec nsproxy ip route add 198.18.0.13/32 dev wan1
-ip netns exec nsproxy ip route add 198.18.0.14/32 dev wan1
+ip netns exec nsproxy ip address add 100.64.0.10/24 dev wan0
+ip netns exec nsproxy ip route add default via 100.64.0.1
+ip netns exec nsproxy ip route add 100.64.0.11/32 dev wan1
+ip netns exec nsproxy ip route add 100.64.0.12/32 dev wan1
+ip netns exec nsproxy ip route add 100.64.0.13/32 dev wan1
+ip netns exec nsproxy ip route add 100.64.0.14/32 dev wan1
 
 
 ### [NS-WAN]
@@ -133,14 +133,14 @@ ip link set wan0 netns nswan
 ip netns exec nswan ip link set dev wan0 mtu 1500
 ip netns exec nswan ip link set dev wan0 address 00:00:C6:12:00:01
 ip netns exec nswan ip link set dev wan0 up
-ip netns exec nswan ip address add 198.18.0.1/24 dev wan0
+ip netns exec nswan ip address add 100.64.0.1/24 dev wan0
 # Add new interface for inter-routing
 ip link add link qbi-wan2 dev wan1 type macvlan mode bridge
 ip link set wan1 netns nswan
 ip netns exec nswan ip link set dev wan1 mtu 1500
 ip netns exec nswan ip link set dev wan1 address 00:00:C6:12:01:01
 ip netns exec nswan ip link set dev wan1 up
-ip netns exec nswan ip address add 198.18.1.1/24 dev wan1
+ip netns exec nswan ip address add 100.64.1.1/24 dev wan1
 
 ### [NS-WAN2]
 ip link add link qbi-wan2 dev wan1 type macvlan mode bridge
@@ -148,8 +148,8 @@ ip link set wan1 netns nswan2
 ip netns exec nswan2 ip link set dev wan1 mtu 1500
 ip netns exec nswan2 ip link set dev wan1 address 00:00:C6:12:01:65
 ip netns exec nswan2 ip link set dev wan1 up
-ip netns exec nswan2 ip address add 198.18.1.101/24 dev wan1
-ip netns exec nswan2 ip route add default via 198.18.1.1
+ip netns exec nswan2 ip address add 100.64.1.101/24 dev wan1
+ip netns exec nswan2 ip route add default via 100.64.1.1
 
 
 ##################################### EBTABLES #################################
@@ -165,7 +165,7 @@ ip netns exec nswan2 ip route add default via 198.18.1.1
 #
 #ebtables -t nat -F
 ## Create different ARP responder based on incoming interface for Realm Gateway IP addresses
-#for ip in "198.18.0.11" "198.18.0.12" "198.18.0.13" "198.18.0.14"
+#for ip in "100.64.0.11" "100.64.0.12" "100.64.0.13" "100.64.0.14"
 #do
 #    ebtables -t nat -A PREROUTING --logical-in $NIC_BRIDGE -i $NIC_GATEWAY -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac $MAC_SYNPROXY
 #    ebtables -t nat -A PREROUTING --logical-in $NIC_BRIDGE -i $NIC_PROXY   -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac $MAC_RGW
@@ -191,11 +191,11 @@ sysctl -w net.ipv4.conf.wan0.proxy_arp=1
 ip netns exec nsproxy iptables -t raw    -F
 ip netns exec nsproxy iptables -t raw    -A PREROUTING -i wan0 -p tcp -m tcp --syn -j CT --notrack                                                    
 ip netns exec nsproxy iptables -t filter -F
-ip netns exec nsproxy iptables -t filter -A FORWARD -i wan0 -p tcp -m tcp -d 198.18.0.0/24 -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+ip netns exec nsproxy iptables -t filter -A FORWARD -i wan0 -p tcp -m tcp -d 100.64.0.0/24 -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
 ip netns exec nsproxy iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
 
 # Create different ARP responder based on incoming interface for Realm Gateway IP addresses
-#for ip in "198.18.0.11" "198.18.0.12" "198.18.0.13" "198.18.0.14"
+#for ip in "100.64.0.11" "100.64.0.12" "100.64.0.13" "100.64.0.14"
 #do
 #    ebtables -t nat -A PREROUTING  --logical-in qbi-wan -i wan0_phy -p arp --arp-opcode 1 --arp-ip-dst $ip -j arpreply --arpreply-mac 00:00:c6:12:00:0a
 #done
