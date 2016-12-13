@@ -79,6 +79,12 @@ class DNSCallbacks(object):
         # Create host entry arguments as a dictionary
         host_data = dict(user_data)
         host_data['services'] = dict(user_services)
+        # HACK: Provisional until datarepository returns default data
+        host_data['ipv4'] = ipaddr
+        host_data['fqdn'] = fqdn
+        host_data['services'].setdefault('SFQDN', [{'fqdn':fqdn, 'carriergrade':False}])
+        host_data['services'].setdefault('CIRCULARPOOL', [{'max':100}])
+        #/HACK
         host_obj = HostEntry(name=fqdn, **host_data)
         self.hosttable.add(host_obj)
         # Create network resources
@@ -95,6 +101,7 @@ class DNSCallbacks(object):
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
             self.network.ipt_add_user_carriergrade(hostname, carriergrade_ipt)
+        self.hosttable.show()
 
     @asyncio.coroutine
     def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
