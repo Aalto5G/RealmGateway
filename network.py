@@ -11,6 +11,9 @@ from aalto_helpers import iptc_helper3
 from async_nfqueue import AsyncNFQueue
 from loglevel import LOGLEVEL_NETWORK
 
+DEFAULT_HOST_POLICY = 'ACCEPT'
+#DEFAULT_HOST_POLICY = 'DROP'
+
 class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
@@ -150,8 +153,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
 
         # 2. Register triggers in host chain
         ## Get packet marks based on traffic direction
@@ -162,7 +165,8 @@ class Network(object):
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_parental})
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_legacy, 'mark':{'mark':mark_legacy}})
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces, 'mark':{'mark':mark_ces}})
-        iptc_helper3.add_rule('filter', host_chain, {'target':'DROP'})
+        # Add a variable for default host policy
+        iptc_helper3.add_rule('filter', host_chain, {'target':DEFAULT_HOST_POLICY})
 
     def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -178,8 +182,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
 
         # 2. Remove host chains
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
@@ -194,8 +198,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
 
     def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
@@ -206,8 +210,8 @@ class Network(object):
         mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'src':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
 
     def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
@@ -253,8 +257,8 @@ class Network(object):
         if goto_table:
             ret += ' -g {}'.format(goto_table)
         return ret
-    
-    
+
+
     def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
         try:
             self._logger.debug('System call: {}'.format(command))
