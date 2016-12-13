@@ -101,7 +101,6 @@ class DNSCallbacks(object):
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
             self.network.ipt_add_user_carriergrade(hostname, carriergrade_ipt)
-        self.hosttable.show()
 
     @asyncio.coroutine
     def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
