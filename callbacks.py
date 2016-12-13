@@ -72,7 +72,7 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
-        self._logger.debug('Register new user {} @ {}'.format(fqdn, ipaddr))
+        self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
         user_data     = self.datarepository.get_subscriber_data(fqdn).items()
         user_services = self.datarepository.get_subscriber_service(fqdn, None)
@@ -213,7 +213,7 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def _dns_process_rgw_wan_soa_carriergrade(self, query, addr, cback, host_obj, service_data):
         fqdn = format(query.question[0].name)
-        self._logger.warning('_dns_process_rgw_wan_soa_carriergrade {}'.format(fqdn))
+        self._logger.debug('_dns_process_rgw_wan_soa_carriergrade {}'.format(fqdn))
         rdtype = query.question[0].rdtype
 
         if not self._check_policyrgw(host_obj, addr[0], None):
@@ -228,14 +228,14 @@ class DNSCallbacks(object):
             cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
-            self._logger.warning('Refused to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
+            self._logger.warning('ConnectionRefusedError: Resolving Carrier Grade IP from {} for {}'.format(host_obj.ipv4, fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.REFUSED)
             cback(query, addr, response)
             return
 
         if not cgresponse:
             # Failed to allocate an address - Drop DNS Query
-            self._logger.warning('Failed to resolve address from {} for {}'.format(host_obj.ipv4, fqdn))
+            self._logger.warning('ResolutionFailure: Failed to resolve address from {} for {}'.format(host_obj.ipv4, fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
             cback(query, addr, response)
             return
@@ -243,7 +243,7 @@ class DNSCallbacks(object):
         host_cgaddr = dnsutils.get_first_record(cgresponse)
         if not host_cgaddr:
             # Failed to allocate an address - Drop DNS Query
-            self._logger.warning('Failed to obtain Carrier Grage IP address from {} for {}'.format(host_obj.ipv4, fqdn))
+            self._logger.warning('EmptyDNSResponse: Failed to obtain Carrier Grage IP from {} for {}'.format(host_obj.ipv4, fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
             cback(query, addr, response)
             return
@@ -257,7 +257,7 @@ class DNSCallbacks(object):
             cback(query, addr, response)
             return
 
-        self._logger.debug('Use circularpool address pool for {} @ {}'.format(fqdn, host_cgaddr))
+        self._logger.debug('Use CircularPool address pool for {} @ {}'.format(fqdn, host_cgaddr))
         # Get service data based on host FQDN
         allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_cgaddr, addr[0], None, fqdn, service_data)
 
@@ -286,7 +286,7 @@ class DNSCallbacks(object):
             self._logger.debug('Use NS address for {}'.format(fqdn))
             allocated_ipv4 = host_obj.ipv4
         elif self._check_policyrgw(host_obj, addr[0], None):
-            self._logger.debug('Use circularpool address pool for {}'.format(fqdn))
+            self._logger.debug('Use CircularPool address pool for {}'.format(fqdn))
             allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
 
         if not allocated_ipv4:
@@ -337,7 +337,7 @@ class DNSCallbacks(object):
         # Get host usage stats of the pool - lookup because there could be none
         rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
         host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.fqdn)) # Use host fqdn as connection id
-        # Get CircularPool policies for RGW and host
+        # Get Circular Pool policies for RGW and host
         rgw_policy  = rgw_obj.get_service('CIRCULARPOOL')[0]
         host_policy = host_obj.get_service('CIRCULARPOOL')[0]
 
@@ -416,10 +416,10 @@ class DNSCallbacks(object):
         ipaddr = conn.outbound_ip
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
-            self._logger.info('Cannot release IP address to Circular Pool: {} still in use'.format(ipaddr))
+            self._logger.info('Cannot release IP address to Circular Pool: {} ({}) still in use'.format(ipaddr, conn.fqdn))
             return
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {}'.format(ipaddr))
+        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn.fqdn))
 
     def _do_callback(self, query, addr, response=None):
         try:
@@ -491,7 +491,7 @@ class PacketCallbacks(object):
             return
 
         # DNAT to private host
-        self._logger.info('DNAT to {} to {}'.format(dst, conn.private_ip))
+        self._logger.info('DNAT to {} @ {} via {}'.format(conn.fqdn, conn.private_ip, dst))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):

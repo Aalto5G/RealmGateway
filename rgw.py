@@ -180,7 +180,7 @@ class RealmGateway(object):
         for subscriber_id, subscriber_data in self._datarepository.get_subscriber_data(None).items():
             ipaddr = subscriber_data['ipv4']
             fqdn = subscriber_data['fqdn']
-            self._logger.info('Registering subscriber {} / {}@{}'.format(subscriber_id, fqdn, ipaddr))
+            self._logger.debug('Registering subscriber {} / {}@{}'.format(subscriber_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
 
     def _init_network(self):
