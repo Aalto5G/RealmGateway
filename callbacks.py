@@ -135,13 +135,13 @@ class DNSCallbacks(object):
                     yield from self.ddns_register_user(format(rr.name), rr.rdtype, rr[0].address)
                 elif rr.rdtype == dns.rdatatype.A and rr.ttl == 0:
                     yield from self.ddns_deregister_user(format(rr.name), rr.rdtype, rr[0].address)
-
+        except Exception as e:
+            self._logger.warning('Failed to process UPDATE DNS message {}'.format(e))
+        finally:
             # Send generic DDNS Response NOERROR
             response = dnsutils.make_response_rcode(query)
             self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
-        except Exception as e:
-            self._logger.error('Failed to process UPDATE DNS message {}'.format(e))
 
     @asyncio.coroutine
     def dns_process_rgw_lan_soa(self, query, addr, cback):
