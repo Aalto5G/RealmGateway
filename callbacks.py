@@ -82,7 +82,12 @@ class DNSCallbacks(object):
         # HACK: Provisional until datarepository returns default data
         host_data['ipv4'] = ipaddr
         host_data['fqdn'] = fqdn
-        host_data['services'].setdefault('SFQDN', [{'fqdn':fqdn, 'carriergrade':False}])
+        sfqdn_services = []
+        for token, proxy in (('',False), ('www.',True), ('sip',True)):
+            sfqdn_services.append({'fqdn':'{}{}'.format(token, fqdn),
+                                   'carriergrade': False,
+                                   'proxy_required': proxy})
+        host_data['services'].setdefault('SFQDN', sfqdn_services)
         host_data['services'].setdefault('CIRCULARPOOL', [{'max':100}])
         #/HACK
         host_obj = HostEntry(name=fqdn, **host_data)
