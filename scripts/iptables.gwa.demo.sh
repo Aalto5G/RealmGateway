@@ -135,6 +135,7 @@ iptables -t mangle -A PREROUTING -i $WAN_L3 -m conntrack --ctstate NEW -m set --
 iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p tcp --syn -j NFQUEUE --queue-bypass --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
 iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p udp       -j NFQUEUE --queue-bypass --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
 iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY -p icmp      -j NFQUEUE --queue-bypass --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
+iptables -t mangle -A MANGLE_PRE_CPOOL_POLICY              -j NFQUEUE --queue-bypass --queue-num $NFQUEUE_CPOOL -m comment --comment "[CircularPool] Send to ControlPlane"
 
 ## Trace traffic for debugging
 #iptables -t mangle -I PREROUTING -m mark ! --mark 0x00 -j NFLOG --nflog-prefix "MANGLE.PRE "
