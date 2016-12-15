@@ -70,6 +70,9 @@ class DNSCallbacks(object):
             n = random.randrange(len(self.resolver_list))
         return self.resolver_list[n]
 
+    def dns_register_timeouts(self, timeout_d):
+        self.timeouts = timeout_d
+
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
@@ -171,6 +174,7 @@ class DNSCallbacks(object):
         # Forward or continue to DNS resolver
         q = query.question[0]
         key = (query.id, q.name, q.rdtype, addr)
+        fqdn = q.name
 
         if key in self.activequeries:
             # Continue ongoing resolution
@@ -182,7 +186,17 @@ class DNSCallbacks(object):
         raddr = self.dns_get_resolver()
         resolver = uDNSResolver()
         self.activequeries[key] = resolver
-        response = yield from resolver.do_resolve(query, raddr, timeouts=[0.5, 0.5])
+        try:
+            response = yield from resolver.do_resolve(query, raddr, timeouts=self.timeouts['a'])
+        except ConnectionRefusedError:
+            # Refused to allocate an address - Drop DNS Query
+            self._logger.warning('ConnectionRefusedError: Resolving {} via {}:{}'.format(fqdn, raddr[0], raddr[1]))
+            response = dnsutils.make_response_rcode(query, dns.rcode.REFUSED)
+        if not response:
+            # Failed to resolve DNS query - Drop DNS Query
+            self._logger.warning('ResolutionFailure: Failed to resolve address for {} via {}:{}'.format(fqdn, raddr[0], raddr[1]))
+            response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+        # Resolution ended, send generated response
         del self.activequeries[key]
         cback(query, addr, response)
 
@@ -236,7 +250,7 @@ class DNSCallbacks(object):
         self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
         try:
-            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=[0.5])
+            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.timeouts)
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('ConnectionRefusedError: Resolving Carrier Grade IP from {} for {}'.format(host_obj.ipv4, fqdn))

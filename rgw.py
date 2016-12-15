@@ -127,6 +127,9 @@ class RealmGateway(object):
                                   pooltable = self._pooltable,
                                   connectiontable = self._connectiontable)
 
+        # Register defined DNS timeouts
+        self.dnscb.dns_register_timeouts(self._config['DNS']['timeouts'])
+
         # Register defined SOA zones
         for name in self._config['DNS']['soa']:
             self._logger.info('Registering DNS SOA {}'.format(name))
