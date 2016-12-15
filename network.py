@@ -92,10 +92,7 @@ class Network(object):
 
     def ipt_nfpacket_dnat(self, packet, ipaddr):
         mark = self._gen_pktmark_cpool(ipaddr)
-        # New version of NetfilterQueue does htonl(mark)
-        ## We want to undo it - BUG & HACK
-        ## https://github.com/kti/python-netfilterqueue/issues/21
-        packet.set_mark(socket.htonl(mark))
+        packet.set_mark(mark)
         packet.accept()
 
     def ipt_nfpacket_accept(self, packet):
