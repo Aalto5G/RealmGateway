@@ -12,7 +12,7 @@ The following dependencies are required:
 
 ```
 # apt-get install build-essential python3-dev libnetfilter-queue-dev python3-pip
-# apt-get install ipset libipset3 iptables ebtables bridge-utils
+# apt-get install ipset libipset3 iptables ipset ebtables bridge-utils
 # apt-get install ipsec-tools openvswitch-common openvswitch-ipsec openvswitch-switch python-openvswitch racoon
 ```
 
