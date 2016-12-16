@@ -10,7 +10,7 @@ SUBSCRIBER_SERVICES:
         SFQDN:
             - {fqdn: 'gwa.demo.'}
         FIREWALL_EXAMPLE:
-            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip'}, 'comment':{'comment':'Host DNS limit'}}
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'60000'}, 'comment':{'comment':'Host DNS limit'}}
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
             - {'priority': 10, 'direction': 'INGRESS', 'src': '100.64.0.1/32', 'protocol': '1', 'icmp':{'icmp-type':'8/0'}, 'target': 'DROP', 'comment':{'comment':'Deny incoming ICMP'}}
             - {'priority': 10, 'direction': 'INGRESS', 'src': '100.64.1.1/32', 'protocol': '1', 'icmp':{'icmp-type':'8/0'}, 'target': 'ACCEPT', 'comment':{'comment':'Allow incoming ICMP'}}
@@ -35,7 +35,7 @@ SUBSCRIBER_SERVICES:
             - {ipv4: 192.168.0.201}
             - {ipv4: 192.168.0.202}
         FIREWALL_ADMIN:
-            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip'}, 'comment':{'comment':'Host DNS limit'}}
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'60000'}, 'comment':{'comment':'Host DNS limit'}}
         FIREWALL_PARENTAL:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
         FIREWALL_LEGACY:
@@ -62,7 +62,7 @@ SUBSCRIBER_SERVICES:
             - {fqdn: 'sip.foo101.gwa.demo.'  , protocol: 17,   port: 5060, proxy_required: true }
 
         FIREWALL_ADMIN:
-            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip'}, 'comment':{'comment':'Host DNS limit'}}
+            - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'1/sec', 'hashlimit-burst':'1', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'60000'}, 'comment':{'comment':'Host DNS limit'}}
         FIREWALL_PARENTAL:
             - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
         FIREWALL_LEGACY:
