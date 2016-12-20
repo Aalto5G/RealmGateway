@@ -470,16 +470,21 @@ class PacketCallbacks(object):
         self._logger.setLevel(LOGLEVEL_PACKETCALLBACK)
         utils3.set_attributes(self, **kwargs)
 
+    def _format_5tuple(self, packet_fields):
+        return '{}:{} {}:{} [{}] (TTL {})'.format(packet_fields['src'], packet_fields['sport'],
+                                                  packet_fields['dst'], packet_fields['dport'],
+                                                  packet_fields['proto'], packet_fields['ttl'])
+
     def packet_in_circularpool(self, packet):
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
         # Parse packet
         packet_fields = network_helper3.parse_packet_custom(data)
         # Select appropriate values for building the keys
-        src, dst, proto = packet_fields['src'], packet_fields['dst'], packet_fields['proto']
-        sport, dport =  (0,0)
-        if 'dport' in packet_fields:
-            sport, dport = (packet_fields['sport'],packet_fields['dport'])
+        src, dst = packet_fields['src'], packet_fields['dst']
+        proto, ttl = packet_fields['proto'], packet_fields['ttl']
+        sport = packet_fields.setdefault('sport', 0)
+        dport = packet_fields.setdefault('dport', 0)
         sender = '{}:{}'.format(src, sport)
         self._logger.debug('Received PacketIn: {}'.format(packet_fields))
 
@@ -499,24 +504,24 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.info('No connection found for IP: {} from {}'.format(dst,sender))
+            self._logger.info('No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
             return
 
         # Lookup connection in table with rest of the keys
         conn = None
         for key in [key2, key3, key4, key5, key6]:
             if self.connectiontable.has(key):
-                self._logger.debug('Connection found for n-tuple*: {} from {}'.format(key,sender))
+                self._logger.debug('Connection found for n-tuple* {}: [{}]'.format(key,self._format_5tuple(packet_fields)))
                 conn = self.connectiontable.get(key)
                 break
 
         if conn is None:
-            self._logger.warning('No connection found for packet: {} from {}'.format(packet_fields,sender))
+            self._logger.warning('No connection found for packet: [{}]'.format(self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_drop(packet)
             return
 
         # DNAT to private host
-        self._logger.info('DNAT to {} @ {} via {}'.format(conn.fqdn, conn.private_ip, dst))
+        self._logger.info('DNAT to {} @ {} via {}: [{}]'.format(conn.fqdn, conn.private_ip, dst, self._format_5tuple(packet_fields)))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):
