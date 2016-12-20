@@ -462,7 +462,7 @@ class DNSCallbacks(object):
             self._logger.info('Cannot release IP address to Circular Pool: {} ({}) still in use'.format(ipaddr, conn.fqdn))
             return
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn.fqdn))
+        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn))
 
     def _do_callback(self, query, addr, response=None):
         try:
