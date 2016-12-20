@@ -27,8 +27,8 @@ class Network(object):
         self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
         self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
         # Test if MARKDNAT is available in the system
-        self.MARKDNAT = iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'})
-        if self.MARKDNAT:
+        self._enabled_MARKDNAT = self._test_MARKDNAT()
+        if self._enabled_MARKDNAT:
             self._add_MARKDNAT('nat', self.iptables['circularpool']['chain'])
 
     def ipt_flush_chain(self, table, chain):
@@ -104,15 +104,23 @@ class Network(object):
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
+    def _test_MARKDNAT(self):
+        if iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'}):
+            self._logger.info('Enabling iptables MARKDNAT target')
+            return True
+        self._logger.warning('Unsupported iptables MARKDNAT target')
+        return False
+
     def _add_MARKDNAT(self, table, chain):
         # Insert rule on the top of the chain
         rule = {'target':{'MARKDNAT': {'or-mark':'0'}},
                 'comment':{'comment':'Realm Gateway NAT Traversal'}}
+        self._logger.info('Inserting MARKDNAT rule in {}@{}'.format(chain, table))
         iptc_helper3.add_rule(table, chain, rule, 0)
 
     def _add_circularpool(self, hostname, ipaddr):
         # Do not add specific rule if MARKDNAT is enabled
-        if self.MARKDNAT:
+        if self._enabled_MARKDNAT:
             return
         # Add rule to iptables
         table = 'nat'
@@ -123,7 +131,7 @@ class Network(object):
 
     def _remove_circularpool(self, hostname, ipaddr):
         # Do not delete specific rule if MARKDNAT is enabled
-        if self.MARKDNAT:
+        if self._enabled_MARKDNAT:
             return
         # Remove rule from iptables
         table = 'nat'
