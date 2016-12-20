@@ -14,6 +14,40 @@ from loglevel import LOGLEVEL_NETWORK
 DEFAULT_HOST_POLICY = 'ACCEPT'
 #DEFAULT_HOST_POLICY = 'DROP'
 
+# Definition of PACKET MARKS
+## Definition of specific packet MARK for traffic
+MARK_LOCAL_FROM_LAN      = 0xFF121212/0xFFFFFFFF
+MARK_LOCAL_TO_LAN        = 0xFF211221/0xFFFFFFFF
+MARK_LOCAL_FROM_WAN      = 0xFF021113/0xFFFFFFFF
+MARK_LOCAL_TO_WAN        = 0xFF011131/0xFFFFFFFF
+MARK_LOCAL_FROM_TUN      = 0xFF021114/0xFFFFFFFF
+MARK_LOCAL_TO_TUN        = 0xFF011141/0xFFFFFFFF
+MARK_LAN_TO_WAN          = 0xFF222232/0xFFFFFFFF
+MARK_LAN_FROM_WAN        = 0xFF112223/0xFFFFFFFF
+MARK_LAN_TO_TUN          = 0xFF222342/0xFFFFFFFF
+MARK_LAN_FROM_TUN        = 0xFF112324/0xFFFFFFFF
+## Definition of packet MASKS for traffic
+### Classified by traffic scope and direction
+MASK_LOCAL               = 0xFF001010/0xFF00F0F0
+MASK_LOCAL_INGRESS       = 0xFF021010/0xFF0FF0F0
+MASK_LOCAL_EGRESS        = 0xFF011001/0xFF0FF00F
+MASK_HOST_INGRESS        = 0xFF000020/0xFF0000F0
+MASK_HOST_EGRESS         = 0xFF000002/0xFF00000F
+MASK_HOST_LEGACY         = 0xFF000200/0xFF000F00
+MASK_HOST_LEGACY_INGRESS = 0xFF000220/0xFF000FF0
+MASK_HOST_LEGACY_EGRESS  = 0xFF000202/0xFF000F0F
+MASK_HOST_CES            = 0xFF000300/0xFF000F00
+MASK_HOST_CES_INGRESS    = 0xFF000320/0xFF000FF0
+MASK_HOST_CES_EGRESS     = 0xFF000302/0xFF000F0F
+### Classified by ingress or egress interface
+MASK_LAN_INGRESS         = 0xFF000002/0xFF00000F
+MASK_WAN_INGRESS         = 0xFF000003/0xFF00000F
+MASK_TUN_INGRESS         = 0xFF000004/0xFF00000F
+MASK_LAN_EGRESS          = 0xFF000020/0xFF0000F0
+MASK_WAN_EGRESS          = 0xFF000030/0xFF0000F0
+MASK_TUN_EGRESS          = 0xFF000040/0xFF0000F0
+
+
 class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
@@ -162,8 +196,8 @@ class Network(object):
 
         # 1. Register triggers in global host policy chain
         ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        mark_in = MASK_HOST_INGRESS
+        mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
@@ -171,8 +205,8 @@ class Network(object):
 
         # 2. Register triggers in host chain
         ## Get packet marks based on traffic direction
-        mark_legacy = self.iptables['pktmark']['MASK_HOST_LEGACY']
-        mark_ces = self.iptables['pktmark']['MASK_HOST_CES']
+        mark_legacy = MASK_HOST_LEGACY
+        mark_ces = MASK_HOST_CES
         ## Add rules to iptables
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_admin})
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_parental})
@@ -191,8 +225,8 @@ class Network(object):
 
         # 1. Remove triggers in global host policy chain
         ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        mark_in = MASK_HOST_INGRESS
+        mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
@@ -207,8 +241,8 @@ class Network(object):
         host_chain          = 'HOST_{}'.format(hostname)
         # 1. Register triggers in global host policy chain
         ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        mark_in = MASK_HOST_INGRESS
+        mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
@@ -219,8 +253,8 @@ class Network(object):
         host_chain          = 'HOST_{}'.format(hostname)
         # 1. Register triggers in global host policy chain
         ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
+        mark_in = MASK_HOST_INGRESS
+        mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
         chain = self.iptables['hostpolicy']['chain']
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
@@ -241,9 +275,9 @@ class Network(object):
         ret = dict(rule)
         # Translate direction value into packet mark
         if ret['direction'] == 'EGRESS':
-            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_EGRESS']}
+            ret['mark'] = {'mark':MASK_HOST_EGRESS}
         elif ret['direction'] == 'INGRESS':
-            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_INGRESS']}
+            ret['mark'] = {'mark':MASK_HOST_INGRESS}
         elif ret['direction'] == 'ANY':
             pass
         else:

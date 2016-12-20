@@ -17,7 +17,7 @@ DNS:
     server:
         - [100.64.1.130, 53]
     resolver:
-        - [127.0.0.1, 54]
+        - [8.8.8.8, 53]
     timeouts:
         naptr: [0.010, 0.100, 0.200]
         a:     [0.010, 0.100, 0.200]
@@ -43,38 +43,6 @@ NETWORK:
         hostpolicy:
             chain: FILTER_HOST_POLICY
             accept: FILTER_HOST_POLICY_ACCEPT
-        pktmark:
-            ## Definition of specific packet MARK for traffic
-            MARK_LOCAL_FROM_LAN: 0xFF121212/0xFFFFFFFF
-            MARK_LOCAL_TO_LAN: 0xFF211221/0xFFFFFFFF
-            MARK_LOCAL_FROM_WAN: 0xFF021113/0xFFFFFFFF
-            MARK_LOCAL_TO_WAN: 0xFF011131/0xFFFFFFFF
-            MARK_LOCAL_FROM_TUN: 0xFF021114/0xFFFFFFFF
-            MARK_LOCAL_TO_TUN: 0xFF011141/0xFFFFFFFF
-            MARK_LAN_TO_WAN: 0xFF222232/0xFFFFFFFF
-            MARK_LAN_FROM_WAN: 0xFF112223/0xFFFFFFFF
-            MARK_LAN_TO_TUN: 0xFF222342/0xFFFFFFFF
-            MARK_LAN_FROM_TUN: 0xFF112324/0xFFFFFFFF
-            ## Definition of packet MASKS for traffic
-            ### Classified by traffic scope and direction
-            MASK_LOCAL: 0xFF001010/0xFF00F0F0
-            MASK_LOCAL_INGRESS: 0xFF021010/0xFF0FF0F0
-            MASK_LOCAL_EGRESS: 0xFF011001/0xFF0FF00F
-            MASK_HOST_INGRESS: 0xFF000020/0xFF0000F0
-            MASK_HOST_EGRESS: 0xFF000002/0xFF00000F
-            MASK_HOST_LEGACY: 0xFF000200/0xFF000F00
-            MASK_HOST_LEGACY_INGRESS: 0xFF000220/0xFF000FF0
-            MASK_HOST_LEGACY_EGRESS: 0xFF000202/0xFF000F0F
-            MASK_HOST_CES: 0xFF000300/0xFF000F00
-            MASK_HOST_CES_INGRESS: 0xFF000320/0xFF000FF0
-            MASK_HOST_CES_EGRESS: 0xFF000302/0xFF000F0F
-            ### Classified by ingress or egress interface
-            MASK_LAN_INGRESS: 0xFF000002/0xFF00000F
-            MASK_WAN_INGRESS: 0xFF000003/0xFF00000F
-            MASK_TUN_INGRESS: 0xFF000004/0xFF00000F
-            MASK_LAN_EGRESS: 0xFF000020/0xFF0000F0
-            MASK_WAN_EGRESS: 0xFF000030/0xFF0000F0
-            MASK_TUN_EGRESS: 0xFF000040/0xFF0000F0
 
 DATAREPOSITORY:
     subscriberdata: gwa.demo.datarepository.yaml
