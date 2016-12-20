@@ -1,5 +1,28 @@
 #!/usr/bin/env python3
 
+#TODO: Overwrite method getattr from argument object Namespace to return None if non existing or default value
+'''
+Run as:
+./rgw.py  --name gwa.demo                                                    \
+          --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
+          --dns-server-local 127.0.0.1 53 --dns-server-local 127.0.0.1 1053  \
+          --dns-server-lan   192.168.0.1 53                                  \
+          --dns-server-wan   100.64.1.130 53                                 \
+          --dns-resolver     8.8.8.8 53                                      \
+          --dns-resolver     127.0.0.1 54                                    \
+          --ddns-server      127.0.0.1 53                                    \
+          --dns-timeout      0.010 0.100 0.200                               \
+          --pool-serviceip   100.64.1.130/32                                 \
+          --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
+          --ipt-cpool-queue  1 2 3                                           \
+          --ipt-cpool-chain  NAT_PRE_CPOOL                                   \
+          --ipt-host-chain   FILTER_HOST_POLICY                              \
+          --ipt-host-accept  FILTER_HOST_POLICY_ACCEPT                       \
+          --repository-subscriber-file   subscriber.yaml                     \
+          --repository-subscriber-folder subscriber.d/
+'''
+
+import argparse
 import asyncio
 import pool
 import configparser
@@ -46,9 +69,84 @@ def setup_logging_yaml(default_path='logging.yaml',
     else:
         logging.basicConfig(level=default_level)
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Realm Gateway')
+    parser.add_argument('--name', type=str, required=True,
+                        help='Name of the Realm Gateway instance i.e. gwa.demo')
+
+    # DNS parameters
+    parser.add_argument('--dns-soa', nargs='*', required=True,
+                        help='Available SOA zones (FQDN and PTR)')
+    parser.add_argument('--dns-server-local', nargs=2, action='append',
+                        metavar=('IPADDR', 'PORT'),
+                        help='DNS serving own host')
+    parser.add_argument('--dns-server-lan', nargs=2, action='append',
+                        metavar=('IPADDR', 'PORT'),
+                        help='DNS serving LAN hosts')
+    parser.add_argument('--dns-server-wan', nargs=2, action='append',
+                        metavar=('IPADDR', 'PORT'),
+                         help='DNS serving WAN hosts')
+    parser.add_argument('--dns-resolver', nargs=2, action='append',
+                        metavar=('IPADDR', 'PORT'),
+                        help='DNS resolver server')
+    parser.add_argument('--ddns-server', nargs=2, action='append',
+                        metavar=('IPADDR', 'PORT'),
+                        help='DDNS serving own DHCP server')
+
+    # DNS timeout parameters
+    parser.add_argument('--dns-timeout', nargs='+', type=float, default=[0.100, 0.200, 0.200],
+                        help='Default timeouts for DNS resolution (sec)')
+    parser.add_argument('--dns-timeout-a', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+                        help='Default timeouts for DNS A resolution (sec)')
+    parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+                        help='Default timeouts for DNS AAAA resolution (sec)')
+    parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+                        help='Default timeouts for DNS NAPTR resolution (sec)')
+
+    # Address pool parameters
+    parser.add_argument('--pool-serviceip', nargs='*',
+                        metavar=('IPADDR'),
+                        help='IP address of public proxy frontend')
+    parser.add_argument('--pool-cpoolip',nargs='*',
+                        metavar=('IPADDR'),
+                        help='IP address of public Circular Pool')
+
+    # Iptables parameters
+    parser.add_argument('--ipt-cpool-queue', nargs='*', type=int,
+                        metavar=('QUEUENUM'),
+                        help='NFQUEUE number')
+    parser.add_argument('--ipt-cpool-chain', type=str,
+                        metavar=('IPT_CPOOL_CHAIN'),
+                        help='Iptables CircularPool nat chain')
+    parser.add_argument('--ipt-host-chain', type=str,
+                        metavar=('IPT_HOST_CHAIN'),
+                        help='Iptables Host filter chain')
+    parser.add_argument('--ipt-host-accept', type=str,
+                        metavar=('IPT_HOST_ACCEPT'),
+                        help='Iptables Host accept target chain')
+
+    # Data repository parameters
+    ## Subscriber information
+    parser.add_argument('--repository-subscriber-file', type=str,
+                        metavar=('FILENAME'),
+                        help='Configuration file with subscriber information')
+    parser.add_argument('--repository-subscriber-folder', type=str,
+                        metavar=('FOLDERNAME'),
+                        help='Configuration folder with subscriber information')
+    ### Policy information
+    #parser.add_argument('--repository-policy-file', nargs=1,
+    #                    metavar=('FILENAME'),
+    #                    help='Configuration file with policy information')
+    #parser.add_argument('--repository-policy-folder', nargs=1,
+    #                    metavar=('FOLDERNAME'),
+    #                    help='Configuration folder with policy information')
+
+    return parser.parse_args()
+
 class RealmGateway(object):
-    def __init__(self, configfile, name='RealmGateway'):
-        self._logger = logging.getLogger(name)
+    def __init__(self, args):
+        self._config = args
+        self._logger = logging.getLogger(self._config.name)
         self._logger.setLevel(LOGLEVEL_MAIN)
 
         # Get event loop
@@ -57,8 +155,6 @@ class RealmGateway(object):
         self._set_verbose()
         # Capture signals
         self._capture_signal()
-        # Read configuration
-        self._config = self._load_configuration(configfile)
         # Initialize Data Repository
         self._init_datarepository()
         # Initialize Host table
@@ -78,16 +174,11 @@ class RealmGateway(object):
         for signame in ('SIGINT', 'SIGTERM'):
             self._loop.add_signal_handler(getattr(signal, signame), self._signal_handler, signame)
 
-    def _load_configuration(self, filename):
-        return yaml.load(open(filename,'r'))
-
     def _init_datarepository(self):
         # Initialize Data Repository
         self._logger.info('Initializing data repository')
-        subscriberdata = self._config['DATAREPOSITORY']['subscriberdata']
-        servicedata = self._config['DATAREPOSITORY']['servicedata']
-        policydata = self._config['DATAREPOSITORY']['policydata']
-        self._datarepository = DataRepository(subscriberdata=subscriberdata,servicedata=servicedata,policydata=policydata)
+        self._datarepository = DataRepository(configfile = self._config.repository_subscriber_file,
+                                              configfolder = self._config.repository_subscriber_folder)
 
     def _init_hosttable(self):
         # Create container of Hosts
@@ -100,100 +191,108 @@ class RealmGateway(object):
     def _init_pools(self):
         # Create container of Address Pools
         self._pooltable = PoolContainer()
-        # Create specific Address Pools
-        for k,v in self._config['NETWORK']['addresspool'].items():
-            if k == 'circularpool':
-                ap = AddressPoolShared(k)
-            elif k == 'servicepool':
-                ap = AddressPoolShared(k)
-            elif k == 'proxypool':
-                ap = AddressPoolUser(k)
-            else:
-                self._logger.warning('AddressPool {} not supported'.format(k))
-                continue
 
-            self._logger.info('Created Address Pool <{}>'.format(k))
-            for net in v:
-                self._logger.debug('Adding resource(s) to pool {}@<{}>'.format(net, k))
-                ap.add_to_pool(net)
-            self._pooltable.add(ap)
+        # Create specific Address Pools
+        ## Service IP Pool
+        ap = AddressPoolShared('servicepool')
+        self._pooltable.add(ap)
+        for ipaddr in self._config.pool_serviceip:
+            self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
+            ap.add_to_pool(ipaddr)
+
+        ## Circular IP Pool
+        ap = AddressPoolShared('circularpool')
+        self._pooltable.add(ap)
+        for ipaddr in self._config.pool_cpoolip:
+            self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
+            ap.add_to_pool(ipaddr)
+        '''
+        # For future use
+        ## CES Proxy IP Pool
+        ap = AddressPoolUser('proxypool')
+        self._pooltable.add(ap)
+        for ipaddr in self._config.pool_cespoolip:
+            self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
+            ap.add_to_pool(ipaddr)
+        '''
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
-        self.dnscb = DNSCallbacks(cachetable = None,
-                                  datarepository = self._datarepository,
-                                  network = self._network,
-                                  hosttable = self._hosttable,
-                                  pooltable = self._pooltable,
+        self.dnscb = DNSCallbacks(cachetable      = None,
+                                  datarepository  = self._datarepository,
+                                  network         = self._network,
+                                  hosttable       = self._hosttable,
+                                  pooltable       = self._pooltable,
                                   connectiontable = self._connectiontable)
 
         # Register defined DNS timeouts
-        self.dnscb.dns_register_timeouts(self._config['DNS']['timeouts'])
+        self.dnscb.dns_register_timeouts(self._config.dns_timeout, None)
+        ## TODO: Add rest of DNS recort type timeouts
 
         # Register defined SOA zones
-        for name in self._config['DNS']['soa']:
-            self._logger.info('Registering DNS SOA {}'.format(name))
-            self.dnscb.dns_register_soa(name)
+        for soa_name in self._config.dns_soa:
+            self._logger.info('Registering DNS SOA {}'.format(soa_name))
+            self.dnscb.dns_register_soa(soa_name)
         soa_list = self.dnscb.dns_get_soa()
 
         # Register DNS resolvers
-        for addr in self._config['DNS']['resolver']:
-            self._logger.info('Creating DNS Resolver endpoint @{}:{}'.format(addr[0],addr[1]))
-            self.dnscb.dns_register_resolver(addr)
+        for ipaddr, port in self._config.dns_resolver:
+            self._logger.info('Creating DNS Resolver endpoint @{}:{}'.format(ipaddr, port))
+            self.dnscb.dns_register_resolver((ipaddr, port))
 
         # Dynamic DNS Server for DNS update messages
-        for addr in self._config['DNS']['ddnsserver']:
+        for ipaddr, port in self._config.ddns_server:
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=tuple(addr))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS DDNS endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
-            self.dnscb.register_object('DDNS@{}:{}'.format(addr[0],addr[1]), protocol)
+            self._logger.info('Creating DNS DDNS endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Server for WAN
-        for addr in self._config['DNS']['server']:
+        for ipaddr, port in self._config.dns_server_wan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Server endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
-            self.dnscb.register_object('DNSServer@{}:{}'.format(addr[0],addr[1]), protocol)
+            self._logger.info('Creating DNS Server endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Proxy for LAN
-        for addr in self._config['DNS']['proxylan']:
+        for ipaddr, port in self._config.dns_server_lan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
-            self.dnscb.register_object('DNSProxy@{}:{}'.format(addr[0],addr[1]), protocol)
+            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
         ## DNS Proxy for Local
-        for addr in self._config['DNS']['proxylocal']:
+        for ipaddr, port in self._config.dns_server_local:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=tuple(addr))
+            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(addr[0],addr[1], id(protocol)))
-            self.dnscb.register_object('DNSProxy@{}:{}'.format(addr[0],addr[1]), protocol)
-
+            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
         self._logger.info('Initializing subscriber data')
-        for subscriber_id, subscriber_data in self._datarepository.get_subscriber_data(None).items():
-            ipaddr = subscriber_data['ipv4']
-            fqdn = subscriber_data['fqdn']
-            self._logger.debug('Registering subscriber {} / {}@{}'.format(subscriber_id, fqdn, ipaddr))
+        for subs_id, subs_data in self._datarepository.getall_subscriber(default = {}).items():
+            ipaddr = subs_data['ID']['IPV4'][0]
+            fqdn = subs_data['ID']['FQDN'][0]
+            self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
 
     def _init_network(self):
-        kwargs = self._config['NETWORK']
-        self._network = network.Network(**kwargs)
+        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
+                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
+                                        ipt_host_chain   = self._config.ipt_host_chain ,
+                                        ipt_host_accept  = self._config.ipt_host_accept)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
-        # Register NFQUEUE callback
-        queue = self._config['NETWORK']['iptables']['circularpool']['nfqueue']
-        self._network.ipt_register_nfqueue(queue, self.packetcb.packet_in_circularpool)
+        # Register NFQUEUE(s) callback
+        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
 
     def _set_verbose(self, loglevel = LOGLEVEL_MAIN):
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
@@ -207,8 +306,8 @@ class RealmGateway(object):
             #TODO: Close all sockets?
             for obj in self.dnscb.get_object(None):
                 obj.connection_lost(None)
-            # Close NFQUEUE
-            self._network.ipt_deregister_nfqueue()
+            # Close bound NFQUEUEs
+            self._network.ipt_deregister_nfqueues()
         except:
             self._logger.exception()
         finally:
@@ -219,6 +318,10 @@ class RealmGateway(object):
         self._loop.run_forever()
 
 if __name__ == '__main__':
+    # Parse arguments
+    args = parse_arguments()
+    print(args)
+
     # Use function to configure logging from file
     setup_logging_yaml()
 
@@ -226,7 +329,7 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.DEBUG)
     try:
         loop = asyncio.get_event_loop()
-        rgw = RealmGateway(sys.argv[1])
+        rgw = RealmGateway(args)
         rgw.begin()
     except Exception as e:
         logger = logging.getLogger(__name__)

@@ -64,11 +64,11 @@ class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVEL_HOST)
-        attrlist_none = ['ipv4','fqdn']
         # Initialize services dictionary
         self.services = {}
+        self.ipv4 = None
+        self.fqdn = None
         utils3.set_attributes(self, override=True, **kwargs)
-        utils3.set_default_attributes(self, attrlist_none, None)
         # Sanitize key in dictionary for lookupkeys()
         self.services.setdefault(KEY_SERVICE_SFQDN, [])
         # Normalize SFQDN service definition

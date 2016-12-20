@@ -8,7 +8,7 @@ import os, subprocess
 from aalto_helpers import container3
 from aalto_helpers import utils3
 from aalto_helpers import iptc_helper3
-from async_nfqueue import AsyncNFQueue
+from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
 DEFAULT_HOST_POLICY = 'ACCEPT'
@@ -53,17 +53,17 @@ class Network(object):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVEL_NETWORK)
         utils3.set_attributes(self, **kwargs)
-        # Initialize nfqueue object to None
-        self._nfqueue = None
+        # Initialize nfqueues list
+        self._nfqueues = []
         # Temporary: Zero Circular Pool chain for counters
-        self.ipt_zero_chain('nat', self.iptables['circularpool']['chain'])
+        self.ipt_zero_chain('nat', self.ipt_cpool_chain)
         # Temporary: Flush critical chains
-        self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
-        self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
+        self.ipt_flush_chain('nat', self.ipt_cpool_chain)
+        self.ipt_flush_chain('filter', self.ipt_host_chain)
         # Test if MARKDNAT is available in the system
         self._enabled_MARKDNAT = self._test_MARKDNAT()
         if self._enabled_MARKDNAT:
-            self._add_MARKDNAT('nat', self.iptables['circularpool']['chain'])
+            self._add_MARKDNAT('nat', self.ipt_cpool_chain)
         # Temporary: Flush conntrack
         self.ipt_flush_conntrack()
 
@@ -124,13 +124,13 @@ class Network(object):
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             iptc_helper3.add_rule('filter', host_chain, xlat_rule)
 
-    def ipt_register_nfqueue(self, queue, cb):
-        assert (self._nfqueue is None)
-        self._nfqueue = AsyncNFQueue(queue, cb)
+    def ipt_register_nfqueues(self, cb, *cb_args, **cb_kwargs):
+        for queue in self.ipt_cpool_queue:
+            self._nfqueues.append(NFQueue3(queue, cb, *cb_args, **cb_kwargs))
 
-    def ipt_deregister_nfqueue(self):
-        assert (self._nfqueue is not None)
-        self._nfqueue.terminate()
+    def ipt_deregister_nfqueues(self):
+        for nfqueueObj in self._nfqueues:
+            nfqueueObj.terminate()
 
     def ipt_nfpacket_dnat(self, packet, ipaddr):
         mark = self._gen_pktmark_cpool(ipaddr)
@@ -148,7 +148,7 @@ class Network(object):
 
     def _test_MARKDNAT(self):
         if iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'}):
-            self._logger.info('Enabling iptables MARKDNAT target')
+            self._logger.debug('Enabling iptables MARKDNAT target')
             return True
         self._logger.warning('Unsupported iptables MARKDNAT target')
         return False
@@ -166,7 +166,7 @@ class Network(object):
             return
         # Add rule to iptables
         table = 'nat'
-        chain = self.iptables['circularpool']['chain']
+        chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
         iptc_helper3.add_rule(table, chain, rule)
@@ -177,7 +177,7 @@ class Network(object):
             return
         # Remove rule from iptables
         table = 'nat'
-        chain = self.iptables['circularpool']['chain']
+        chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
         iptc_helper3.delete_rule(table, chain, rule, True)
@@ -199,7 +199,7 @@ class Network(object):
         mark_in = MASK_HOST_INGRESS
         mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
+        chain = self.ipt_host_chain
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
 
@@ -228,7 +228,7 @@ class Network(object):
         mark_in = MASK_HOST_INGRESS
         mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
+        chain = self.ipt_host_chain
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
 
@@ -244,7 +244,7 @@ class Network(object):
         mark_in = MASK_HOST_INGRESS
         mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
+        chain = self.ipt_host_chain
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
         iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
 
@@ -256,7 +256,7 @@ class Network(object):
         mark_in = MASK_HOST_INGRESS
         mark_eg = MASK_HOST_EGRESS
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
+        chain = self.ipt_host_chain
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
 

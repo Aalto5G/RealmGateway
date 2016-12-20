@@ -33,6 +33,7 @@ class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
         self._logger.setLevel(LOGLEVEL_DNSCALLBACK)
+        self._dns_timeout = {None:[0]} # Default single blocking query
         utils3.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.state = {}
@@ -54,6 +55,8 @@ class DNSCallbacks(object):
         del self.registry[name]
 
     def dns_register_soa(self, name):
+        if not name.endswith('.'):
+            name += '.'
         if name not in self.soa_list:
             self.soa_list.append(name)
 
@@ -70,13 +73,26 @@ class DNSCallbacks(object):
             n = random.randrange(len(self.resolver_list))
         return self.resolver_list[n]
 
-    def dns_register_timeouts(self, timeout_d):
-        self.timeouts = timeout_d
+    def dns_get_timeouts(self, record_type = None):
+        if record_type not in self._dns_timeout:
+            # Return default timeout values
+            return self._dns_timeout[None]
+        else:
+            # Return specific timeout values for record type
+            return self._dns_timeout[record_type]
+
+    def dns_register_timeouts(self, timeouts, record_type = None):
+        self._dns_timeout[record_type] = timeouts
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
+        user_data = self.datarepository.get_subscriber(fqdn, default = None)
+        if user_data is None:
+            self._logger.info('Generating default subscriber data for {}'.format(fqdn))
+            user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
+        '''
         user_data     = self.datarepository.get_subscriber_data(fqdn).items()
         user_services = self.datarepository.get_subscriber_service(fqdn, None)
         # Create host entry arguments as a dictionary
@@ -93,7 +109,8 @@ class DNSCallbacks(object):
         host_data['services'].setdefault('SFQDN', sfqdn_services)
         host_data['services'].setdefault('CIRCULARPOOL', [{'max':100}])
         #/HACK
-        host_obj = HostEntry(name=fqdn, **host_data)
+        '''
+        host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
         # Create network resources
         hostname = ipaddr
@@ -327,7 +344,8 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
-        self._logger.warning('dns_process_rgw_wan_nosoa')
+        fqdn = format(query.question[0].name)
+        self._logger.warning('Drop DNS query for non-SOA domain {}'.format(fqdn))
         # Drop DNS Query
         return
 
