@@ -21,15 +21,23 @@ class Network(object):
         utils3.set_attributes(self, **kwargs)
         # Initialize nfqueue object to None
         self._nfqueue = None
-        # Zero Circular Pool chain for counters
+        # Temporary: Zero Circular Pool chain for counters
         self.ipt_zero_chain('nat', self.iptables['circularpool']['chain'])
-        # Flush critical chains
+        # Temporary: Flush critical chains
         self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
         self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
         # Test if MARKDNAT is available in the system
         self._enabled_MARKDNAT = self._test_MARKDNAT()
         if self._enabled_MARKDNAT:
             self._add_MARKDNAT('nat', self.iptables['circularpool']['chain'])
+        # Temporary: Flush conntrack
+        self.ipt_flush_conntrack()
+
+    def ipt_flush_conntrack(self):
+        if self._do_subprocess_call('conntrack -F', False, False):
+            self._logger.info('Successfully flushed connection tracking information')
+            return
+        self._logger.warning('Failed to flush connection tracking information')
 
     def ipt_flush_chain(self, table, chain):
         iptc_helper3.flush_chain(table, chain)
@@ -245,6 +253,21 @@ class Network(object):
     def _gen_pktmark_cpool(self, ipaddr):
         """ Return the integer representation of an IPv4 address """
         return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
+
+    def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
+        try:
+            self._logger.debug('System call: {}'.format(command))
+            if supress_stdout:
+                with open(os.devnull, 'w') as f:
+                    subprocess.check_call(command, shell=True, stdout=f, stderr=f)
+            else:
+                subprocess.check_call(command, shell=True)
+            return True
+        except Exception as e:
+            self._logger.info(e)
+            if raise_exc:
+                raise e
+            return False
 
     '''
     def _ipt_chain_trigger(self, table, chain, action, mark, source, destination, jump_table, goto_table):
