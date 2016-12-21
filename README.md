@@ -36,6 +36,30 @@ If Internet connectivity is desired on the virtual environment, one can enable N
 iptables -t nat -I POSTROUTING -o interfaceWithInternetAccess -j MASQUERADE
 ```
 
+## How to run a Realm Gateway
+
+The configuration file has been discontinued. Now all parameters are passed as arguments to the program, i.e.:
+
+'''
+Run as:
+./rgw.py  --name gwa.demo                                                    \
+          --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
+          --dns-server-local 127.0.0.1 53 --dns-server-local 127.0.0.1 1053  \
+          --dns-server-lan   192.168.0.1 53                                  \
+          --dns-server-wan   100.64.1.130 53                                 \
+          --dns-resolver     8.8.8.8 53                                      \
+          --dns-resolver     127.0.0.1 54                                    \
+          --ddns-server      127.0.0.1 53                                    \
+          --dns-timeout      0.010 0.100 0.200                               \
+          --pool-serviceip   100.64.1.130/32                                 \
+          --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
+          --ipt-cpool-queue  1 2 3                                           \
+          --ipt-cpool-chain  NAT_PRE_CPOOL                                   \
+          --ipt-host-chain   FILTER_HOST_POLICY                              \
+          --ipt-host-accept  FILTER_HOST_POLICY_ACCEPT                       \
+          --repository-subscriber-file   gwa.subscriber.yaml                 \
+          --repository-subscriber-folder gwa.subscriber.d/
+'''
 
 ## Build & install the iptables modules for Realm Gateway (optional)
 

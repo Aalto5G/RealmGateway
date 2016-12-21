@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 #TODO: Overwrite method getattr from argument object Namespace to return None if non existing or default value
+#TODO: Add logic to register several DNS resolvers and round robin or avoid using unreachable one
+
 '''
 Run as:
 ./rgw.py  --name gwa.demo                                                    \
@@ -18,8 +20,8 @@ Run as:
           --ipt-cpool-chain  NAT_PRE_CPOOL                                   \
           --ipt-host-chain   FILTER_HOST_POLICY                              \
           --ipt-host-accept  FILTER_HOST_POLICY_ACCEPT                       \
-          --repository-subscriber-file   subscriber.yaml                     \
-          --repository-subscriber-folder subscriber.d/
+          --repository-subscriber-file   gwa.subscriber.yaml                 \
+          --repository-subscriber-folder gwa.subscriber.d/
 '''
 
 import argparse
