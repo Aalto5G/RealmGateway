@@ -2,6 +2,7 @@ import logging
 import yaml
 import pprint
 import os
+from contextlib import suppress
 
 from aalto_helpers import utils3
 from loglevel import LOGLEVEL_DATAREPOSITORY
@@ -17,32 +18,23 @@ class DataRepository(object):
         self._logger.setLevel(LOGLEVEL_DATAREPOSITORY)
         self.configfile = None
         self.configfolder = None
+        self._loaded_data = None
         utils3.set_attributes(self, override=True, **kwargs)
-        #attrlist_none = ['url','file','subscriberdata','servicedata','policydata']
-        #utils3.set_default_attributes(self, attrlist_none, None)
+        self.reload_data()
 
-    def get_subscriber(self, subscriber_id, default = None):
-        try:
-            return self._get_subscriber(subscriber_id)
-        except KeyError as e:
-            self._logger.warning('No data for subscriber <{}>'.format(subscriber_id))
-            return default
+    def reload_data(self):
+        self._load_data()
 
-    def getall_subscriber(self, default = None):
-        try:
-            return self._getall_subscriber()
-        except Exception as e:
-            self._logger.warning('No data found for subscribers: {}'.format(e))
-            return default
+    def _load_data(self):
+        # Load configuration data from config file
+        d_file = self._load_data_file(self.configfile)
+        d_folder = self._load_data_folder(self.configfolder)
+        self._loaded_data = {**d_file, **d_folder}
 
-    def get_subscriber_service(self, subscriber_id, service_id, default = None):
-        try:
-            return self._get_subscriber_service(subscriber_id, service_id)
-        except KeyError as e:
-            self._logger.warning('No service <{}> for subscriber <{}>'.format(service_id, subscriber_id))
-            return default
+    def _get_data(self):
+        return dict(self._loaded_data)
 
-    def _load_config_file(self, filename):
+    def _load_data_file(self, filename):
         # Load configuration from a single file
         data_d = {}
         try:
@@ -54,36 +46,42 @@ class DataRepository(object):
         finally:
             return data_d
 
-    def _load_config_folder(self, foldername):
-        # Load configuration from folder. Process only yaml files
+    def _load_data_folder(self, foldername):
+        # Load configuration data from folder. Process only yaml files
         data_d = {}
+        cwd = os.getcwd()
         try:
             for filename in os.listdir(foldername):
                 if not filename.endswith('.yaml'):
                     continue
-                d = self._load_config_file(filename)
+                path_filename = os.path.join(os.getcwd(), foldername, filename)
+                d = self._load_data_file(path_filename)
                 data_d = {**data_d, **d}
         except:
             self._logger.warning('Failed to load repository folder <{}>'.format(foldername))
         finally:
             return data_d
 
-    def _load_config(self):
-        # Load configuration from config file
-        d_file = self._load_config_file(self.configfile)
-        d_folder = self._load_config_folder(self.configfolder)
-        return {**d_file, **d_folder}
+    def get_subscriber(self, subscriber_id, default = None):
+        try:
+            return self._get_data()[subscriber_id]
+        except KeyError as e:
+            self._logger.warning('No data for subscriber <{}>'.format(subscriber_id))
+            return default
 
-    def _get_subscriber(self, subscriber_id):
-        raw_data = self._load_config()
-        return raw_data[subscriber_id]
+    def getall_subscriber(self, default = None):
+        try:
+            return self._get_data()
+        except Exception as e:
+            self._logger.warning('No data found for subscribers: {}'.format(e))
+            return default
 
-    def _getall_subscriber(self):
-        return self._load_config()
-
-    def _get_subscriber_service(self, subscriber_id, service_id):
-        raw_data = self._get_subscriber_data(subscriber_id)
-        return raw_data[service_id]
+    def get_subscriber_service(self, subscriber_id, service_id, default = None):
+        try:
+            return self._get_data()[subscriber_id][service_id]
+        except KeyError as e:
+            self._logger.warning('No service <{}> for subscriber <{}>'.format(service_id, subscriber_id))
+            return default
 
     def generate_default_subscriber(self, fqdn, ipv4):
         data_d = {}
