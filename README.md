@@ -40,7 +40,7 @@ iptables -t nat -I POSTROUTING -o interfaceWithInternetAccess -j MASQUERADE
 
 The configuration file has been discontinued. Now all parameters are passed as arguments to the program, i.e.:
 
-'''
+```
 Run as:
 ./rgw.py  --name gwa.demo                                                    \
           --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
@@ -59,7 +59,7 @@ Run as:
           --ipt-host-accept  FILTER_HOST_POLICY_ACCEPT                       \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/
-'''
+```
 
 ## Build & install the iptables modules for Realm Gateway (optional)
 
