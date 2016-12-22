@@ -73,7 +73,7 @@ class DNSCallbacks(object):
             n = random.randrange(len(self.resolver_list))
         return self.resolver_list[n]
 
-    def dns_get_timeouts(self, record_type = None):
+    def dns_get_timeout(self, record_type = None):
         if record_type not in self._dns_timeout:
             # Return default timeout values
             return self._dns_timeout[None]
@@ -81,7 +81,7 @@ class DNSCallbacks(object):
             # Return specific timeout values for record type
             return self._dns_timeout[record_type]
 
-    def dns_register_timeouts(self, timeouts, record_type = None):
+    def dns_register_timeout(self, timeouts, record_type = None):
         self._dns_timeout[record_type] = timeouts
 
     @asyncio.coroutine
@@ -204,7 +204,7 @@ class DNSCallbacks(object):
         resolver = uDNSResolver()
         self.activequeries[key] = resolver
         try:
-            response = yield from resolver.do_resolve(query, raddr, timeouts=self.timeouts['a'])
+            response = yield from resolver.do_resolve(query, raddr, timeouts=self.dns_get_timeout('a'))
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('ConnectionRefusedError: Resolving {} via {}:{}'.format(fqdn, raddr[0], raddr[1]))
@@ -267,7 +267,7 @@ class DNSCallbacks(object):
         self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
         try:
-            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.timeouts)
+            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.dns_get_timeout('a'))
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('ConnectionRefusedError: Resolving Carrier Grade IP from {} for {}'.format(host_obj.ipv4, fqdn))

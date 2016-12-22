@@ -228,7 +228,7 @@ class RealmGateway(object):
                                   connectiontable = self._connectiontable)
 
         # Register defined DNS timeouts
-        self.dnscb.dns_register_timeouts(self._config.dns_timeout, None)
+        self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
         ## TODO: Add rest of DNS recort type timeouts
 
         # Register defined SOA zones
