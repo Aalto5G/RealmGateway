@@ -165,7 +165,7 @@ ipt_data = data_all['IPTABLES']
 process_ipt_group(ipt_data['PACKET_MARKING'])
 
 # Install rules CIRCULAR_POOL
-process_ipt_group(ipt_data['CIRCULAR_POOL'])
+process_ipt_group(ipt_data['NAT'])
 
 # Install rules mREJECT
 process_ipt_group(ipt_data['mREJECT'])
