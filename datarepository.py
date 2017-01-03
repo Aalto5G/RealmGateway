@@ -18,21 +18,38 @@ class DataRepository(object):
         self._logger.setLevel(LOGLEVEL_DATAREPOSITORY)
         self.configfile = None
         self.configfolder = None
-        self._loaded_data = None
+        self.policyfile = None
+        self.policyfolder = None
         utils3.set_attributes(self, override=True, **kwargs)
+        self._loaded_data_subscriber = None
+        self._loaded_data_policy = None
         self.reload_data()
 
     def reload_data(self):
-        self._load_data()
+        self._load_data_subscriber()
+        self._load_data_policy()
 
-    def _load_data(self):
+    def _load_data_subscriber(self):
         # Load configuration data from config file
+        self._logger.info('Loading subscriber data from file   <{}>'.format(self.configfile))
+        self._logger.info('Loading subscriber data from folder <{}>'.format(self.configfolder))
         d_file = self._load_data_file(self.configfile)
         d_folder = self._load_data_folder(self.configfolder)
-        self._loaded_data = {**d_file, **d_folder}
+        self._loaded_data_subscriber = {**d_file, **d_folder}
 
-    def _get_data(self):
-        return dict(self._loaded_data)
+    def _load_data_policy(self):
+        # Load configuration data from config file
+        self._logger.info('Loading policy data from file   <{}>'.format(self.policyfile))
+        self._logger.info('Loading policy data from folder <{}>'.format(self.policyfolder))
+        d_file = self._load_data_file(self.policyfile)
+        d_folder = self._load_data_folder(self.policyfolder)
+        self._loaded_data_policy = {**d_file, **d_folder}
+
+    def _get_subscriber_data(self):
+        return dict(self._loaded_data_subscriber)
+
+    def _get_policy_data(self):
+        return dict(self._loaded_data_policy)
 
     def _load_data_file(self, filename):
         # Load configuration from a single file
@@ -49,7 +66,6 @@ class DataRepository(object):
     def _load_data_folder(self, foldername):
         # Load configuration data from folder. Process only yaml files
         data_d = {}
-        cwd = os.getcwd()
         try:
             for filename in os.listdir(foldername):
                 if not filename.endswith('.yaml'):
@@ -62,23 +78,30 @@ class DataRepository(object):
         finally:
             return data_d
 
+    def get_policy(self, policy_id, default = None):
+        try:
+            return self._get_policy_data()[policy_id]
+        except KeyError as e:
+            self._logger.warning('No data for policy <{}>'.format(policy_id))
+            return default
+
     def get_subscriber(self, subscriber_id, default = None):
         try:
-            return self._get_data()[subscriber_id]
+            return self._get_subscriber_data()[subscriber_id]
         except KeyError as e:
             self._logger.warning('No data for subscriber <{}>'.format(subscriber_id))
             return default
 
     def getall_subscriber(self, default = None):
         try:
-            return self._get_data()
+            return self._get_subscriber_data()
         except Exception as e:
             self._logger.warning('No data found for subscribers: {}'.format(e))
             return default
 
     def get_subscriber_service(self, subscriber_id, service_id, default = None):
         try:
-            return self._get_data()[subscriber_id][service_id]
+            return self._get_subscriber_data()[subscriber_id][service_id]
         except KeyError as e:
             self._logger.warning('No service <{}> for subscriber <{}>'.format(service_id, subscriber_id))
             return default
@@ -95,34 +118,6 @@ class DataRepository(object):
         data_d['CIRCULARPOOL'] = [{'max':100}]
         return data_d
 
-    '''
-    def _getall_subscriber_service(self, subscriber_id, service_id):
-        servicedata = {}
-        raw_data = self._get_subscriber_data(subscriber_id)
-
-        for usr_id, srv_data in data.items():
-                if service_id in srv_data:
-                    userdata[usr_id] = {service_id: srv_data[service_id]}
-
-        data_all = yaml.load(open(self.servicedata,'r'))
-        data = data_all[SUBSCRIBER_SERVICES]
-        if subscriber_id and service_id:
-            # Return data for subscriber_id
-            return data[subscriber_id][service_id]
-        elif subscriber_id:
-            # Return specific service_id for subscriber_id
-            return data[subscriber_id]
-        elif service_id:
-            # Return data for specific service_id
-            userdata = {}
-            for usr_id, srv_data in data.items():
-                if service_id in srv_data:
-                    userdata[usr_id] = {service_id: srv_data[service_id]}
-            return userdata
-        else:
-            # Return data for all services
-            return data
-    '''
 
 if __name__ == "__main__":
     configfile = 'gwa.demo.datarepository.yaml'

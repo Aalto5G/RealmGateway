@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-#TODO: Overwrite method getattr from argument object Namespace to return None if non existing or default value
 #TODO: Add logic to register several DNS resolvers and round robin or avoid using unreachable one
-
+#TODO: Define better transition from CUSTOMER_POLICY towards ADMIN_POLICY in filter.FORWARD - Use ipt-host-unknown ?
 '''
 Run as:
 ./rgw.py  --name gwa.demo                                                    \
@@ -17,13 +16,16 @@ Run as:
           --pool-serviceip   100.64.1.130/32                                 \
           --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
           --ipt-cpool-queue  1 2 3                                           \
-          --ipt-cpool-chain  NAT_PRE_CPOOL                                   \
-          --ipt-host-chain   FILTER_HOST_POLICY                              \
-          --ipt-host-accept  FILTER_HOST_POLICY_ACCEPT                       \
+          --ipt-cpool-chain  PREROUTING                                      \
+          --ipt-host-chain   CUSTOMER_POLICY                                 \
+          --ipt-host-unknown CUSTOMER_POLICY_ACCEPT                          \
+          --ipt-policy-order PACKET_MARKING NAT mREJECT ADMIN_PREEMPTIVE     \
+                             CUSTOMER_POLICY ADMIN_POLICY ADMIN_POLICY_DHCP  \
+                             ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
-          --repository-subscriber-folder gwa.subscriber.d/
+          --repository-subscriber-folder gwa.subscriber.d/                   \
+          --repository-policy-file       gwa.policy.yaml
 '''
-
 import argparse
 import asyncio
 import pool
@@ -123,9 +125,13 @@ def parse_arguments():
     parser.add_argument('--ipt-host-chain', type=str,
                         metavar=('IPT_HOST_CHAIN'),
                         help='Iptables Host filter chain')
-    parser.add_argument('--ipt-host-accept', type=str,
-                        metavar=('IPT_HOST_ACCEPT'),
-                        help='Iptables Host accept target chain')
+    parser.add_argument('--ipt-host-unknown', type=str,
+                        metavar=('IPT_HOST_UNKNOWN'),
+                        default='CONTINUE',
+                        help='Default iptables target for unknown LAN host (CUSTOMER_POLICY_ACCEPT/DROP)')
+    parser.add_argument('--ipt-policy-order', nargs='*', type=str,
+                        metavar=('IPT_POLICY_ORDER'),
+                        help='Iptables install policy order')
 
     # Data repository parameters
     ## Subscriber information
@@ -135,13 +141,13 @@ def parse_arguments():
     parser.add_argument('--repository-subscriber-folder', type=str,
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with subscriber information')
-    ### Policy information
-    #parser.add_argument('--repository-policy-file', nargs=1,
-    #                    metavar=('FILENAME'),
-    #                    help='Configuration file with policy information')
-    #parser.add_argument('--repository-policy-folder', nargs=1,
-    #                    metavar=('FOLDERNAME'),
-    #                    help='Configuration folder with policy information')
+    ## Policy information
+    parser.add_argument('--repository-policy-file', type=str,
+                        metavar=('FILENAME'),
+                        help='Configuration file with local policy information')
+    parser.add_argument('--repository-policy-folder', type=str,
+                        metavar=('FOLDERNAME'),
+                        help='Configuration folder with local policy information')
 
     return parser.parse_args()
 
@@ -179,8 +185,12 @@ class RealmGateway(object):
     def _init_datarepository(self):
         # Initialize Data Repository
         self._logger.info('Initializing data repository')
-        self._datarepository = DataRepository(configfile = self._config.repository_subscriber_file,
-                                              configfolder = self._config.repository_subscriber_folder)
+        configfile   = self._config.getdefault('repository_subscriber_file', None)
+        configfolder = self._config.getdefault('repository_subscriber_folder', None)
+        policyfile   = self._config.getdefault('repository_policy_file', None)
+        policyfolder = self._config.getdefault('repository_policy_folder', None)
+        self._datarepository = DataRepository(configfile = configfile, configfolder = configfolder,
+                                              policyfile = policyfile, policyfolder = policyfolder)
 
     def _init_hosttable(self):
         # Create container of Hosts
@@ -198,25 +208,24 @@ class RealmGateway(object):
         ## Service IP Pool
         ap = AddressPoolShared('servicepool')
         self._pooltable.add(ap)
-        for ipaddr in self._config.pool_serviceip:
+        for ipaddr in self._config.getdefault('pool_serviceip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
 
         ## Circular IP Pool
         ap = AddressPoolShared('circularpool')
         self._pooltable.add(ap)
-        for ipaddr in self._config.pool_cpoolip:
+        for ipaddr in self._config.getdefault('pool_cpoolip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
-        '''
+
         # For future use
         ## CES Proxy IP Pool
         ap = AddressPoolUser('proxypool')
         self._pooltable.add(ap)
-        for ipaddr in self._config.pool_cespoolip:
+        for ipaddr in self._config.getdefault('pool_cespoolip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
-        '''
 
     def _init_dns(self):
         # Create object for storing all DNS-related information
@@ -229,7 +238,9 @@ class RealmGateway(object):
 
         # Register defined DNS timeouts
         self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
-        ## TODO: Add rest of DNS recort type timeouts
+        self.dnscb.dns_register_timeout(self._config.dns_timeout_a, 1)
+        self.dnscb.dns_register_timeout(self._config.dns_timeout_aaaa, 28)
+        self.dnscb.dns_register_timeout(self._config.dns_timeout_naptr, 35)
 
         # Register defined SOA zones
         for soa_name in self._config.dns_soa:
@@ -290,7 +301,9 @@ class RealmGateway(object):
         self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
                                         ipt_cpool_chain  = self._config.ipt_cpool_chain,
                                         ipt_host_chain   = self._config.ipt_host_chain ,
-                                        ipt_host_accept  = self._config.ipt_host_accept)
+                                        ipt_host_unknown = self._config.ipt_host_unknown,
+                                        ipt_policy_order = self._config.ipt_policy_order,
+                                        datarepository   = self._datarepository)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
         # Register NFQUEUE(s) callback
@@ -322,8 +335,9 @@ class RealmGateway(object):
 if __name__ == '__main__':
     # Parse arguments
     args = parse_arguments()
+    # Overload Namespace object with getdefault function
+    args.getdefault = lambda name, default: getattr(args, name, default)
     print(args)
-
     # Use function to configure logging from file
     setup_logging_yaml()
 
