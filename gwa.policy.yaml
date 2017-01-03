@@ -82,9 +82,9 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','132'],                     ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
             - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': [['mark',{'mark':'0xFF000003/0xFF00000F'}], ['conntrack',{'ctstate':'NEW'}], ['set',{'match-set':['IPS_CIRCULAR_POOL', 'dst']}], ['comment',{'comment':'New connections via CircularPool'}], ['target','CIRCULAR_POOL']]}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
-            - {'table': 'nat', 'chain': 'PREROUTING',       'rule': [['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
+            - {'table': 'nat',    'chain': 'PREROUTING',    'rule': [['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
             # Enable SNAT for MARK_LAN_TO_WAN packets			
-            - {'table': 'nat', 'chain': 'POSTROUTING',      'rule': [['mark',{'mark':'0xFF222232/0xFFFFFFFF'}],['target',{'SNAT':{'to-source':'100.64.1.133-100.64.1.135', 'persistent':''}}], ['comment',{'comment':'SNAT to available pool'}]]}
+            - {'table': 'nat',    'chain': 'POSTROUTING',   'rule': [['mark',{'mark':'0xFF222232/0xFFFFFFFF'}],['target',{'SNAT':{'to-source':'100.64.1.133-100.64.1.135', 'persistent':''}}], ['comment',{'comment':'SNAT to available pool'}]]}
 
     ADMIN_PREEMPTIVE:
         requires:
@@ -100,7 +100,7 @@ IPTABLES:
 
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['set', {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}], ['comment', {'comment': 'Drop blacklisted sources'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['set', {'match-set': ['IPS_FILTER_WHITELIST', 'src']}], ['comment', {'comment': 'Accept whitelisted sources'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['comment', {'comment': 'Fragmented packets'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['fragment', true], ['comment', {'comment': 'Fragmented packets'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}], ['conntrack', {'ctstate': 'NEW'}], ['comment', {'comment': 'Invalid TCP SYN packet'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'FIN,SYN,RST,PSH,ACK,URG']}], ['comment', {'comment': 'Invalid TCP flags / Christmas in July'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'NONE']}], ['comment', {'comment': 'Invalid TCP flags / Nothing to See Here'}], ['target', 'DROP']]}

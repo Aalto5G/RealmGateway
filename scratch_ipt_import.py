@@ -49,6 +49,8 @@ def decode_custom_iptc_rule(iptc_rule):
         l.append(['in-interface', iptc_rule.in_interface])
     if iptc_rule.out_interface is not None:
         l.append(['out-interface', iptc_rule.out_interface])
+    if iptc_rule.fragment:
+        l.append(['fragment', iptc_rule.fragment])
     for iptc_match in iptc_rule.matches:
         l.append([iptc_match.name, decode_custom_iptc_match(iptc_match)])
     if iptc_rule.target.name:
