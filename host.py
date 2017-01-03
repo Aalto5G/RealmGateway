@@ -23,7 +23,7 @@ class HostTable(container3.Container):
     def has_carriergrade(self, fqdn):
         """ Return True if a matching host is defined as carrier grade """
         # 1. Check if the host exists for the given FQDN and supports carriergrade
-        ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
+        ## TODO TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
         host = self.lookup((KEY_HOST_FQDN, fqdn))
         if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
             self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))

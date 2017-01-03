@@ -2,6 +2,7 @@
 
 #TODO: Add logic to register several DNS resolvers and round robin or avoid using unreachable one
 #TODO: Define better transition from CUSTOMER_POLICY towards ADMIN_POLICY in filter.FORWARD - Use ipt-host-unknown ?
+#TODO: Move local policy stored in subscriber [gwa.demo.] to policy file with IPSET and IPTABLES policies
 '''
 Run as:
 ./rgw.py  --name gwa.demo                                                    \
@@ -9,7 +10,6 @@ Run as:
           --dns-server-local 127.0.0.1 53 --dns-server-local 127.0.0.1 1053  \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
-          --dns-resolver     8.8.8.8 53                                      \
           --dns-resolver     127.0.0.1 54                                    \
           --ddns-server      127.0.0.1 53                                    \
           --dns-timeout      0.010 0.100 0.200                               \
@@ -24,7 +24,8 @@ Run as:
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-file       gwa.policy.yaml
+          --repository-policy-file       gwa.policy.yaml                     \
+          --repository-policy-folder     gwa.policy.d/
 '''
 import argparse
 import asyncio

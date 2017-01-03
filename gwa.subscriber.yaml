@@ -15,7 +15,7 @@ test.gwa.demo.:
         MSISDN: ['0000000100']
     CIRCULARPOOL:
         - {max: 1000 }
-	CARRIERGRADE:
+    CARRIERGRADE:
         - {ipv4: 192.168.0.240}
         - {ipv4: 192.168.0.241}
         - {ipv4: 192.168.0.242}

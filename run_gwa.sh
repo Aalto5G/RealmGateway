@@ -21,4 +21,5 @@ echo "Starting Realm Gateway as gwa.demo"
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-file       gwa.policy.yaml
+          --repository-policy-file       gwa.policy.yaml                     \
+          --repository-policy-folder     gwa.policy.d/
