@@ -19,7 +19,7 @@ test10.gwa.demo.:
         - {fqdn:  'udp1234.test10.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234 }
         - {fqdn: 'sctp1234.test10.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
     FIREWALL_ADMIN:
-        - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'10', 'hashlimit-name':'lan_dns_hosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'60000'}, 'comment':{'comment':'Host DNS limit'}}
+        - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'10', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1100'}, 'comment':{'comment':'Host DNS limit'}}
     FIREWALL_PARENTAL:
         - {'priority': 0, 'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
     FIREWALL_LEGACY:

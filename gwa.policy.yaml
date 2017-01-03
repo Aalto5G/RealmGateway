@@ -1,16 +1,5 @@
-#MASK_LAN_INGRESS="0xFF000002/0xFF00000F"
-#MASK_WAN_INGRESS="0xFF000003/0xFF00000F"
-#MASK_TUN_INGRESS="0xFF000004/0xFF00000F"
-#MARK_LOCAL_FROM_LAN="0xFF121212/0xFFFFFFFF"
-#MARK_LOCAL_TO_LAN="0xFF211221/0xFFFFFFFF"
-#MARK_LOCAL_FROM_WAN="0xFF021113/0xFFFFFFFF"
-#MARK_LOCAL_TO_WAN="0xFF011131/0xFFFFFFFF"
-#MARK_LOCAL_FROM_TUN="0xFF021114/0xFFFFFFFF"
-#MARK_LOCAL_TO_TUN="0xFF011141/0xFFFFFFFF"
-#MARK_LAN_TO_WAN="0xFF222232/0xFFFFFFFF"
-#MARK_LAN_FROM_WAN="0xFF112223/0xFFFFFFFF"
-#MARK_LAN_TO_TUN="0xFF222342/0xFFFFFFFF"
-#MARK_LAN_FROM_TUN="0xFF112324/0xFFFFFFFF"
+# hashlimit-name limited to 15 char
+# iptables chain name limited to 28 char
 
 IPSET:
     requires:
@@ -80,10 +69,11 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','1'],                       ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','17'],                      ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','132'],                     ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [                                        ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
             - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': [['mark',{'mark':'0xFF000003/0xFF00000F'}], ['conntrack',{'ctstate':'NEW'}], ['set',{'match-set':['IPS_CIRCULAR_POOL', 'dst']}], ['comment',{'comment':'New connections via CircularPool'}], ['target','CIRCULAR_POOL']]}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
             - {'table': 'nat',    'chain': 'PREROUTING',    'rule': [['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
-            # Enable SNAT for MARK_LAN_TO_WAN packets			
+            # Enable SNAT for MARK_LAN_TO_WAN packets
             - {'table': 'nat',    'chain': 'POSTROUTING',   'rule': [['mark',{'mark':'0xFF222232/0xFFFFFFFF'}],['target',{'SNAT':{'to-source':'100.64.1.133-100.64.1.135', 'persistent':''}}], ['comment',{'comment':'SNAT to available pool'}]]}
 
     ADMIN_PREEMPTIVE:
@@ -110,9 +100,9 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000003/0xff00000f'}], ['set', {'match-set': ['IPS_SPOOFED_NET_WAN', 'src']}], ['comment', {'comment': 'WAN IP Spoofing'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000004/0xff00000f'}], ['set', {'match-set': ['IPS_SPOOFED_NET_TUN', 'src']}], ['comment', {'comment': 'TUN IP Spoofing'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['conntrack', {'ctstate': 'NEW'}], ['multiport', {'dports': '135,137,138,139'}], ['comment', {'comment': 'Reject vulnerable multiport TCP services'}], ['target', 'mREJECT']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000002/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '3333/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'GLOBAL_NEW_CONNECTION', 'hashlimit-burst': '3000'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000003/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '3333/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'GLOBAL_NEW_CONNECTION', 'hashlimit-burst': '3000', 'hashlimit-htable-expire': '1000'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000004/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '3333/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'GLOBAL_NEW_CONNECTION', 'hashlimit-burst': '3000', 'hashlimit-htable-expire': '1000'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000002/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000003/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000004/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
 
     CUSTOMER_POLICY:
         requires:
@@ -178,7 +168,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Apply blacklist'}], ['target', 'POLICY_DNS_LAN_BLACKLIST']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Apply global limitation'}], ['target', 'POLICY_DNS_LAN_GLOBAL_LIMIT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Should not be here'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'DNS_LAN', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept LAN traffic'}], ['target', 'ACCEPT']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsLan', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept DNS LAN traffic'}], ['target', 'ACCEPT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': [['comment', {'comment': 'DNS LAN rate exceeded'}], ['target', 'DROP']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'rule': [['comment', {'comment': 'Drop DNS @TUN'}], ['target', 'DROP']]}
 
@@ -193,11 +183,11 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['string', {'to': '65535', 'hex-string': '|07|in-addr|04|arpa|00|', 'algo': 'bm'}], ['comment', {'comment': 'Accept SOA record'}], ['target', 'RETURN']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['string', {'to': '65535', 'hex-string': '|03|gwa|04|demo|00|', 'algo': 'bm'}], ['comment', {'comment': 'Accept SOA record'}], ['target', 'RETURN']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['comment', {'comment': 'Drop !SOA allowed records'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'DNS_WAN_GREYLIST', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept Non-SLA traffic'}], ['target', 'ACCEPT']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept Non-SLA traffic'}], ['target', 'ACCEPT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': [['comment', {'comment': 'Drop excess'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': [['hashlimit', {'hashlimit-upto': '25/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'DNS_WAN_GREYLIST', 'hashlimit-burst': '50'}], ['comment', {'comment': 'Best effort Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': [['hashlimit', {'hashlimit-upto': '25/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-burst': '50'}], ['comment', {'comment': 'Best effort Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': [['comment', {'comment': 'Drop excess in Greylist'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': [['hashlimit', {'hashlimit-upto': '180/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'DNS_WAN_WHITELIST', 'hashlimit-mode': 'srcip', 'hashlimit-burst': '200'}], ['comment', {'comment': 'SLA Whitelist'}], ['target', 'ACCEPT']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': [['hashlimit', {'hashlimit-upto': '180/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanWhite', 'hashlimit-mode': 'srcip', 'hashlimit-burst': '200'}], ['comment', {'comment': 'SLA Whitelist'}], ['target', 'ACCEPT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': [['comment', {'comment': 'Continue as WK-Greylist'}], ['target', 'POLICY_DNS_WAN_WKGREYLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': [['hashlimit', {'hashlimit-upto': '75/sec', 'hashlimit-htable-expire': '1000', 'hashlimit-name': 'DNS_WAN_WKGREYLIST', 'hashlimit-burst': '100'}], ['comment', {'comment': 'Preferred WK-Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': [['hashlimit', {'hashlimit-upto': '75/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-burst': '100'}], ['comment', {'comment': 'Preferred WK-Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': [['comment', {'comment': 'Continue as Greylist'}], ['target', 'POLICY_DNS_WAN_GREYLIST']]}
