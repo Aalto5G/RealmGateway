@@ -337,7 +337,7 @@ if __name__ == '__main__':
     args = parse_arguments()
     # Overload Namespace object with getdefault function
     args.getdefault = lambda name, default: getattr(args, name, default)
-    print(args)
+
     # Use function to configure logging from file
     setup_logging_yaml()
 
