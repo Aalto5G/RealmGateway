@@ -12,7 +12,7 @@ echo "Starting Realm Gateway as gwa.demo"
           --dns-timeout      0.010 0.100 0.200                               \
           --pool-serviceip   100.64.1.130/32                                 \
           --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
-          --ipt-cpool-queue  1 2 3                                           \
+          --ipt-cpool-queue  1                                               \
           --ipt-cpool-chain  CIRCULAR_POOL                                   \
           --ipt-host-chain   CUSTOMER_POLICY                                 \
           --ipt-host-unknown CUSTOMER_POLICY_ACCEPT                          \
