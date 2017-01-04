@@ -4,6 +4,7 @@ import json
 import logging
 import socket, struct
 import os, subprocess
+import random, string
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
@@ -180,11 +181,30 @@ class Network(object):
         return packet.get_payload()
 
     def _test_MARKDNAT(self):
-        if iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'}):
-            self._logger.info('Supported iptables MARKDNAT target')
-            return True
-        self._logger.warning('Unsupported iptables MARKDNAT target')
-        return False
+        ''' Create a temporary chain to insert a MARKDNAT test rule.
+        Check if the rule is successfully inserted '''
+        try:
+            ret = False
+            table = 'nat'
+            chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
+            rule_l = [['target',{'MARKDNAT':{'or-mark':'0'}}]]
+            while iptc_helper3.has_chain(table, chain):
+                chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
+            iptc_helper3.add_chain(table, chain)
+            iptc_helper3.add_rule(table, chain, rule_l)
+            if iptc_helper3.dump_chain(table, chain):
+                self._logger.info('Supported iptables MARKDNAT target')
+                ret = True
+            else:
+                self._logger.warning('Unsupported iptables MARKDNAT target')
+                ret = True
+        except:
+            ret = False
+        finally:
+            # Delete temporary chain
+            iptc_helper3.flush_chain(table, chain)
+            iptc_helper3.delete_chain(table, chain)
+            return ret
 
     def _add_circularpool(self, hostname, ipaddr):
         # Do not add specific rule if MARKDNAT is enabled
