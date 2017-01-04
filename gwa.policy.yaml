@@ -72,7 +72,7 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [                                        ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':true}}]]}
             - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': [['mark',{'mark':'0xFF000003/0xFF00000F'}], ['conntrack',{'ctstate':'NEW'}], ['set',{'match-set':['IPS_CIRCULAR_POOL', 'dst']}], ['comment',{'comment':'New connections via CircularPool'}], ['target','CIRCULAR_POOL']]}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
-            - {'table': 'nat',    'chain': 'PREROUTING',    'rule': [['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
+            - {'table': 'nat',    'chain': 'PREROUTING',    'rule': [['mark',{'mark':['!','0x0']}], ['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
             # Enable SNAT for MARK_LAN_TO_WAN packets
             - {'table': 'nat',    'chain': 'POSTROUTING',   'rule': [['mark',{'mark':'0xFF222232/0xFFFFFFFF'}],['target',{'SNAT':{'to-source':'100.64.1.133-100.64.1.135', 'persistent':''}}], ['comment',{'comment':'SNAT to available pool'}]]}
 
