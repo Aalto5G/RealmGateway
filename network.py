@@ -65,18 +65,20 @@ class Network(object):
 
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
-        self._logger.warning('Installing local ipset policy')
-        self._logger.warning('Requirements/Rules: {}/{}'.format(len(data_d['requires']), len(data_d['rules'])))
+        self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(data_d['requires']), len(data_d['rules'])))
         # Install requirements
-        for entry in data_d['requires']:
-            if entry['create'] and not iproute2_helper3.ipset_exists(entry['name']):
+        for i, entry in enumerate(data_d.setdefault('requires', [])):
+            self._logger.debug('#{} requires {} {}'.format(i+1, entry['name'], entry['type']))
+            if entry.setdefault('create',False) and not iproute2_helper3.ipset_exists(entry['name']):
                 iproute2_helper3.ipset_create(entry['name'], entry['type'])
-            if entry['flush']:
+            if entry.setdefault('flush',False):
                 iproute2_helper3.ipset_flush(entry['name'])
         # Populate ipsets
-        for entry in data_d['rules']:
-            for i in entry['items']:
-                iproute2_helper3.ipset_add(entry['name'], i, etype=entry['type'])
+        for entry in data_d.setdefault('rules', []):
+            self._logger.debug('Adding {} items to {} type {}'.format(len(entry['items']), entry['name'], entry['type']))
+            for i, e in enumerate(entry['items']):
+                self._logger.debug('#{} Adding {}'.format(i+1, e))
+                iproute2_helper3.ipset_add(entry['name'], e, etype=entry['type'])
 
     def ipt_init(self):
         data_d = self.datarepository.get_policy('IPTABLES', {})
@@ -85,16 +87,17 @@ class Network(object):
                 self._logger.critical('Not found local iptables policy <{}>'.format(p))
                 continue
             policy_d = data_d[p]
-            self._logger.warning('Installing local iptables policy <{}>'.format(p))
-            self._logger.warning('Requirements/Rules: {}/{}'.format(len(policy_d['requires']), len(policy_d['rules'])))
+            self._logger.info('Installing local iptables policy <{}>: {} requirements and {} rules'.format(p, len(policy_d['requires']), len(policy_d['rules'])))
             # Install requirements
-            for entry in policy_d['requires']:
-                if entry['create'] and not iptc_helper3.has_chain(entry['table'], entry['chain']):
+            for i, entry in enumerate(policy_d.setdefault('requires', [])):
+                self._logger.debug('#{} requires {}.{}'.format(i+1, entry['table'], entry['chain']))
+                if entry.setdefault('create',False) and not iptc_helper3.has_chain(entry['table'], entry['chain']):
                     iptc_helper3.add_chain(entry['table'], entry['chain'], silent=False)
-                if entry['flush']:
+                if entry.setdefault('flush',False):
                     iptc_helper3.flush_chain(entry['table'], entry['chain'])
             # Install rules
-            for entry in policy_d['rules']:
+            for i, entry in enumerate(policy_d.setdefault('rules', [])):
+                self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
                 iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
 
     def ipt_flush_conntrack(self):
@@ -178,17 +181,10 @@ class Network(object):
 
     def _test_MARKDNAT(self):
         if iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'}):
-            self._logger.debug('Enabling iptables MARKDNAT target')
+            self._logger.info('Supported iptables MARKDNAT target')
             return True
         self._logger.warning('Unsupported iptables MARKDNAT target')
         return False
-
-    def _add_MARKDNAT(self, table, chain):
-        # Insert rule on the top of the chain
-        rule = {'target':{'MARKDNAT': {'or-mark':'0'}},
-                'comment':{'comment':'Realm Gateway NAT Traversal'}}
-        self._logger.info('Inserting MARKDNAT rule in {}@{}'.format(chain, table))
-        iptc_helper3.add_rule(table, chain, rule, 0)
 
     def _add_circularpool(self, hostname, ipaddr):
         # Do not add specific rule if MARKDNAT is enabled

@@ -13,7 +13,7 @@ echo "Starting Realm Gateway as gwa.demo"
           --pool-serviceip   100.64.1.130/32                                 \
           --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
           --ipt-cpool-queue  1 2 3                                           \
-          --ipt-cpool-chain  PREROUTING                                      \
+          --ipt-cpool-chain  CIRCULAR_POOL                                   \
           --ipt-host-chain   CUSTOMER_POLICY                                 \
           --ipt-host-unknown CUSTOMER_POLICY_ACCEPT                          \
           --ipt-policy-order PACKET_MARKING NAT mREJECT ADMIN_PREEMPTIVE     \
