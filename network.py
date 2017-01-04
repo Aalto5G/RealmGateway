@@ -197,7 +197,7 @@ class Network(object):
                 ret = True
             else:
                 self._logger.warning('Unsupported iptables MARKDNAT target')
-                ret = True
+                ret = False
         except:
             ret = False
         finally:
