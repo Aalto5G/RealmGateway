@@ -23,7 +23,7 @@ class HostTable(container3.Container):
     def has_carriergrade(self, fqdn):
         """ Return True if a matching host is defined as carrier grade """
         # 1. Check if the host exists for the given FQDN and supports carriergrade
-        ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
+        ## TODO TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
         host = self.lookup((KEY_HOST_FQDN, fqdn))
         if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
             self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
@@ -64,11 +64,11 @@ class HostEntry(container3.ContainerNode):
     def __init__(self, name='HostEntry', **kwargs):
         """ Initialize as a ContainerNode """
         super().__init__(name, LOGLEVEL_HOST)
-        attrlist_none = ['ipv4','fqdn']
         # Initialize services dictionary
         self.services = {}
+        self.ipv4 = None
+        self.fqdn = None
         utils3.set_attributes(self, override=True, **kwargs)
-        utils3.set_default_attributes(self, attrlist_none, None)
         # Sanitize key in dictionary for lookupkeys()
         self.services.setdefault(KEY_SERVICE_SFQDN, [])
         # Normalize SFQDN service definition

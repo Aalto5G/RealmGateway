@@ -4,32 +4,108 @@ import json
 import logging
 import socket, struct
 import os, subprocess
+import random, string
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
 from aalto_helpers import iptc_helper3
-from async_nfqueue import AsyncNFQueue
+from aalto_helpers import iproute2_helper3
+from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
-DEFAULT_HOST_POLICY = 'ACCEPT'
-#DEFAULT_HOST_POLICY = 'DROP'
+
+# Definition of PACKET MARKS
+## Definition of specific packet MARK for traffic
+MARK_LOCAL_FROM_LAN      = '0xFF121212/0xFFFFFFFF'
+MARK_LOCAL_TO_LAN        = '0xFF211221/0xFFFFFFFF'
+MARK_LOCAL_FROM_WAN      = '0xFF021113/0xFFFFFFFF'
+MARK_LOCAL_TO_WAN        = '0xFF011131/0xFFFFFFFF'
+MARK_LOCAL_FROM_TUN      = '0xFF021114/0xFFFFFFFF'
+MARK_LOCAL_TO_TUN        = '0xFF011141/0xFFFFFFFF'
+MARK_LAN_TO_WAN          = '0xFF222232/0xFFFFFFFF'
+MARK_LAN_FROM_WAN        = '0xFF112223/0xFFFFFFFF'
+MARK_LAN_TO_TUN          = '0xFF222342/0xFFFFFFFF'
+MARK_LAN_FROM_TUN        = '0xFF112324/0xFFFFFFFF'
+## Definition of packet MASKS for traffic
+### Classified by traffic scope and direction
+MASK_LOCAL               = '0xFF001010/0xFF00F0F0'
+MASK_LOCAL_INGRESS       = '0xFF021010/0xFF0FF0F0'
+MASK_LOCAL_EGRESS        = '0xFF011001/0xFF0FF00F'
+MASK_HOST_INGRESS        = '0xFF000020/0xFF0000F0'
+MASK_HOST_EGRESS         = '0xFF000002/0xFF00000F'
+MASK_HOST_LEGACY         = '0xFF000200/0xFF000F00'
+MASK_HOST_LEGACY_INGRESS = '0xFF000220/0xFF000FF0'
+MASK_HOST_LEGACY_EGRESS  = '0xFF000202/0xFF000F0F'
+MASK_HOST_CES            = '0xFF000300/0xFF000F00'
+MASK_HOST_CES_INGRESS    = '0xFF000320/0xFF000FF0'
+MASK_HOST_CES_EGRESS     = '0xFF000302/0xFF000F0F'
+### Classified by ingress or egress interface
+MASK_LAN_INGRESS         = '0xFF000002/0xFF00000F'
+MASK_WAN_INGRESS         = '0xFF000003/0xFF00000F'
+MASK_TUN_INGRESS         = '0xFF000004/0xFF00000F'
+MASK_LAN_EGRESS          = '0xFF000020/0xFF0000F0'
+MASK_WAN_EGRESS          = '0xFF000030/0xFF0000F0'
+MASK_TUN_EGRESS          = '0xFF000040/0xFF0000F0'
+
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
         self._logger.setLevel(LOGLEVEL_NETWORK)
         utils3.set_attributes(self, **kwargs)
-        # Initialize nfqueue object to None
-        self._nfqueue = None
-        # Zero Circular Pool chain for counters
-        self.ipt_zero_chain('nat', self.iptables['circularpool']['chain'])
-        # Flush critical chains
-        self.ipt_flush_chain('nat', self.iptables['circularpool']['chain'])
-        self.ipt_flush_chain('filter', self.iptables['hostpolicy']['chain'])
+        # Initialize nfqueues list
+        self._nfqueues = []
         # Test if MARKDNAT is available in the system
-        self.MARKDNAT = iptc_helper3.test_target('MARKDNAT', {'or-mark':'0'})
-        if self.MARKDNAT:
-            self._add_MARKDNAT('nat', self.iptables['circularpool']['chain'])
+        self._enabled_MARKDNAT = self._test_MARKDNAT()
+        # Flush conntrack
+        self.ipt_flush_conntrack()
+        # Initialize ipsets
+        self.ips_init()
+        # Initialize iptables
+        self.ipt_init()
+
+    def ips_init(self):
+        data_d = self.datarepository.get_policy('IPSET', {})
+        self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(data_d['requires']), len(data_d['rules'])))
+        # Install requirements
+        for i, entry in enumerate(data_d.setdefault('requires', [])):
+            self._logger.debug('#{} requires {} {}'.format(i+1, entry['name'], entry['type']))
+            if entry.setdefault('create',False) and not iproute2_helper3.ipset_exists(entry['name']):
+                iproute2_helper3.ipset_create(entry['name'], entry['type'])
+            if entry.setdefault('flush',False):
+                iproute2_helper3.ipset_flush(entry['name'])
+        # Populate ipsets
+        for entry in data_d.setdefault('rules', []):
+            self._logger.debug('Adding {} items to {} type {}'.format(len(entry['items']), entry['name'], entry['type']))
+            for i, e in enumerate(entry['items']):
+                self._logger.debug('#{} Adding {}'.format(i+1, e))
+                iproute2_helper3.ipset_add(entry['name'], e, etype=entry['type'])
+
+    def ipt_init(self):
+        data_d = self.datarepository.get_policy('IPTABLES', {})
+        for p in self.ipt_policy_order:
+            if p not in data_d:
+                self._logger.critical('Not found local iptables policy <{}>'.format(p))
+                continue
+            policy_d = data_d[p]
+            self._logger.info('Installing local iptables policy <{}>: {} requirements and {} rules'.format(p, len(policy_d['requires']), len(policy_d['rules'])))
+            # Install requirements
+            for i, entry in enumerate(policy_d.setdefault('requires', [])):
+                self._logger.debug('#{} requires {}.{}'.format(i+1, entry['table'], entry['chain']))
+                if entry.setdefault('create',False) and not iptc_helper3.has_chain(entry['table'], entry['chain']):
+                    iptc_helper3.add_chain(entry['table'], entry['chain'], silent=False)
+                if entry.setdefault('flush',False):
+                    iptc_helper3.flush_chain(entry['table'], entry['chain'])
+            # Install rules
+            for i, entry in enumerate(policy_d.setdefault('rules', [])):
+                self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
+                iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
+
+    def ipt_flush_conntrack(self):
+        if self._do_subprocess_call('conntrack -F', False, False):
+            self._logger.info('Successfully flushed connection tracking information')
+            return
+        self._logger.warning('Failed to flush connection tracking information')
 
     def ipt_flush_chain(self, table, chain):
         iptc_helper3.flush_chain(table, chain)
@@ -82,13 +158,13 @@ class Network(object):
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             iptc_helper3.add_rule('filter', host_chain, xlat_rule)
 
-    def ipt_register_nfqueue(self, queue, cb):
-        assert (self._nfqueue is None)
-        self._nfqueue = AsyncNFQueue(queue, cb)
+    def ipt_register_nfqueues(self, cb, *cb_args, **cb_kwargs):
+        for queue in self.ipt_cpool_queue:
+            self._nfqueues.append(NFQueue3(queue, cb, *cb_args, **cb_kwargs))
 
-    def ipt_deregister_nfqueue(self):
-        assert (self._nfqueue is not None)
-        self._nfqueue.terminate()
+    def ipt_deregister_nfqueues(self):
+        for nfqueueObj in self._nfqueues:
+            nfqueueObj.terminate()
 
     def ipt_nfpacket_dnat(self, packet, ipaddr):
         mark = self._gen_pktmark_cpool(ipaddr)
@@ -104,30 +180,50 @@ class Network(object):
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
-    def _add_MARKDNAT(self, table, chain):
-        # Insert rule on the top of the chain
-        rule = {'target':{'MARKDNAT': {'or-mark':'0'}},
-                'comment':{'comment':'Realm Gateway NAT Traversal'}}
-        iptc_helper3.add_rule(table, chain, rule, 0)
+    def _test_MARKDNAT(self):
+        ''' Create a temporary chain to insert a MARKDNAT test rule.
+        Check if the rule is successfully inserted '''
+        try:
+            ret = False
+            table = 'nat'
+            chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
+            rule_l = [['target',{'MARKDNAT':{'or-mark':'0'}}]]
+            while iptc_helper3.has_chain(table, chain):
+                chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
+            iptc_helper3.add_chain(table, chain)
+            iptc_helper3.add_rule(table, chain, rule_l)
+            if iptc_helper3.dump_chain(table, chain):
+                self._logger.info('Supported iptables MARKDNAT target')
+                ret = True
+            else:
+                self._logger.warning('Unsupported iptables MARKDNAT target')
+                ret = False
+        except:
+            ret = False
+        finally:
+            # Delete temporary chain
+            iptc_helper3.flush_chain(table, chain)
+            iptc_helper3.delete_chain(table, chain)
+            return ret
 
     def _add_circularpool(self, hostname, ipaddr):
         # Do not add specific rule if MARKDNAT is enabled
-        if self.MARKDNAT:
+        if self._enabled_MARKDNAT:
             return
         # Add rule to iptables
         table = 'nat'
-        chain = self.iptables['circularpool']['chain']
+        chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
         iptc_helper3.add_rule(table, chain, rule)
 
     def _remove_circularpool(self, hostname, ipaddr):
         # Do not delete specific rule if MARKDNAT is enabled
-        if self.MARKDNAT:
+        if self._enabled_MARKDNAT:
             return
         # Remove rule from iptables
         table = 'nat'
-        chain = self.iptables['circularpool']['chain']
+        chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
         iptc_helper3.delete_rule(table, chain, rule, True)
@@ -145,25 +241,19 @@ class Network(object):
             self._ipt_create_chain('filter', chain)
 
         # 1. Register triggers in global host policy chain
-        ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
+        chain = self.ipt_host_chain
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain})
 
         # 2. Register triggers in host chain
-        ## Get packet marks based on traffic direction
-        mark_legacy = self.iptables['pktmark']['MASK_HOST_LEGACY']
-        mark_ces = self.iptables['pktmark']['MASK_HOST_CES']
         ## Add rules to iptables
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_admin})
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_parental})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_legacy, 'mark':{'mark':mark_legacy}})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces, 'mark':{'mark':mark_ces}})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_legacy, 'mark':{'mark':MASK_HOST_LEGACY}})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces,    'mark':{'mark':MASK_HOST_CES}})
         # Add a variable for default host policy
-        iptc_helper3.add_rule('filter', host_chain, {'target':DEFAULT_HOST_POLICY})
+        iptc_helper3.add_rule('filter', host_chain, {'target':self.ipt_host_unknown})
 
     def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -174,13 +264,10 @@ class Network(object):
         host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
         # 1. Remove triggers in global host policy chain
-        ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
+        chain = self.ipt_host_chain
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, True)
 
         # 2. Remove host chains
         for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
@@ -190,25 +277,19 @@ class Network(object):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
         # 1. Register triggers in global host policy chain
-        ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain})
+        chain = self.ipt_host_chain
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain})
+        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain})
 
     def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
         # 1. Register triggers in global host policy chain
-        ## Get packet marks based on traffic direction
-        mark_in = self.iptables['pktmark']['MASK_HOST_INGRESS']
-        mark_eg = self.iptables['pktmark']['MASK_HOST_EGRESS']
         ## Add rules to iptables
-        chain = self.iptables['hostpolicy']['chain']
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_in}, 'dst':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':mark_eg}, 'src':ipaddr, 'target':host_chain}, True)
+        chain = self.ipt_host_chain
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, True)
+        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, True)
 
     def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
@@ -225,9 +306,9 @@ class Network(object):
         ret = dict(rule)
         # Translate direction value into packet mark
         if ret['direction'] == 'EGRESS':
-            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_EGRESS']}
+            ret['mark'] = {'mark':MASK_HOST_EGRESS}
         elif ret['direction'] == 'INGRESS':
-            ret['mark'] = {'mark':self.iptables['pktmark']['MASK_HOST_INGRESS']}
+            ret['mark'] = {'mark':MASK_HOST_INGRESS}
         elif ret['direction'] == 'ANY':
             pass
         else:
@@ -238,24 +319,6 @@ class Network(object):
         """ Return the integer representation of an IPv4 address """
         return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
 
-    '''
-    def _ipt_chain_trigger(self, table, chain, action, mark, source, destination, jump_table, goto_table):
-        #TOBEUSED
-        ret = ''
-        ret += 'iptables -t {} -{} {}'.format(table, action, chain)
-        if mark:
-            ret += ' -m mark --mark {}'.format(mark)
-        if source:
-            ret += ' -s {}'.format(source)
-        if destination:
-            ret += ' -d {}'.format(destination)
-        if jump_table:
-            ret += ' -j {}'.format(jump_table)
-        if goto_table:
-            ret += ' -g {}'.format(goto_table)
-        return ret
-
-
     def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
         try:
             self._logger.debug('System call: {}'.format(command))
@@ -264,11 +327,14 @@ class Network(object):
                     subprocess.check_call(command, shell=True, stdout=f, stderr=f)
             else:
                 subprocess.check_call(command, shell=True)
+            return True
         except Exception as e:
             self._logger.info(e)
             if raise_exc:
                 raise e
+            return False
 
+    '''
     # This is for CES
 
     def create_tunnel(self):

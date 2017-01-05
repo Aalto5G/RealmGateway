@@ -33,6 +33,7 @@ class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
         self._logger.setLevel(LOGLEVEL_DNSCALLBACK)
+        self._dns_timeout = {None:[0]} # Default single blocking query
         utils3.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
         self.state = {}
@@ -54,6 +55,8 @@ class DNSCallbacks(object):
         del self.registry[name]
 
     def dns_register_soa(self, name):
+        if not name.endswith('.'):
+            name += '.'
         if name not in self.soa_list:
             self.soa_list.append(name)
 
@@ -70,13 +73,26 @@ class DNSCallbacks(object):
             n = random.randrange(len(self.resolver_list))
         return self.resolver_list[n]
 
-    def dns_register_timeouts(self, timeout_d):
-        self.timeouts = timeout_d
+    def dns_get_timeout(self, record_type = None):
+        if record_type not in self._dns_timeout:
+            # Return default timeout values
+            return self._dns_timeout[None]
+        else:
+            # Return specific timeout values for record type
+            return self._dns_timeout[record_type]
+
+    def dns_register_timeout(self, timeouts, record_type = None):
+        self._dns_timeout[record_type] = timeouts
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
+        user_data = self.datarepository.get_subscriber(fqdn, default = None)
+        if user_data is None:
+            self._logger.info('Generating default subscriber data for {}'.format(fqdn))
+            user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
+        '''
         user_data     = self.datarepository.get_subscriber_data(fqdn).items()
         user_services = self.datarepository.get_subscriber_service(fqdn, None)
         # Create host entry arguments as a dictionary
@@ -93,7 +109,8 @@ class DNSCallbacks(object):
         host_data['services'].setdefault('SFQDN', sfqdn_services)
         host_data['services'].setdefault('CIRCULARPOOL', [{'max':100}])
         #/HACK
-        host_obj = HostEntry(name=fqdn, **host_data)
+        '''
+        host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
         # Create network resources
         hostname = ipaddr
@@ -187,7 +204,7 @@ class DNSCallbacks(object):
         resolver = uDNSResolver()
         self.activequeries[key] = resolver
         try:
-            response = yield from resolver.do_resolve(query, raddr, timeouts=self.timeouts['a'])
+            response = yield from resolver.do_resolve(query, raddr, timeouts=self.dns_get_timeout('a'))
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('ConnectionRefusedError: Resolving {} via {}:{}'.format(fqdn, raddr[0], raddr[1]))
@@ -250,7 +267,7 @@ class DNSCallbacks(object):
         self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
         try:
-            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.timeouts)
+            cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.dns_get_timeout('a'))
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
             self._logger.warning('ConnectionRefusedError: Resolving Carrier Grade IP from {} for {}'.format(host_obj.ipv4, fqdn))
@@ -327,7 +344,8 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
-        self._logger.warning('dns_process_rgw_wan_nosoa')
+        fqdn = format(query.question[0].name)
+        self._logger.warning('Drop DNS query for non-SOA domain {}'.format(fqdn))
         # Drop DNS Query
         return
 
@@ -444,7 +462,7 @@ class DNSCallbacks(object):
             self._logger.info('Cannot release IP address to Circular Pool: {} ({}) still in use'.format(ipaddr, conn.fqdn))
             return
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn.fqdn))
+        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn))
 
     def _do_callback(self, query, addr, response=None):
         try:
@@ -470,16 +488,21 @@ class PacketCallbacks(object):
         self._logger.setLevel(LOGLEVEL_PACKETCALLBACK)
         utils3.set_attributes(self, **kwargs)
 
+    def _format_5tuple(self, packet_fields):
+        return '{}:{} {}:{} [{}] (TTL {})'.format(packet_fields['src'], packet_fields['sport'],
+                                                  packet_fields['dst'], packet_fields['dport'],
+                                                  packet_fields['proto'], packet_fields['ttl'])
+
     def packet_in_circularpool(self, packet):
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
         # Parse packet
         packet_fields = network_helper3.parse_packet_custom(data)
         # Select appropriate values for building the keys
-        src, dst, proto = packet_fields['src'], packet_fields['dst'], packet_fields['proto']
-        sport, dport =  (0,0)
-        if 'dport' in packet_fields:
-            sport, dport = (packet_fields['sport'],packet_fields['dport'])
+        src, dst = packet_fields['src'], packet_fields['dst']
+        proto, ttl = packet_fields['proto'], packet_fields['ttl']
+        sport = packet_fields.setdefault('sport', 0)
+        dport = packet_fields.setdefault('dport', 0)
         sender = '{}:{}'.format(src, sport)
         self._logger.debug('Received PacketIn: {}'.format(packet_fields))
 
@@ -499,24 +522,24 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.info('No connection found for IP: {} from {}'.format(dst,sender))
+            self._logger.info('No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
             return
 
         # Lookup connection in table with rest of the keys
         conn = None
         for key in [key2, key3, key4, key5, key6]:
             if self.connectiontable.has(key):
-                self._logger.debug('Connection found for n-tuple*: {} from {}'.format(key,sender))
+                self._logger.debug('Connection found for n-tuple* {}: [{}]'.format(key,self._format_5tuple(packet_fields)))
                 conn = self.connectiontable.get(key)
                 break
 
         if conn is None:
-            self._logger.warning('No connection found for packet: {} from {}'.format(packet_fields,sender))
+            self._logger.warning('No connection found for packet: [{}]'.format(self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_drop(packet)
             return
 
         # DNAT to private host
-        self._logger.info('DNAT to {} @ {} via {}'.format(conn.fqdn, conn.private_ip, dst))
+        self._logger.info('DNAT to {} @ {} via {}: [{}]'.format(conn.fqdn, conn.private_ip, dst, self._format_5tuple(packet_fields)))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):
