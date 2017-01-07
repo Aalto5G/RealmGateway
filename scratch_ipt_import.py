@@ -26,12 +26,12 @@ def dump_chain(table, chain):
     l = []
     iptc_chain = iptc_helper3.get_chain(table, chain)
     for i, iptc_rule in enumerate(iptc_chain.rules):
-        l.append(decode_custom_iptc_rule(iptc_rule))
+        l.append(decode_custom_iptc_rule_dict(iptc_rule))
     return l
 ### /DUMP FUNCTIONS ###
 
 ### DECODE FUNCTIONS ###
-def decode_custom_iptc_rule(iptc_rule):
+def decode_custom_iptc_rule_list(iptc_rule):
     """Generate list representation of an iptc.Rule
     @param iptc_rule: The iptc.Rule object
     @type iptc_rule: iptc.Rule
@@ -53,9 +53,40 @@ def decode_custom_iptc_rule(iptc_rule):
         l.append(['fragment', iptc_rule.fragment])
     for iptc_match in iptc_rule.matches:
         l.append([iptc_match.name, decode_custom_iptc_match(iptc_match)])
-    if iptc_rule.target.name:
+    if iptc_rule.target and iptc_rule.target.name:
         l.append(['target', decode_custom_iptc_target(iptc_rule.target)])
     return l
+
+def decode_custom_iptc_rule_dict(iptc_rule):
+    """Generate list representation of an iptc.Rule
+    @param iptc_rule: The iptc.Rule object
+    @type iptc_rule: iptc.Rule
+    @returns: The list representation of a rule
+    @rtype: list
+    """
+    d = {}
+    if iptc_rule.src != '0.0.0.0/0.0.0.0':
+        d['src'] = iptc_rule.src
+    if iptc_rule.dst != '0.0.0.0/0.0.0.0':
+        d['dst'] = iptc_rule.dst
+    if iptc_rule.protocol != 'ip':
+        d['protocol'] = iptc_rule.protocol
+    if iptc_rule.in_interface is not None:
+        d['in-interface'] = iptc_rule.in_interface
+    if iptc_rule.out_interface is not None:
+        d['out-interface'] = iptc_rule.out_interface
+    if iptc_rule.fragment:
+        d['fragment'] = iptc_rule.fragment
+    for m in iptc_rule.matches:
+        if m.name not in d:
+            d[m.name] = decode_custom_iptc_match(m)
+        elif isinstance(d[m.name], list):
+            d[m.name].append(decode_custom_iptc_match(m))
+        else:
+            d[m.name] = [d[m.name], decode_custom_iptc_match(m)]
+    if iptc_rule.target and iptc_rule.target.name:
+        d['target'] = decode_custom_iptc_target(iptc_rule.target)
+    return d
 
 def decode_custom_iptc_match(iptc_match):
     data_d = {}
@@ -70,7 +101,7 @@ def decode_custom_iptc_match(iptc_match):
     if iptc_match.name == 'hashlimit':
         # Set default value 1 sec (expressed in ms)
         ## Reported issue here: https://github.com/ldx/python-iptables/issues/201
-        data_d.setdefault('hashlimit-htable-expire', '1000')
+        data_d.setdefault('hashlimit-htable-expire', '1100')
     return data_d
 
 def decode_custom_iptc_target(iptc_target):
@@ -91,11 +122,13 @@ def decode_custom_iptc_target(iptc_target):
 ### FORMATTED OUTPUT FUNCTIONS ###
 def print_all_rules():
     for table in ['security', 'raw', 'mangle', 'nat', 'filter']:
+        print('### [{}] ###'.format(table))
         print_table_rules(table)
 
 def print_table_rules(table):
     iptc_table = iptc_helper3.get_table(table)
     for iptc_chain in iptc_table.chains:
+        print('\n>>> {}'.format(iptc_chain.name))
         print_chain_rules(iptc_table.name, iptc_chain.name)
 
 def print_chain_rules(table, chain):
@@ -150,36 +183,22 @@ def process_ipt_group(data_d):
 
 ### /RULE PROCESSING FUNCTIONS ###
 
-#print_all_rules()
-#exit()
+if __name__ == "__main__":
+    #print_all_rules()
+    #exit()
 
-filename = 'gwa.dataplane.yaml'
-data_all = yaml.load(open(filename,'r'))
+    filename = 'gwa.policy.yaml'
+    data_all = yaml.load(open(filename,'r'))
 
-# Iterate over IPSET data
-ips_data = data_all['IPSET']
-process_ips_group(ips_data)
+    # Iterate over IPSET data
+    ips_data = data_all['IPSET']
+    process_ips_group(ips_data)
 
-# Iterate over IPTABLES data
-ipt_data = data_all['IPTABLES']
+    # Iterate over IPTABLES data
+    ipt_data = data_all['IPTABLES']
 
-# Install rules PACKET_MARKING
-process_ipt_group(ipt_data['PACKET_MARKING'])
+    policies = ['PACKET_MARKING', 'NAT', 'mREJECT', 'ADMIN_PREEMPTIVE', 'GROUP_POLICY', 'CUSTOMER_POLICY', 'ADMIN_POLICY', 'ADMIN_POLICY_DHCP', 'ADMIN_POLICY_HTTP', 'ADMIN_POLICY_DNS']
+    for p in policies:
+        print('Install rules {}'.format(p))
+        process_ipt_group(ipt_data[p])
 
-# Install rules CIRCULAR_POOL
-process_ipt_group(ipt_data['NAT'])
-
-# Install rules mREJECT
-process_ipt_group(ipt_data['mREJECT'])
-
-# Install rules ADMIN_PREEMPTIVE
-process_ipt_group(ipt_data['ADMIN_PREEMPTIVE'])
-
-# Install rules CUSTOMER_POLICY
-process_ipt_group(ipt_data['CUSTOMER_POLICY'])
-
-# Install rules ADMIN_POLICY & ADMIN_POLICY_xyz
-process_ipt_group(ipt_data['ADMIN_POLICY'])
-process_ipt_group(ipt_data['ADMIN_POLICY_DHCP'])
-process_ipt_group(ipt_data['ADMIN_POLICY_HTTP'])
-process_ipt_group(ipt_data['ADMIN_POLICY_DNS'])
