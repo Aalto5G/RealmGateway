@@ -12,6 +12,10 @@ IPSET:
         - {'name': 'IPS_DNS_WHITELIST',    'type': 'hash:ip',  'create': true, 'flush': true}
         - {'name': 'IPS_DNS_BLACKLIST',    'type': 'hash:ip',  'create': true, 'flush': true}
         - {'name': 'IPS_DNS_WKGREYLIST',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_POSTPAID',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID1',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID2',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID3',   'type': 'hash:ip',  'create': true, 'flush': true}
     rules:
         - {'name': 'IPS_CIRCULAR_POOL',    'type': 'ip',  'items': ['100.64.1.133/32', '100.64.1.134/32', '100.64.1.135/32']}
         - {'name': 'IPS_SPOOFED_NET_LAN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '224.0.0.0/3']}
@@ -22,9 +26,15 @@ IPSET:
         - {'name': 'IPS_DNS_WHITELIST',    'type': 'ip',  'items': []}
         - {'name': 'IPS_DNS_BLACKLIST',    'type': 'ip',  'items': []}
         - {'name': 'IPS_DNS_WKGREYLIST',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_POSTPAID',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID1',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID2',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID3',   'type': 'ip',  'items': []}
 
 IPTABLES:
     PACKET_MARKING:
+    # This policy marks packets according to the incoming and outgoing interfaces, forwarded or local traffic to CES/RGW.
+    # The marks can then be masked to match with a number of different scenarios.
         requires:
             - {'table': 'mangle', 'chain': 'PREROUTING', 'create': false, 'flush': true}
             - {'table': 'mangle', 'chain': 'FORWARD',    'create': false, 'flush': true}
@@ -32,123 +42,166 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'OUTPUT',     'create': false, 'flush': true}
         rules:
             # Marks in PREROUTING to indicate input interface
-            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': [['in-interface','lan0'], ['target',{'MARK':{'set-mark':'0xFF000002/0xFF00000F'}}], ['comment',{'comment':'MASK_LAN_INGRESS'}]]}
-            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': [['in-interface','wan0'], ['target',{'MARK':{'set-mark':'0xFF000003/0xFF00000F'}}], ['comment',{'comment':'MASK_WAN_INGRESS'}]]}
-            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': [['in-interface','tun0'], ['target',{'MARK':{'set-mark':'0xFF000004/0xFF00000F'}}], ['comment',{'comment':'MASK_TUN_INGRESS'}]]}
+            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': {'comment': {'comment': 'MASK_LAN_INGRESS'}, 'target': {'MARK': {'set-xmark': '0xff000002/0xff00000f'}}, 'in-interface': 'lan0'}}
+            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': {'comment': {'comment': 'MASK_WAN_INGRESS'}, 'target': {'MARK': {'set-xmark': '0xff000003/0xff00000f'}}, 'in-interface': 'wan0'}}
+            - {'table': 'mangle', 'chain': 'PREROUTING', 'rule': {'comment': {'comment': 'MASK_TUN_INGRESS'}, 'target': {'MARK': {'set-xmark': '0xff000004/0xff00000f'}}, 'in-interface': 'tun0'}}
             # Marks in FORWARD to indicate input & output interface
-            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': [['in-interface','lan0'], ['out-interface','wan0'], ['target',{'MARK':{'set-mark':'0xFF222232/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LAN_TO_WAN'}]]}
-            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': [['in-interface','lan0'], ['out-interface','tun0'], ['target',{'MARK':{'set-mark':'0xFF222342/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LAN_TO_TUN'}]]}
-            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': [['in-interface','wan0'], ['out-interface','lan0'], ['target',{'MARK':{'set-mark':'0xFF112223/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LAN_FROM_WAN'}]]}
-            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': [['in-interface','tun0'], ['out-interface','lan0'], ['target',{'MARK':{'set-mark':'0xFF112324/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LAN_FROM_TUN'}]]}
+            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_TO_WAN'}, 'out-interface': 'wan0', 'in-interface': 'lan0', 'target': {'MARK': {'set-xmark': '0xff222232/0xffffffff'}}}}
+            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_TO_TUN'}, 'out-interface': 'tun0', 'in-interface': 'lan0', 'target': {'MARK': {'set-xmark': '0xff222342/0xffffffff'}}}}
+            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_WAN'}, 'out-interface': 'lan0', 'in-interface': 'wan0', 'target': {'MARK': {'set-xmark': '0xff112223/0xffffffff'}}}}
+            - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_TUN'}, 'out-interface': 'lan0', 'in-interface': 'tun0', 'target': {'MARK': {'set-xmark': '0xff112324/0xffffffff'}}}}
             # Marks in INPUT to indicate input interface
-            - {'table': 'mangle', 'chain': 'INPUT',      'rule': [['in-interface','lan0'], ['target',{'MARK':{'set-mark':'0xFF121212/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_FROM_LAN'}]]}
-            - {'table': 'mangle', 'chain': 'INPUT',      'rule': [['in-interface','wan0'], ['target',{'MARK':{'set-mark':'0xFF021113/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_FROM_WAN'}]]}
-            - {'table': 'mangle', 'chain': 'INPUT',      'rule': [['in-interface','tun0'], ['target',{'MARK':{'set-mark':'0xFF021114/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_FROM_TUN'}]]}
+            - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_LAN'}, 'target': {'MARK': {'set-xmark': '0xff121212/0xffffffff'}}, 'in-interface': 'lan0'}}
+            - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_WAN'}, 'target': {'MARK': {'set-xmark': '0xff021113/0xffffffff'}}, 'in-interface': 'wan0'}}
+            - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_TUN'}, 'target': {'MARK': {'set-xmark': '0xff021114/0xffffffff'}}, 'in-interface': 'tun0'}}
             # Marks in OUTPUT to indicate output interface
-            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': [['out-interface','lan0'], ['target',{'MARK':{'set-mark':'0xFF211221/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_TO_LAN'}]]}
-            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': [['out-interface','wan0'], ['target',{'MARK':{'set-mark':'0xFF011131/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_TO_WAN'}]]}
-            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': [['out-interface','tun0'], ['target',{'MARK':{'set-mark':'0xFF011141/0xFFFFFFFF'}}], ['comment',{'comment':'MARK_LOCAL_TO_TUN'}]]}
+            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': {'comment': {'comment': 'MARK_LOCAL_TO_LAN'}, 'out-interface': 'lan0', 'target': {'MARK': {'set-xmark': '0xff211221/0xffffffff'}}}}
+            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': {'comment': {'comment': 'MARK_LOCAL_TO_WAN'}, 'out-interface': 'wan0', 'target': {'MARK': {'set-xmark': '0xff011131/0xffffffff'}}}}
+            - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': {'comment': {'comment': 'MARK_LOCAL_TO_TUN'}, 'out-interface': 'tun0', 'target': {'MARK': {'set-xmark': '0xff011141/0xffffffff'}}}}
 
     mREJECT:
+    # This policy rejects packets according to packet's protocol. Contrary to dropping a packet, it is intended to convey the error to the remote sender.
         requires:
             - {'table': 'filter', 'chain': 'mREJECT', 'create': true, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'mREJECT', 'rule': [['protocol','1'],  ['target',{'REJECT':{'reject-with':'icmp-admin-prohibited'}}]]}
-            - {'table': 'filter', 'chain': 'mREJECT', 'rule': [['protocol','6'],  ['target',{'REJECT':{'reject-with':'tcp-reset'}}]]}
-            - {'table': 'filter', 'chain': 'mREJECT', 'rule': [['protocol','17'], ['target',{'REJECT':{'reject-with':'icmp-port-unreachable'}}]]}
-            - {'table': 'filter', 'chain': 'mREJECT', 'rule': [['target',{'REJECT':{'reject-with':'icmp-proto-unreachable'}}]]}
+            - {'table': 'filter', 'chain': 'mREJECT', 'rule': {'protocol': 'icmp', 'target': {'REJECT': {'reject-with': 'icmp-admin-prohibited'}}}}
+            - {'table': 'filter', 'chain': 'mREJECT', 'rule': {'protocol': 'tcp', 'target': {'REJECT': {'reject-with': 'tcp-reset'}}}}
+            - {'table': 'filter', 'chain': 'mREJECT', 'rule': {'protocol': 'udp', 'target': {'REJECT': {'reject-with': 'icmp-port-unreachable'}}}}
+            - {'table': 'filter', 'chain': 'mREJECT', 'rule': {'target': {'REJECT': {'reject-with': 'icmp-proto-unreachable'}}}}
 
     NAT:
+    # This policy enables the NAT functionality on the node.
+    # The target SNAT modifies the source IP address for the outgoing packets to the given range.
+    # The target MARKDNAT modifies the destination IP address to enable the NAT traversal operation of the Circular Pool.
+    # The Circular Pool works requires close interworking with the mangle table, as to divert packets towards the Userspace application running the address allocation algorithms.
         requires:
             - {'table': 'mangle', 'chain': 'PREROUTING',    'create': false, 'flush': false}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'create': true,  'flush': true}
             - {'table': 'nat',    'chain': 'PREROUTING',    'create': false, 'flush': true}
             - {'table': 'nat',    'chain': 'POSTROUTING',   'create': false, 'flush': true}
-            - {'table': 'nat',    'chain': 'CIRCULAR_POOL',   'create': true,  'flush': true}
+            - {'table': 'nat',    'chain': 'CIRCULAR_POOL', 'create': true,  'flush': true}
         rules:
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','6'],  ['target','DROP'], ['tcp', {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}]]}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','6'],  ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':''}}], ['tcp', {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}]]}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','1'],  ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':''}}]]}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','17'], ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':''}}]]}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [['protocol','132'],['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':''}}]]}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': [                   ['target',{'NFQUEUE':{'queue-num':'1', 'queue-bypass':''}}]]}
-            - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': [['mark',{'mark':'0xFF000003/0xFF00000F'}], ['conntrack',{'ctstate':'NEW'}], ['set',{'match-set':['IPS_CIRCULAR_POOL', 'dst']}], ['comment',{'comment':'New connections via CircularPool'}], ['target','CIRCULAR_POOL']]}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': 'DROP', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'icmp', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'udp', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': '132', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'set': {'match-set': ['IPS_CIRCULAR_POOL', 'dst']}, 'comment': {'comment': 'New connections via CircularPool'}, 'conntrack': {'ctstate': 'NEW'}, 'target': 'CIRCULAR_POOL'}}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
-            - {'table': 'nat',    'chain': 'PREROUTING',    'rule': [['mark',{'mark':['!','0x0']}], ['mark',{'mark':['!', '0xFF000000/0xFF000000']}],['target','CIRCULAR_POOL'], ['comment',{'comment':'DNAT via CIRCULAR_POOL'}]]}
-            - {'table': 'nat',    'chain': 'CIRCULAR_POOL', 'rule': [['target',{'MARKDNAT':{'or-mark':'0'}}], ['comment',{'comment':'Do MARKDNAT'}]]}
+            - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': [{'mark': ['!', '0x0']}, {'mark': ['!', '0xff000000/0xff000000']}], 'comment': {'comment': 'DNAT via CIRCULAR_POOL'}, 'target': 'CIRCULAR_POOL'}}
+            - {'table': 'nat', 'chain': 'CIRCULAR_POOL',    'rule': {'comment': {'comment': 'Do MARKDNAT'}, 'target': {'MARKDNAT': {'set-xmark': '0x0/0x0'}}}}
             # Enable SNAT for MARK_LAN_TO_WAN packets
-            - {'table': 'nat',    'chain': 'POSTROUTING',   'rule': [['mark',{'mark':'0xFF222232/0xFFFFFFFF'}],['target',{'SNAT':{'to-source':'100.64.1.133-100.64.1.135', 'persistent':''}}], ['comment',{'comment':'SNAT to available pool'}]]}
+            - {'table': 'nat', 'chain': 'POSTROUTING',      'rule': {'mark': {'mark': '0xFF000030/0xFF0000F0'}, 'comment': {'comment': 'SNAT to available pool'}, 'target': {'SNAT': {'to-source': '100.64.1.133-100.64.1.135'}}}}
 
     ADMIN_PREEMPTIVE:
+    # This policy installs the basic filtering/droppping/rejecting functionality based on invalid packets and disallowed protocols. In addition, it includes several rules for limiting the number of new connections handled by the node.
         requires:
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'create': true,  'flush': true}
             - {'table': 'filter', 'chain': 'INPUT',            'create': false, 'flush': true}
             - {'table': 'filter', 'chain': 'OUTPUT',           'create': false, 'flush': true}
             - {'table': 'filter', 'chain': 'FORWARD',          'create': false, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',            'rule': [['in-interface','lo'],   ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'INPUT',            'rule': [['in-interface','mgt0'], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'INPUT',            'rule': [['comment', {'comment': 'Continue in ADMIN_PREEMPTIVE'}], ['target', 'ADMIN_PREEMPTIVE']]}
-            - {'table': 'filter', 'chain': 'FORWARD',          'rule': [['comment', {'comment': 'Continue in ADMIN_PREEMPTIVE'}], ['target', 'ADMIN_PREEMPTIVE']]}
+            - {'table': 'filter', 'chain': 'INPUT',            'rule': {'target': 'ACCEPT', 'in-interface': 'lo'}}
+            - {'table': 'filter', 'chain': 'INPUT',            'rule': {'target': 'ACCEPT', 'in-interface': 'mgt0'}}
+            - {'table': 'filter', 'chain': 'INPUT',            'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
+            - {'table': 'filter', 'chain': 'FORWARD',          'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
 
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['set', {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}], ['comment', {'comment': 'Drop blacklisted sources'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['set', {'match-set': ['IPS_FILTER_WHITELIST', 'src']}], ['comment', {'comment': 'Accept whitelisted sources'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['fragment', true], ['comment', {'comment': 'Fragmented packets'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}], ['conntrack', {'ctstate': 'NEW'}], ['comment', {'comment': 'Invalid TCP SYN packet'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'FIN,SYN,RST,PSH,ACK,URG']}], ['comment', {'comment': 'Invalid TCP flags / Christmas in July'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['tcp', {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'NONE']}], ['comment', {'comment': 'Invalid TCP flags / Nothing to See Here'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['conntrack', {'ctstate': 'RELATED,ESTABLISHED'}], ['comment', {'comment': 'Accept TCP established traffic'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['conntrack', {'ctstate': 'INVALID'}], ['comment', {'comment': 'Drop invalid traffic'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000002/0xff00000f'}], ['set', {'match-set': ['IPS_SPOOFED_NET_LAN', 'src']}], ['comment', {'comment': 'LAN IP Spoofing'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000003/0xff00000f'}], ['set', {'match-set': ['IPS_SPOOFED_NET_WAN', 'src']}], ['comment', {'comment': 'WAN IP Spoofing'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000004/0xff00000f'}], ['set', {'match-set': ['IPS_SPOOFED_NET_TUN', 'src']}], ['comment', {'comment': 'TUN IP Spoofing'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['protocol', 'tcp'], ['conntrack', {'ctstate': 'NEW'}], ['multiport', {'dports': '135,137,138,139'}], ['comment', {'comment': 'Reject vulnerable multiport TCP services'}], ['target', 'mREJECT']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000002/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000003/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': [['mark', {'mark': '0xff000004/0xff00000f'}], ['conntrack', {'ctstate': 'NEW'}], ['hashlimit', {'hashlimit-above': '500/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-burst': '750'}], ['comment', {'comment': 'New connection'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklisted sources'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_WHITELIST', 'src']}, 'comment': {'comment': 'Accept whitelisted sources'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Fragmented packets'}, 'fragment': True, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Invalid TCP SYN packet'}, 'target': 'DROP', 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'tcp': {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Invalid TCP flags / Christmas in July'}, 'target': 'DROP', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'FIN,SYN,RST,PSH,ACK,URG']}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Invalid TCP flags / Nothing to See Here'}, 'target': 'DROP', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'NONE']}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Accept TCP established traffic'}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'RELATED,ESTABLISHED'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Drop invalid traffic'}, 'target': 'DROP', 'conntrack': {'ctstate': 'INVALID'}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'set': {'match-set': ['IPS_SPOOFED_NET_LAN', 'src']}, 'comment': {'comment': 'LAN IP Spoofing'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'set': {'match-set': ['IPS_SPOOFED_NET_WAN', 'src']}, 'comment': {'comment': 'WAN IP Spoofing'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'set': {'match-set': ['IPS_SPOOFED_NET_TUN', 'src']}, 'comment': {'comment': 'TUN IP Spoofing'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Reject vulnerable multiport TCP services'}, 'multiport': {'dports': '135,137,138,139'}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'mREJECT'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+
+    GROUP_POLICY:
+    # This policy installs the basic group functionality upon which users traffic is processed by a set of policy rules specific to each group or membership.
+    # So far only 4 groups have been defined: (i) postpaid, (ii) prepaid-1, (iii) prepaid-2, and (iv) prepaid-3.
+        requires:
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GROUP_POSTPAID',  'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID1',  'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID3',  'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'CUSTOMER_POLICY', 'create': true, 'flush': false}
+        rules:
+            - {'table': 'filter', 'chain': 'INPUT',           'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',         'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
+            # Set rules for group matching based on IP src/dst and IP sets
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_POSTPAID', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_POSTPAID'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_PREPAID1', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_PREPAID1'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_PREPAID2', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_PREPAID2'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_PREPAID3', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_PREPAID3'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_POSTPAID', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_POSTPAID'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID1', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID1'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID2', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID2'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID3', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID3'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'comment': {'comment': 'Unknown subscriber'}, 'target': 'CUSTOMER_POLICY'}}
+            # Set group rules for disallowed traffic
+            - {'table': 'filter', 'chain': 'GROUP_POSTPAID',  'rule': {'comment': {'comment': 'No traffic restrictions'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID1',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Restricted inbound traffic'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID1',  'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'comment': {'comment': 'Allowed outbound traffic'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Allow subset of inbound traffic'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Restricted inbound traffic'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'comment': {'comment': 'Allowed outbound traffic'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID3',  'rule': {'comment': {'comment': 'No traffic restrictions'}, 'target': 'CUSTOMER_POLICY'}}
 
     CUSTOMER_POLICY:
+    # This policy includes a basic set of chains and rules as the foundation where specific user rules will be further on installed.
         requires:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY',        'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY',           'create': true, 'flush': false}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',                  'rule': [['comment', {'comment': 'Continue in CUSTOMER_POLICY'}], ['target', 'CUSTOMER_POLICY']]}
-            - {'table': 'filter', 'chain': 'FORWARD',                'rule': [['comment', {'comment': 'Continue in CUSTOMER_POLICY'}], ['target', 'CUSTOMER_POLICY']]}
-            - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'rule': [['comment', {'comment': 'Continue in ADMIN_POLICY'}],    ['target', 'ADMIN_POLICY']]}
+            - {'table': 'filter', 'chain': 'INPUT',                  'rule': {'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',                'rule': {'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
 
     ADMIN_POLICY:
+    # This policy includes the triggers to policies of local services running in CES/RGW that should be accessible on the different interfaces .e.g.: DHCP, DNS, HTTP.
         requires:
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DHCP',  'create': true, 'flush': false}
             - {'table': 'filter', 'chain': 'POLICY_HTTP',  'create': true, 'flush': false}
             - {'table': 'filter', 'chain': 'POLICY_DNS',   'create': true, 'flush': false}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',        'rule': [['comment', {'comment': 'Continue in ADMIN_POLICY'}], ['target', 'ADMIN_POLICY']]}
-            - {'table': 'filter', 'chain': 'FORWARD',      'rule': [['comment', {'comment': 'Continue in ADMIN_POLICY'}], ['target', 'ADMIN_POLICY']]}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff001010/0xff00f0f0'}], ['udp', {'dport': '67'}], ['comment', {'comment': 'Continue in POLICY_DHCP'}], ['target', 'POLICY_DHCP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff001010/0xff00f0f0'}], ['multiport', {'dports': '80,443'}], ['comment', {'comment': 'Continue in POLICY_HTTP'}], ['target', 'POLICY_HTTP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff001010/0xff00f0f0'}], ['multiport', {'dports': '8080,8443'}], ['comment', {'comment': 'Continue in POLICY_HTTP'}], ['target', 'POLICY_HTTP']]}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff001010/0xff00f0f0'}], ['udp', {'dport': '53'}], ['comment', {'comment': 'Continue in POLICY_DNS'}], ['target', 'POLICY_DNS']]}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': [['comment', {'comment': 'Accept'}], ['target', 'ACCEPT']]}
+            - {'table': 'filter', 'chain': 'INPUT',        'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',      'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DHCP'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'POLICY_DHCP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DNS'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'comment': {'comment': 'Accept'}, 'target': 'ACCEPT'}}
 
     ADMIN_POLICY_DHCP:
+    # This policy includes the rules for the DHCP server.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DHCP', 'create': true, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff000002/0xff00000f'}], ['udp', {'sport': '68', 'dport': '67'}], ['comment', {'comment': 'Accept DHCP'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff021010/0xff0ff0f0'}], ['udp', {'dport': '67'}], ['comment', {'comment': 'Drop'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'Accept DHCP'}, 'udp': {'sport': '68', 'dport': '67'}, 'protocol': 'udp', 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'DROP'}}
 
     ADMIN_POLICY_HTTP:
+    # This policy includes the rules for the HTTP/HTTPS reverse proxy server.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_HTTP', 'create': true, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff000003/0xff00000f'}], ['tcp', {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}], ['multiport', {'dports': '80,443'}], ['conntrack', {'ctstate': 'NEW'}], ['comment', {'comment': 'Accept HTTP(S) @WAN'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff000003/0xff00000f'}], ['tcp', {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}], ['multiport', {'dports': '8080,8443'}], ['conntrack', {'ctstate': 'NEW'}], ['comment', {'comment': 'Accept HTTP(S) @WAN'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff021010/0xff0ff0f0'}], ['multiport', {'dports': '80,443'}], ['comment', {'comment': 'Drop'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': [['protocol', 'tcp'], ['mark', {'mark': '0xff021010/0xff0ff0f0'}], ['multiport', {'dports': '8080,8443'}], ['comment', {'comment': 'Drop'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @WAN'}, 'multiport': {'dports': '80,443'}, 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @WAN'}, 'multiport': {'dports': '8080,8443'}, 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'DROP'}}
 
     ADMIN_POLICY_DNS:
+    # This policy includes the rules for the DNS server. The policy defines a basic system of leaky-buckets and ultimately a contention based mechanism to admit a packet to the DNS server running in userspace.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
@@ -164,33 +217,34 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'create': true, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff000002/0xff00000f'}], ['udp', {'dport': '53'}], ['comment', {'comment': 'Continue in POLICY_DNS_LAN'}], ['target', 'POLICY_DNS_LAN']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff000003/0xff00000f'}], ['udp', {'dport': '53'}], ['comment', {'comment': 'Continue in POLICY_DNS_WAN'}], ['target', 'POLICY_DNS_WAN']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': [['protocol', 'udp'], ['mark', {'mark': '0xff000004/0xff00000f'}], ['udp', {'dport': '53'}], ['comment', {'comment': 'Continue in POLICY_DNS_TUN'}], ['target', 'POLICY_DNS_TUN']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'Continue in POLICY_DNS_LAN'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS_LAN'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Continue in POLICY_DNS_WAN'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS_WAN'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'comment': {'comment': 'Continue in POLICY_DNS_TUN'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS_TUN'}}
 
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Apply blacklist'}], ['target', 'POLICY_DNS_LAN_BLACKLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Apply global limitation'}], ['target', 'POLICY_DNS_LAN_GLOBAL_LIMIT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': [['comment', {'comment': 'Should not be here'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsLan', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept DNS LAN traffic'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': [['comment', {'comment': 'DNS LAN rate exceeded'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'rule': [['comment', {'comment': 'Drop DNS @TUN'}], ['target', 'DROP']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Apply blacklist'}, 'target': 'POLICY_DNS_LAN_BLACKLIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Apply global limitation'}, 'target': 'POLICY_DNS_LAN_GLOBAL_LIMIT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept DNS LAN traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsLan', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'DNS LAN rate exceeded'}, 'target': 'DROP'}}
 
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['comment', {'comment': 'Apply blacklist'}], ['target', 'POLICY_DNS_WAN_BLACKLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['comment', {'comment': 'Apply domain limitation'}], ['target', 'POLICY_DNS_WAN_DOMAIN_LIMIT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['set', {'match-set': ['IPS_DNS_WHITELIST', 'src']}], ['comment', {'comment': 'Apply whitelist'}], ['target', 'POLICY_DNS_WAN_WHITELIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['set', {'match-set': ['IPS_DNS_WKGREYLIST', 'src']}], ['comment', {'comment': 'Apply wellknown greylist'}], ['target', 'POLICY_DNS_WAN_WKGREYLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['comment', {'comment': 'Apply greylist'}], ['target', 'POLICY_DNS_WAN_GREYLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': [['comment', {'comment': 'Should not be here'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': [['set', {'match-set': ['IPS_DNS_BLACKLIST', 'src']}], ['comment', {'comment': 'Drop blacklist DNS source'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': [['u32', {'u32': '0x1c&0xf800=0x8000'}], ['conntrack', {'ctstate': 'NEW'}], ['comment', {'comment': 'DNS unexpected response'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['string', {'to': '65535', 'hex-string': '|07|in-addr|04|arpa|00|', 'algo': 'bm'}], ['comment', {'comment': 'Accept SOA record'}], ['target', 'RETURN']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['string', {'to': '65535', 'hex-string': '|03|gwa|04|demo|00|', 'algo': 'bm'}], ['comment', {'comment': 'Accept SOA record'}], ['target', 'RETURN']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': [['comment', {'comment': 'Drop !SOA allowed records'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': [['hashlimit', {'hashlimit-upto': '200/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-burst': '300'}], ['comment', {'comment': 'Accept Non-SLA traffic'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': [['comment', {'comment': 'Drop excess'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': [['hashlimit', {'hashlimit-upto': '25/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-burst': '50'}], ['comment', {'comment': 'Best effort Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': [['comment', {'comment': 'Drop excess in Greylist'}], ['target', 'DROP']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': [['hashlimit', {'hashlimit-upto': '180/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanWhite', 'hashlimit-mode': 'srcip', 'hashlimit-burst': '200'}], ['comment', {'comment': 'SLA Whitelist'}], ['target', 'ACCEPT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': [['comment', {'comment': 'Continue as WK-Greylist'}], ['target', 'POLICY_DNS_WAN_WKGREYLIST']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': [['hashlimit', {'hashlimit-upto': '75/sec', 'hashlimit-htable-expire': '1100', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-burst': '100'}], ['comment', {'comment': 'Preferred WK-Greylist'}], ['target', 'POLICY_DNS_WAN_GLOBAL_LIMIT']]}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': [['comment', {'comment': 'Continue as Greylist'}], ['target', 'POLICY_DNS_WAN_GREYLIST']]}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'rule': {'comment': {'comment': 'Drop DNS @TUN'}, 'target': 'DROP'}}
+
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply blacklist'}, 'target': 'POLICY_DNS_WAN_BLACKLIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply domain limitation'}, 'target': 'POLICY_DNS_WAN_DOMAIN_LIMIT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WHITELIST', 'src']}, 'comment': {'comment': 'Apply whitelist'}, 'target': 'POLICY_DNS_WAN_WHITELIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WKGREYLIST', 'src']}, 'comment': {'comment': 'Apply wellknown greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'set': {'match-set': ['IPS_DNS_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklist DNS source'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'comment': {'comment': 'DNS unexpected response'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}, 'u32': {'u32': '0x1c&0xf800=0x8000'}}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|07696e2d61646472046172706100|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|036777610464656d6f00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Drop !SOA allowed records'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept Non-SLA traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Drop excess'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Best effort Greylist'}, 'hashlimit': {'hashlimit-upto': '25/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '50'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Drop excess in Greylist'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'SLA Whitelist'}, 'hashlimit': {'hashlimit-upto': '181/sec', 'hashlimit-mode': 'srcip', 'hashlimit-name': 'DnsWanWhite', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '200'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'Continue as WK-Greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Preferred WK-Greylist'}, 'hashlimit': {'hashlimit-upto': '75/sec', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '100'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Continue as Greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
