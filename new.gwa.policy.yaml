@@ -33,6 +33,8 @@ IPSET:
 
 IPTABLES:
     PACKET_MARKING:
+    # This policy marks packets according to the incoming and outgoing interfaces, forwarded or local traffic to CES/RGW.
+    # The marks can then be masked to match with a number of different scenarios.
         requires:
             - {'table': 'mangle', 'chain': 'PREROUTING', 'create': false, 'flush': true}
             - {'table': 'mangle', 'chain': 'FORWARD',    'create': false, 'flush': true}
@@ -58,6 +60,7 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'OUTPUT',     'rule': {'comment': {'comment': 'MARK_LOCAL_TO_TUN'}, 'out-interface': 'tun0', 'target': {'MARK': {'set-xmark': '0xff011141/0xffffffff'}}}}
 
     mREJECT:
+    # This policy rejects packets according to packet's protocol. Contrary to dropping a packet, it is intended to convey the error to the remote sender.
         requires:
             - {'table': 'filter', 'chain': 'mREJECT', 'create': true, 'flush': true}
         rules:
@@ -67,6 +70,10 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'mREJECT', 'rule': {'target': {'REJECT': {'reject-with': 'icmp-proto-unreachable'}}}}
 
     NAT:
+    # This policy enables the NAT functionality on the node.
+    # The target SNAT modifies the source IP address for the outgoing packets to the given range.
+    # The target MARKDNAT modifies the destination IP address to enable the NAT traversal operation of the Circular Pool.
+    # The Circular Pool works requires close interworking with the mangle table, as to divert packets towards the Userspace application running the address allocation algorithms.
         requires:
             - {'table': 'mangle', 'chain': 'PREROUTING',    'create': false, 'flush': false}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'create': true,  'flush': true}
@@ -88,6 +95,7 @@ IPTABLES:
             - {'table': 'nat', 'chain': 'POSTROUTING',      'rule': {'mark': {'mark': '0xFF000030/0xFF0000F0'}, 'comment': {'comment': 'SNAT to available pool'}, 'target': {'SNAT': {'to-source': '100.64.1.133-100.64.1.135'}}}}
 
     ADMIN_PREEMPTIVE:
+    # This policy installs the basic filtering/droppping/rejecting functionality based on invalid packets and disallowed protocols. In addition, it includes several rules for limiting the number of new connections handled by the node.
         requires:
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'create': true,  'flush': true}
             - {'table': 'filter', 'chain': 'INPUT',            'create': false, 'flush': true}
@@ -116,6 +124,8 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
 
     GROUP_POLICY:
+    # This policy installs the basic group functionality upon which users traffic is processed by a set of policy rules specific to each group or membership.
+    # So far only 4 groups have been defined: (i) postpaid, (ii) prepaid-1, (iii) prepaid-2, and (iv) prepaid-3.
         requires:
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'GROUP_POSTPAID',  'create': true, 'flush': true}
@@ -146,6 +156,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GROUP_PREPAID3',  'rule': {'comment': {'comment': 'No traffic restrictions'}, 'target': 'CUSTOMER_POLICY'}}
 
     CUSTOMER_POLICY:
+    # This policy includes a basic set of chains and rules as the foundation where specific user rules will be further on installed.
         requires:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY',        'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'create': true, 'flush': true}
@@ -156,6 +167,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
 
     ADMIN_POLICY:
+    # This policy includes the triggers to policies of local services running in CES/RGW that should be accessible on the different interfaces .e.g.: DHCP, DNS, HTTP.
         requires:
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DHCP',  'create': true, 'flush': false}
@@ -171,6 +183,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'comment': {'comment': 'Accept'}, 'target': 'ACCEPT'}}
 
     ADMIN_POLICY_DHCP:
+    # This policy includes the rules for the DHCP server.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DHCP', 'create': true, 'flush': true}
         rules:
@@ -178,6 +191,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'DROP'}}
 
     ADMIN_POLICY_HTTP:
+    # This policy includes the rules for the HTTP/HTTPS reverse proxy server.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_HTTP', 'create': true, 'flush': true}
         rules:
@@ -187,6 +201,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'DROP'}}
 
     ADMIN_POLICY_DNS:
+    # This policy includes the rules for the DNS server. The policy defines a basic system of leaky-buckets and ultimately a contention based mechanism to admit a packet to the DNS server running in userspace.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
