@@ -115,7 +115,7 @@ class DataRepository(object):
                                    'carriergrade': False,
                                    'proxy_required': proxy})
         data_d['SFQDN'] = sfqdn_services
-        data_d['CIRCULARPOOL'] = [{'max':100}]
+        data_d['CIRCULARPOOL'] = [{'max':2}]
         return data_d
 
 
