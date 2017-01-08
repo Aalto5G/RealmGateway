@@ -86,42 +86,28 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
+        # TODO: Move all this complexity to network module? Maybe it's more fitting...
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
         user_data = self.datarepository.get_subscriber(fqdn, default = None)
         if user_data is None:
             self._logger.info('Generating default subscriber data for {}'.format(fqdn))
             user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
-        '''
-        user_data     = self.datarepository.get_subscriber_data(fqdn).items()
-        user_services = self.datarepository.get_subscriber_service(fqdn, None)
-        # Create host entry arguments as a dictionary
-        host_data = dict(user_data)
-        host_data['services'] = dict(user_services)
-        # HACK: Provisional until datarepository returns default data
-        host_data['ipv4'] = ipaddr
-        host_data['fqdn'] = fqdn
-        sfqdn_services = []
-        for token, proxy in (('',False), ('www.',True), ('sip',True)):
-            sfqdn_services.append({'fqdn':'{}{}'.format(token, fqdn),
-                                   'carriergrade': False,
-                                   'proxy_required': proxy})
-        host_data['services'].setdefault('SFQDN', sfqdn_services)
-        host_data['services'].setdefault('CIRCULARPOOL', [{'max':100}])
-        #/HACK
-        '''
+
         host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
         # Create network resources
         hostname = ipaddr
         self.network.ipt_add_user(hostname, ipaddr)
+        ## Add all user groups
+        user_groups = host_obj.get_service('GROUP', [])
+        self.network.ipt_add_user_groups(hostname, ipaddr, user_groups)
         ## Add all firewall rules
-        admin_fw    = host_obj.get_service('FIREWALL_ADMIN', [])
-        parental_fw = host_obj.get_service('FIREWALL_PARENTAL', [])
-        legacy_fw   = host_obj.get_service('FIREWALL_LEGACY', [])
-        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin',    admin_fw)
-        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'parental', parental_fw)
-        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'legacy',   legacy_fw)
+        fw_d = host_obj.get_service('FIREWALL', {})
+        admin_fw = fw_d.setdefault('FIREWALL_ADMIN', [])
+        user_fw  = fw_d.setdefault('FIREWALL_USER', [])
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin', admin_fw)
+        self.network.ipt_add_user_fwrules(hostname, ipaddr, 'user', user_fw)
         ## Carrier Grade services if available
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
@@ -137,6 +123,10 @@ class DNSCallbacks(object):
         self.hosttable.remove(host_obj)
         # Remove network resources
         hostname = ipaddr
+        ## Remove all user groups
+        user_groups = host_obj.get_service('GROUP', [])
+        self.network.ipt_remove_user_groups(hostname, ipaddr, user_groups)
+        ## Remove all firewall rules
         self.network.ipt_remove_user(hostname, ipaddr)
         ## Carrier Grade services if available
         if host_obj.has_service('CARRIERGRADE'):

@@ -154,9 +154,27 @@ class Network(object):
         self._logger.debug('Add fwrules for user {}/{} to chain <{}> ({})'.format(hostname, ipaddr, host_chain, len(fwrules)))
         # Sort list by priority of the rules
         sorted_fwrules = sorted(fwrules, key=lambda rule: rule['priority'])
+        # Flush chain before inserting the lot
+        iptc_helper3.flush_chain('filter', host_chain)
         for rule in sorted_fwrules:
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             iptc_helper3.add_rule('filter', host_chain, xlat_rule)
+
+    def ipt_add_user_groups(self, hostname, ipaddr, groups):
+        self._logger.debug('Registering groups for user {}/{} to <{}>'.format(hostname, ipaddr, groups))
+        for group in groups:
+            if not iproute2_helper3.ipset_exists(group):
+                self._logger.error('Subscriber group {} does not exist!'.format(group))
+                continue
+            iproute2_helper3.ipset_add(group, ipaddr)
+
+    def ipt_remove_user_groups(self, hostname, ipaddr, groups):
+        self._logger.debug('Removing groups for user {}/{} to <{}> ({})'.format(hostname, ipaddr, groups))
+        for group in groups:
+            if not iproute2_helper3.ipset_exists(group):
+                self._logger.error('Subscriber group {} does not exist!'.format(group))
+                continue
+            iproute2_helper3.ipset_delete(group, ipaddr)
 
     def ipt_register_nfqueues(self, cb, *cb_args, **cb_kwargs):
         for queue in self.ipt_cpool_queue:
@@ -232,12 +250,11 @@ class Network(object):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
         host_chain_admin    = 'HOST_{}_ADMIN'.format(hostname)
-        host_chain_parental = 'HOST_{}_PARENTAL'.format(hostname)
-        host_chain_legacy   = 'HOST_{}_LEGACY'.format(hostname)
+        host_chain_user     = 'HOST_{}_USER'.format(hostname)
         host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
         # Create basic chains for host policy
-        for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
+        for chain in [host_chain, host_chain_admin, host_chain_user, host_chain_ces]:
             self._ipt_create_chain('filter', chain)
 
         # 1. Register triggers in global host policy chain
@@ -249,9 +266,8 @@ class Network(object):
         # 2. Register triggers in host chain
         ## Add rules to iptables
         iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_admin})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_parental})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_legacy, 'mark':{'mark':MASK_HOST_LEGACY}})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces,    'mark':{'mark':MASK_HOST_CES}})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_user})
+        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces, 'mark':{'mark':MASK_HOST_CES}})
         # Add a variable for default host policy
         iptc_helper3.add_rule('filter', host_chain, {'target':self.ipt_host_unknown})
 
@@ -259,8 +275,7 @@ class Network(object):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
         host_chain_admin    = 'HOST_{}_ADMIN'.format(hostname)
-        host_chain_parental = 'HOST_{}_PARENTAL'.format(hostname)
-        host_chain_legacy   = 'HOST_{}_LEGACY'.format(hostname)
+        host_chain_user     = 'HOST_{}_USER'.format(hostname)
         host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
         # 1. Remove triggers in global host policy chain
@@ -270,7 +285,7 @@ class Network(object):
         iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, True)
 
         # 2. Remove host chains
-        for chain in [host_chain, host_chain_admin, host_chain_parental, host_chain_legacy, host_chain_ces]:
+        for chain in [host_chain, host_chain_admin, host_chain_user, host_chain_ces]:
             self._ipt_remove_chain('filter', chain)
 
     def _add_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
