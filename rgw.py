@@ -20,7 +20,8 @@ Run as:
           --ipt-host-chain   CUSTOMER_POLICY                                 \
           --ipt-host-unknown CUSTOMER_POLICY_ACCEPT                          \
           --ipt-policy-order PACKET_MARKING NAT mREJECT ADMIN_PREEMPTIVE     \
-                             CUSTOMER_POLICY ADMIN_POLICY ADMIN_POLICY_DHCP  \
+                             GROUP_POLICY CUSTOMER_POLICY                    \
+                             ADMIN_POLICY ADMIN_POLICY_DHCP                  \
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/                   \
