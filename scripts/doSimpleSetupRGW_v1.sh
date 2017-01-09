@@ -22,14 +22,14 @@ rmmod br_netfilter
 
 # [COMMON]
 ## WAN side
-ip link add dev br-wan0 type bridge
-ip link set dev br-wan0 up
-ip link add dev br-wan1 type bridge
-ip link set dev br-wan1 up
+ip link add dev ns-wan0 type bridge
+ip link set dev ns-wan0 up
+ip link add dev ns-wan1 type bridge
+ip link set dev ns-wan1 up
 # [RealmGateway-A]
 ## LAN side
-ip link add dev br-lan0a type bridge
-ip link set dev br-lan0a up
+ip link add dev ns-lan0a type bridge
+ip link set dev ns-lan0a up
 
 
 ###############################################################################
@@ -62,7 +62,7 @@ done
 ###############################################################################
 
 ## Create a macvlan interface to provide NAT and communicate with the other virtual hosts
-ip link add link br-wan0 dev tap-wan0 type macvlan mode bridge
+ip link add link ns-wan0 dev tap-wan0 type macvlan mode bridge
 ip link set dev tap-wan0 up
 ip address add 100.64.0.254/24 dev tap-wan0
 ip route add 100.64.0.0/22 via 100.64.0.1
@@ -73,8 +73,8 @@ ip route add 100.64.0.0/22 via 100.64.0.1
 ###############################################################################
 
 ## Assign and configure namespace interface
-ip link add link br-wan0 dev wan0 type macvlan mode bridge
-ip link add link br-wan1 dev wan1 type macvlan mode bridge
+ip link add link ns-wan0 dev wan0 type macvlan mode bridge
+ip link add link ns-wan1 dev wan1 type macvlan mode bridge
 ip link set wan0 netns router
 ip link set wan1 netns router
 ip netns exec router ip link set dev wan0 up
@@ -102,8 +102,8 @@ ip netns exec router iptables -t filter -A FORWARD -m conntrack --ctstate INVALI
 ###############################################################################
 
 ## Assign and configure namespace interface
-ip link add link br-wan1  dev wan0 type macvlan mode bridge
-ip link add link br-lan0a dev lan0 type macvlan mode bridge
+ip link add link ns-wan1  dev wan0 type macvlan mode bridge
+ip link add link ns-lan0a dev lan0 type macvlan mode bridge
 ip link set wan0 netns gwa
 ip link set lan0 netns gwa
 ip netns exec gwa ip link set dev lan0 up
@@ -135,7 +135,7 @@ ip netns exec gwa ip address add 100.64.1.142/32 dev wan0
 # Create hosta configuration
 ###############################################################################
 
-ip link add link br-lan0a dev lan0 type macvlan mode bridge
+ip link add link ns-lan0a dev lan0 type macvlan mode bridge
 ip link set lan0 netns hosta
 ip netns exec hosta ip link set dev lan0 up
 ip netns exec hosta ip address add 192.168.0.100/24 dev lan0
@@ -148,7 +148,7 @@ ip netns exec hosta bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
 ###############################################################################
 
 ## Assign and configure namespace interface
-ip link add link br-wan0 dev wan0 type macvlan mode bridge
+ip link add link ns-wan0 dev wan0 type macvlan mode bridge
 ip link set wan0 netns public
 ip netns exec public ip link set dev wan0 up
 ip netns exec public ip address add 100.64.0.100/24 dev wan0

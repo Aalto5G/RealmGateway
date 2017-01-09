@@ -12,14 +12,14 @@ fi
 
 # [COMMON]
 ## WAN side
-ip link set dev br-wan0 down
-ip link del dev br-wan0
-ip link set dev br-wan1 down
-ip link del dev br-wan1
+ip link set dev ns-wan0 down
+ip link del dev ns-wan0
+ip link set dev ns-wan1 down
+ip link del dev ns-wan1
 # [RealmGateway-A]
 ## LAN side
-ip link set dev br-lan0a down
-ip link del dev br-lan0a
+ip link set dev ns-lan0a down
+ip link del dev ns-lan0a
 
 
 ###############################################################################
