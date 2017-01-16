@@ -1,7 +1,7 @@
 /*
  *	xt_MARKDNAT - Netfilter module to DNAT based on the MARK value
  *
- *	Jesus Llorente <jesus.llorente@aalto.fi>
+ *	Jesus Llorente Santos <jesus.llorente.santos@aalto.fi>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2 as
@@ -88,7 +88,7 @@ module_init(markdnat_tg_init);
 module_exit(markdnat_tg_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jesus Llorente <jesus.llorente@aalto.fi>");
-MODULE_DESCRIPTION("Xtables: packet mark operations");
+MODULE_AUTHOR("Jesus Llorente Santos <jesus.llorente.santos@aalto.fi>");
+MODULE_DESCRIPTION("Xtables: packet mark and nat operations");
 MODULE_ALIAS("xt_MARKDNAT");
 MODULE_ALIAS("ipt_MARKDNAT");
