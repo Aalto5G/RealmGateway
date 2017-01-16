@@ -161,7 +161,7 @@ class Network(object):
             iptc_helper3.add_rule('filter', host_chain, xlat_rule)
 
     def ipt_add_user_groups(self, hostname, ipaddr, groups):
-        self._logger.debug('Registering groups for user {}/{} to <{}>'.format(hostname, ipaddr, groups))
+        self._logger.debug('Registering groups for user {}/{} <{}>'.format(hostname, ipaddr, groups))
         for group in groups:
             if not iproute2_helper3.ipset_exists(group):
                 self._logger.error('Subscriber group {} does not exist!'.format(group))
@@ -169,7 +169,7 @@ class Network(object):
             iproute2_helper3.ipset_add(group, ipaddr)
 
     def ipt_remove_user_groups(self, hostname, ipaddr, groups):
-        self._logger.debug('Removing groups for user {}/{} to <{}> ({})'.format(hostname, ipaddr, groups))
+        self._logger.debug('Removing groups for user {}/{} <{}>'.format(hostname, ipaddr, groups))
         for group in groups:
             if not iproute2_helper3.ipset_exists(group):
                 self._logger.error('Subscriber group {} does not exist!'.format(group))
