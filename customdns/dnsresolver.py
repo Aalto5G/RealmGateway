@@ -168,6 +168,7 @@ class uDNSResolver():
         self.sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.sock.setblocking(False)
         yield from loop.sock_connect(self.sock, addr)
+        fqdn = query.question[0].name
         response = None
         i = 0
         for tout in timeouts:
@@ -178,7 +179,7 @@ class uDNSResolver():
                 self.sock.close()
                 return dns.message.from_wire(dataresponse)
             except asyncio.TimeoutError:
-                logger.info('#{} timeout expired: {:.4f} sec'.format(i, tout))
+                logger.info('#{} timeout expired: {:.4f} sec ({})'.format(i, tout, fqdn))
                 continue
         return None
 
