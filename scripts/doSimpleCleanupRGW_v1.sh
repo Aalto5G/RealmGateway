@@ -29,7 +29,7 @@ ip link del dev ns-lan0a
 #Create the default namespace
 ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
 
-for i in hosta gwa router public; do
+for i in test_gwa gwa router public; do
     #Remove namespaces
     ip netns del $i > /dev/null 2> /dev/null
 done

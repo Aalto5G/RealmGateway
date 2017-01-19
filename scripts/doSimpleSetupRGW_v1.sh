@@ -39,7 +39,7 @@ ip link set dev ns-lan0a up
 #Create the default namespace
 ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
 
-for i in hosta gwa router public; do
+for i in test_gwa gwa router public; do
     #Remove and create new namespaces
     ip netns del $i > /dev/null 2> /dev/null
     ip netns add $i
@@ -132,15 +132,15 @@ ip netns exec gwa ip address add 100.64.1.142/32 dev wan0
 
 
 ###############################################################################
-# Create hosta configuration
+# Create test_gwa configuration
 ###############################################################################
 
 ip link add link ns-lan0a dev lan0 type macvlan mode bridge
-ip link set lan0 netns hosta
-ip netns exec hosta ip link set dev lan0 up
-ip netns exec hosta ip address add 192.168.0.100/24 dev lan0
-ip netns exec hosta ip route add default via 192.168.0.1 dev lan0
-ip netns exec hosta bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
+ip link set lan0 netns test_gwa
+ip netns exec test_gwa ip link set dev lan0 up
+ip netns exec test_gwa ip address add 192.168.0.100/24 dev lan0
+ip netns exec test_gwa ip route add default via 192.168.0.1 dev lan0
+ip netns exec test_gwa bash -c 'echo "nameserver 192.168.0.1" > /etc/resolv.conf'
 
 
 ###############################################################################
