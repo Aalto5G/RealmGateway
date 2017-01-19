@@ -75,17 +75,19 @@ IPTABLES:
     # The target MARKDNAT modifies the destination IP address to enable the NAT traversal operation of the Circular Pool.
     # The Circular Pool works requires close interworking with the mangle table, as to divert packets towards the Userspace application running the address allocation algorithms.
         requires:
-            - {'table': 'mangle', 'chain': 'PREROUTING',    'create': false, 'flush': false}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'create': true,  'flush': true}
-            - {'table': 'nat',    'chain': 'PREROUTING',    'create': false, 'flush': true}
-            - {'table': 'nat',    'chain': 'POSTROUTING',   'create': false, 'flush': true}
-            - {'table': 'nat',    'chain': 'CIRCULAR_POOL', 'create': true,  'flush': true}
+            - {'table': 'mangle', 'chain': 'PREROUTING',       'create': false, 'flush': false}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL',    'create': true,  'flush': true}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL_RL', 'create': true,  'flush': true}
+            - {'table': 'nat',    'chain': 'PREROUTING',       'create': false, 'flush': true}
+            - {'table': 'nat',    'chain': 'POSTROUTING',      'create': false, 'flush': true}
+            - {'table': 'nat',    'chain': 'CIRCULAR_POOL',    'create': true,  'flush': true}
         rules:
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': 'DROP', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}}}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': 'CIRCULAR_POOL_RL', 'comment': {'comment': 'Rate limit before sending to userspace'}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'tcp',  'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'udp',  'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
+            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': '132',  'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'icmp', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': 'udp', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
-            - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'protocol': '132', 'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
             - {'table': 'mangle', 'chain': 'CIRCULAR_POOL', 'rule': {'target': {'NFQUEUE': {'queue-num': '1', 'queue-bypass': []}}}}
             - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'set': {'match-set': ['IPS_CIRCULAR_POOL', 'dst']}, 'comment': {'comment': 'New connections via CircularPool'}, 'conntrack': {'ctstate': 'NEW'}, 'target': 'CIRCULAR_POOL'}}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
