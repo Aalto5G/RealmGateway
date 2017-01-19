@@ -21,8 +21,8 @@ IPSET:
         - {'name': 'IPS_SPOOFED_NET_LAN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '224.0.0.0/3']}
         - {'name': 'IPS_SPOOFED_NET_WAN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/3']}
         - {'name': 'IPS_SPOOFED_NET_TUN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '192.168.0.0/16', '224.0.0.0/3']}
-        - {'name': 'IPS_FILTER_BLACKLIST', 'type': 'ip',  'items': []}
-        - {'name': 'IPS_FILTER_WHITELIST', 'type': 'ip',  'items': []}
+        - {'name': 'IPS_FILTER_BLACKLIST', 'type': 'ip',  'items': ['192.168.0.200']}
+        - {'name': 'IPS_FILTER_WHITELIST', 'type': 'ip',  'items': ['192.168.0.201']}
         - {'name': 'IPS_DNS_WHITELIST',    'type': 'ip',  'items': []}
         - {'name': 'IPS_DNS_BLACKLIST',    'type': 'ip',  'items': []}
         - {'name': 'IPS_DNS_WKGREYLIST',   'type': 'ip',  'items': []}
@@ -99,6 +99,7 @@ IPTABLES:
     ADMIN_PREEMPTIVE:
     # This policy installs the basic filtering/droppping/rejecting functionality based on invalid packets and disallowed protocols. In addition, it includes several rules for limiting the number of new connections handled by the node.
         requires:
+            - {'table': 'raw',    'chain': 'PREROUTING',       'create': false, 'flush': true}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'create': true,  'flush': true}
             - {'table': 'filter', 'chain': 'INPUT',            'create': false, 'flush': true}
             - {'table': 'filter', 'chain': 'OUTPUT',           'create': false, 'flush': true}
@@ -109,8 +110,12 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'INPUT',            'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
             - {'table': 'filter', 'chain': 'FORWARD',          'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
 
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklisted sources'}, 'target': 'DROP'}}
+            - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Early drop blacklisted sources'}, 'target': 'DROP'}}
+            - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Early drop blacklisted destinations'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklisted sources'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Drop blacklisted destinations'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_WHITELIST', 'src']}, 'comment': {'comment': 'Accept whitelisted sources'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_WHITELIST', 'dst']}, 'comment': {'comment': 'Accept whitelisted destinations'}, 'target': 'ACCEPT'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Fragmented packets'}, 'fragment': True, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Invalid TCP SYN packet'}, 'target': 'DROP', 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'tcp': {'tcp-flags': ['!', 'FIN,SYN,RST,ACK', 'SYN']}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Invalid TCP flags / Christmas in July'}, 'target': 'DROP', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,PSH,ACK,URG', 'FIN,SYN,RST,PSH,ACK,URG']}}}
