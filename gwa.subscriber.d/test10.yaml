@@ -23,7 +23,7 @@ test10.gwa.demo.:
         - {fqdn: 'port1234.test10.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 0,    port: 1234 }
     FIREWALL:
         FIREWALL_ADMIN:
-            - {'priority': 0,   'direction': 'EGRESS',  'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'10', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1100'}, 'comment':{'comment':'Host DNS limit'}}
+            - {'priority': 0,   'direction': 'EGRESS',  'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
         FIREWALL_USER:
             - {'priority': 0,   'direction': 'EGRESS',  'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
             - {'priority': 10,  'direction': 'INGRESS', 'src': '100.64.0.2/32', 'protocol': '1', 'icmp':{'icmp-type':'8/0'}, 'target': 'ACCEPT', 'comment':{'comment':'Allow incoming ICMP'}}
