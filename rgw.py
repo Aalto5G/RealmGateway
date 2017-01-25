@@ -2,7 +2,6 @@
 
 #TODO: Add logic to register several DNS resolvers and round robin or avoid using unreachable one
 #TODO: Define better transition from CUSTOMER_POLICY towards ADMIN_POLICY in filter.FORWARD - Use ipt-host-unknown ?
-#TODO: Move local policy stored in subscriber [gwa.demo.] to policy file with IPSET and IPTABLES policies
 '''
 Run as:
 ./rgw.py  --name gwa.demo                                                    \
