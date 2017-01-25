@@ -32,17 +32,19 @@ class DataRepository(object):
     def _load_data_subscriber(self):
         # Load configuration data from config file
         self._logger.info('Loading subscriber data from file   <{}>'.format(self.configfile))
-        self._logger.info('Loading subscriber data from folder <{}>'.format(self.configfolder))
         d_file = self._load_data_file(self.configfile)
+        self._logger.info('Loading subscriber data from folder <{}>'.format(self.configfolder))
         d_folder = self._load_data_folder(self.configfolder)
+        # Subscriber folder overrides subscriber file definitions
         self._loaded_data_subscriber = {**d_file, **d_folder}
 
     def _load_data_policy(self):
         # Load configuration data from config file
         self._logger.info('Loading policy data from file   <{}>'.format(self.policyfile))
-        self._logger.info('Loading policy data from folder <{}>'.format(self.policyfolder))
         d_file = self._load_data_file(self.policyfile)
+        self._logger.info('Loading policy data from folder <{}>'.format(self.policyfolder))
         d_folder = self._load_data_folder(self.policyfolder)
+        # Policy folder overrides policy file definitions
         self._loaded_data_policy = {**d_file, **d_folder}
 
     def _get_subscriber_data(self):
@@ -53,8 +55,11 @@ class DataRepository(object):
 
     def _load_data_file(self, filename):
         # Load configuration from a single file
+        if not filename:
+            return {}
         data_d = {}
         try:
+            self._logger.info('Loading file <{}>'.format(filename))
             data_d = yaml.load(open(filename,'r'))
         except FileNotFoundError:
             self._logger.warning('Repository file not found <{}>'.format(filename))
@@ -65,6 +70,8 @@ class DataRepository(object):
 
     def _load_data_folder(self, foldername):
         # Load configuration data from folder. Process only yaml files
+        if not foldername:
+            return {}
         data_d = {}
         try:
             for filename in os.listdir(foldername):

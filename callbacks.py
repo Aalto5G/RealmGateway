@@ -221,6 +221,14 @@ class DNSCallbacks(object):
         elif self.hosttable.has_carriergrade(fqdn):
             host_obj = self.hosttable.get_carriergrade(fqdn)
             service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+        elif fqdn in self.soa_list:
+            self._logger.debug('Use NS address for {}'.format(fqdn))
+            host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
+            # Create DNS Response
+            response = dnsutils.make_response_answer_rr(query, fqdn, 1, host_obj.ipv4, rdclass=1, ttl=60)
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
+            return
         else:
             # FQDN not found! Answer NXDOMAIN
             self._logger.debug('Answer {} with NXDOMAIN'.format(fqdn))
@@ -314,9 +322,6 @@ class DNSCallbacks(object):
             ap_spool = self.pooltable.get('servicepool')
             allocated_ipv4 = ap_spool.allocate()
             ap_spool.release(allocated_ipv4)
-        elif fqdn == self.soa_list[0]:
-            self._logger.debug('Use NS address for {}'.format(fqdn))
-            allocated_ipv4 = host_obj.ipv4
         elif self._check_policyrgw(host_obj, addr[0], None):
             self._logger.debug('Use CircularPool address pool for {}'.format(fqdn))
             allocated_ipv4 = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
@@ -361,7 +366,10 @@ class DNSCallbacks(object):
 
     def _check_policyrgw(self, host_obj, dns_server_ip, dns_client_ip):
         # Get RGW and host objects
-        rgw_obj = self.hosttable.get((host.KEY_HOST_FQDN, self.soa_list[0]))
+        rgw_policies = self.datarepository.get_policy('CIRCULARPOOL', [])
+        if not rgw_policies:
+            self._logger.warning('RealmGateway CIRCULARPOOL policy not found!')
+            return False
         # Update table and remove for expired connections
         self.connectiontable.update_all_rgw()
         # Get Circular Pool address pool stats
@@ -371,7 +379,7 @@ class DNSCallbacks(object):
         rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
         host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.fqdn)) # Use host fqdn as connection id
         # Get Circular Pool policies for RGW and host
-        rgw_policy  = rgw_obj.get_service('CIRCULARPOOL')[0]
+        rgw_policy = rgw_policies[0]
         host_policy = host_obj.get_service('CIRCULARPOOL')[0]
 
         if rgw_conns >= rgw_policy['max']:
