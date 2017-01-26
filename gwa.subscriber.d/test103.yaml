@@ -4,7 +4,7 @@ test103.gwa.demo.:
         IPV4:   ['192.168.0.103']
         MSISDN: ['0000000103']
     GROUP:
-        - IPS_GROUP_PREPAID2
+        - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
         - {max: 3 }
     SFQDN:

@@ -130,8 +130,9 @@ IPTABLES:
             # GROUP_PREPAID1: There are restrictions to inbound traffic which is entirely not allowed. All inbound initiated connections are dropped.
             - {'table': 'filter', 'chain': 'GROUP_PREPAID1',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Restricted inbound traffic'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'GROUP_PREPAID1',  'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'comment': {'comment': 'Allowed outbound traffic'}, 'target': 'CUSTOMER_POLICY'}}
-            # GROUP_PREPAID2: There are restrictions to inbound traffic, however incoming connections to HTTP/HTTPS on ports 80/443 are allowed.
+            # GROUP_PREPAID2: There are restrictions to inbound traffic, however incoming connections to ICMP and HTTP/HTTPS on ports 80/443 are allowed.
             - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Allow subset of inbound traffic'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Allow subset of inbound traffic'}, 'protocol': '1', 'icmp':{'icmp-type':'8/0'}, 'target': 'CUSTOMER_POLICY'}}
             - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'comment': {'comment': 'Restricted inbound traffic'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'GROUP_PREPAID2',  'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'comment': {'comment': 'Allowed outbound traffic'}, 'target': 'CUSTOMER_POLICY'}}
             # GROUP_PREPAID3: Likewise GROUP_POSTPAID there are no inbound/outbound traffic restrictions, everything passes through
