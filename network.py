@@ -55,8 +55,8 @@ class Network(object):
         utils3.set_attributes(self, **kwargs)
         # Initialize nfqueues list
         self._nfqueues = []
-        # Test if MARKDNAT is available in the system
-        self._enabled_MARKDNAT = self._test_MARKDNAT()
+        # Configure MARKDNAT
+        self._setup_MARKDNAT()
         # Flush conntrack
         self.ipt_flush_conntrack()
         # Initialize ipsets
@@ -78,8 +78,11 @@ class Network(object):
         for entry in data_d.setdefault('rules', []):
             self._logger.debug('Adding {} items to {} type {}'.format(len(entry['items']), entry['name'], entry['type']))
             for i, e in enumerate(entry['items']):
-                self._logger.debug('#{} Adding {}'.format(i+1, e))
-                iproute2_helper3.ipset_add(entry['name'], e, etype=entry['type'])
+                try:
+                    self._logger.debug('#{} Adding {}'.format(i+1, e))
+                    iproute2_helper3.ipset_add(entry['name'], e, etype=entry['type'])
+                except:
+                    self._logger.error('#{} Failed to add {}'.format(i+1, e))
 
     def ipt_init(self):
         data_d = self.datarepository.get_policy('IPTABLES', {})
@@ -98,8 +101,11 @@ class Network(object):
                     iptc_helper3.flush_chain(entry['table'], entry['chain'])
             # Install rules
             for i, entry in enumerate(policy_d.setdefault('rules', [])):
-                self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
-                iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
+                try:
+                    self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
+                    iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
+                except:
+                    self._logger.error('#{} Failed to add to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
 
     def ipt_flush_conntrack(self):
         if self._do_subprocess_call('conntrack -F', False, False):
@@ -198,6 +204,21 @@ class Network(object):
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
+    def _setup_MARKDNAT(self):
+        ''' Attempt to enable MARKDNAT target '''
+        self._enabled_MARKDNAT = False
+        markdnat_capable = self._test_MARKDNAT()
+        (w,c) = (self.ipt_markdnat, markdnat_capable)
+        if (w,c) == (True, True):
+            self._logger.info('Enabled iptables MARKDNAT target')
+            self._enabled_MARKDNAT = True
+        elif (w,c) == (False, True):
+            self._logger.info('Disabled iptables MARKDNAT target')
+        elif (w,c) == (True, False):
+            self._logger.warning('Unsupported iptables MARKDNAT target')
+        elif (w,c) == (False, False):
+            self._logger.info('Unavailable iptables MARKDNAT target')
+
     def _test_MARKDNAT(self):
         ''' Create a temporary chain to insert a MARKDNAT test rule.
         Check if the rule is successfully inserted '''
@@ -211,10 +232,10 @@ class Network(object):
             iptc_helper3.add_chain(table, chain)
             iptc_helper3.add_rule(table, chain, rule_l)
             if iptc_helper3.dump_chain(table, chain):
-                self._logger.info('Supported iptables MARKDNAT target')
+                self._logger.debug('MARKDNAT capable')
                 ret = True
             else:
-                self._logger.warning('Unsupported iptables MARKDNAT target')
+                self._logger.debug('MARKDNAT uncapable')
                 ret = False
         except:
             ret = False
