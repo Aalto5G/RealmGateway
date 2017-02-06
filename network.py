@@ -66,16 +66,18 @@ class Network(object):
 
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
-        self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(data_d['requires']), len(data_d['rules'])))
+        requires = data_d.setdefault('requires', [])
+        rules = data_d.setdefault('rules', [])
+        self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(requires), len(rules)))
         # Install requirements
-        for i, entry in enumerate(data_d.setdefault('requires', [])):
+        for i, entry in enumerate(requires):
             self._logger.debug('#{} requires {} {}'.format(i+1, entry['name'], entry['type']))
             if entry.setdefault('create',False) and not iproute2_helper3.ipset_exists(entry['name']):
                 iproute2_helper3.ipset_create(entry['name'], entry['type'])
             if entry.setdefault('flush',False):
                 iproute2_helper3.ipset_flush(entry['name'])
         # Populate ipsets
-        for entry in data_d.setdefault('rules', []):
+        for entry in rules:
             self._logger.debug('Adding {} items to {} type {}'.format(len(entry['items']), entry['name'], entry['type']))
             for i, e in enumerate(entry['items']):
                 try:
@@ -91,16 +93,18 @@ class Network(object):
                 self._logger.critical('Not found local iptables policy <{}>'.format(p))
                 continue
             policy_d = data_d[p]
-            self._logger.info('Installing local iptables policy <{}>: {} requirements and {} rules'.format(p, len(policy_d['requires']), len(policy_d['rules'])))
+            requires = policy_d.setdefault('requires', [])
+            rules = policy_d.setdefault('rules', [])
+            self._logger.info('Installing local iptables policy <{}>: {} requirements and {} rules'.format(p, len(requires), len(rules)))
             # Install requirements
-            for i, entry in enumerate(policy_d.setdefault('requires', [])):
+            for i, entry in enumerate(requires):
                 self._logger.debug('#{} requires {}.{}'.format(i+1, entry['table'], entry['chain']))
                 if entry.setdefault('create',False) and not iptc_helper3.has_chain(entry['table'], entry['chain']):
                     iptc_helper3.add_chain(entry['table'], entry['chain'], silent=False)
                 if entry.setdefault('flush',False):
                     iptc_helper3.flush_chain(entry['table'], entry['chain'])
             # Install rules
-            for i, entry in enumerate(policy_d.setdefault('rules', [])):
+            for i, entry in enumerate(rules):
                 try:
                     self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
                     iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
