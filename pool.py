@@ -22,10 +22,10 @@ def _calculate_address_pool(addrmask, ipv6=False):
     return [format(addr) for addr in netobj]
 
 class PoolContainer(container3.Container):
-
     def __init__(self, name='PoolContainer'):
         """ Initialize as a Container """
         super().__init__(name, LOGLEVEL_POOL)
+
 
 class NamePool(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='NamePool'):
@@ -47,6 +47,9 @@ class NamePool(container3.ContainerNode):
     def lookupkeys(self):
         """ Return the lookup keys of the node """
         return ((self._key, True),)
+
+    def __repr__(self):
+        return self._name
 
 class AddressPoolShared(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='AddressPoolShared'):
@@ -93,6 +96,9 @@ class AddressPoolShared(container3.ContainerNode):
 
     def release(self, addr):
         return self._pool.release(addr)
+
+    def __repr__(self):
+        return self._name
 
 
 class AddressPoolUser(container3.ContainerNode):
@@ -160,6 +166,9 @@ class AddressPoolUser(container3.ContainerNode):
 
     def release(self, userid, addr):
         return self._pool[userid].release(addr)
+
+    def __repr__(self):
+        return self._name
 
 class _AddressPoolUnit_set(object):
     def __init__(self, name='_AddressPoolUnit'):

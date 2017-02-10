@@ -211,14 +211,14 @@ class RealmGateway(object):
 
         # Create specific Address Pools
         ## Service IP Pool
-        ap = AddressPoolShared('servicepool')
+        ap = AddressPoolShared('servicepool', name='Service Pool')
         self._pooltable.add(ap)
         for ipaddr in self._config.getdefault('pool_serviceip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
 
         ## Circular IP Pool
-        ap = AddressPoolShared('circularpool')
+        ap = AddressPoolShared('circularpool', name='Circular Pool')
         self._pooltable.add(ap)
         for ipaddr in self._config.getdefault('pool_cpoolip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
@@ -226,7 +226,7 @@ class RealmGateway(object):
 
         # For future use
         ## CES Proxy IP Pool
-        ap = AddressPoolUser('proxypool')
+        ap = AddressPoolUser('proxypool', name='CES Proxy Pool')
         self._pooltable.add(ap)
         for ipaddr in self._config.getdefault('pool_cespoolip', ()):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
@@ -263,7 +263,7 @@ class RealmGateway(object):
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS DDNS endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Server for WAN
@@ -272,7 +272,7 @@ class RealmGateway(object):
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Server endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Proxy for LAN
@@ -281,7 +281,7 @@ class RealmGateway(object):
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
         ## DNS Proxy for Local
@@ -290,7 +290,7 @@ class RealmGateway(object):
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = self._loop.run_until_complete(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{} <{}>'.format(ipaddr, port, id(protocol)))
+            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
     @asyncio.coroutine
