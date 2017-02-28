@@ -113,6 +113,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY', 'create': true, 'flush': false}
         rules:
             - {'table': 'filter', 'chain': 'INPUT',           'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
+            - {'table': 'filter', 'chain': 'OUTPUT',          'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
             - {'table': 'filter', 'chain': 'FORWARD',         'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
             # Set rules for group matching based on IP src/dst and IP sets
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_POSTPAID', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_POSTPAID'}}
