@@ -182,6 +182,8 @@ class RealmGateway(object):
         self._init_dns()
         # Initialize configured subscriber data wrapped as a corutine
         self._loop.create_task(self._init_subscriberdata())
+        # Initialize configured subscriber data wrapped as a corutine
+        self._loop.create_task(self._init_cleanup_cpool(0.1))
 
     def _capture_signal(self):
         for signame in ('SIGINT', 'SIGTERM'):
@@ -204,6 +206,19 @@ class RealmGateway(object):
     def _init_connectiontable(self):
         # Create container of Connections
         self._connectiontable = ConnectionTable()
+
+    def _init_network(self):
+        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
+                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
+                                        ipt_host_chain   = self._config.ipt_host_chain ,
+                                        ipt_host_unknown = self._config.ipt_host_unknown,
+                                        ipt_policy_order = self._config.ipt_policy_order,
+                                        ipt_markdnat     = self._config.ipt_markdnat,
+                                        datarepository   = self._datarepository)
+        # Create object for storing all PacketIn-related information
+        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
+        # Register NFQUEUE(s) callback
+        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
 
     def _init_pools(self):
         # Create container of Address Pools
@@ -302,18 +317,14 @@ class RealmGateway(object):
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
 
-    def _init_network(self):
-        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
-                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
-                                        ipt_host_chain   = self._config.ipt_host_chain ,
-                                        ipt_host_unknown = self._config.ipt_host_unknown,
-                                        ipt_policy_order = self._config.ipt_policy_order,
-                                        ipt_markdnat     = self._config.ipt_markdnat,
-                                        datarepository   = self._datarepository)
-        # Create object for storing all PacketIn-related information
-        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
-        # Register NFQUEUE(s) callback
-        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
+    @asyncio.coroutine
+    def _init_cleanup_cpool(self, delay):
+        self._logger.info('Initiating cleanup of the Circular Pool every {} seconds'.format(delay))
+        while True:
+            yield from asyncio.sleep(delay)
+            self._logger.debug('do cleanup circularpool')
+            # Update table and remove for expired connections
+            self._connectiontable.update_all_rgw()
 
     def _set_verbose(self, loglevel = LOGLEVEL_MAIN):
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
