@@ -1,0 +1,375 @@
+############################################################
+########## TRANSPARENT PSEUDO-LAYER2 TCP SYNPROXY ##########
+############################################################
+
+#############################################################
+#### EXAMPLE OF SINGLE INTERFACE (UPSTREAM & DOWNSTREAM) ####
+
+# Restart OpenvSwitch service
+systemctl restart openvswitch-switch
+
+## Create OVS bridges
+ovs-vsctl del-br br-synproxy
+ovs-vsctl add-br br-synproxy
+
+ovs-vsctl add-port br-synproxy wan0
+ovs-vsctl add-port br-synproxy wan0p
+ovs-vsctl add-port br-synproxy mitm0 -- set interface mitm0 ofport_request=100 -- set interface mitm0 type=internal
+
+# Bring up the interfaces
+ip link set dev wan0 up
+ip link set dev wan0p up
+ip link set dev mitm0 up
+
+# Configure Man-In-The-Middle interface
+ip link set dev mitm0 arp off
+ip link set dev mitm0 address 00:00:00:aa:bb:cc
+ip route add default dev mitm0
+
+
+# Setup flows & rules
+## Create ipset for matching
+ipset create circularpool hash:ip -!
+ipset flush  circularpool
+ipset add circularpool 100.64.1.131
+ipset add circularpool 100.64.1.132
+ipset add circularpool 100.64.1.133
+ipset add circularpool 100.64.1.134
+ipset add circularpool 100.64.1.135
+ipset add circularpool 100.64.1.136
+ipset add circularpool 100.64.1.137
+ipset add circularpool 100.64.1.138
+ipset add circularpool 100.64.1.139
+ipset add circularpool 100.64.1.140
+ipset add circularpool 100.64.1.141
+ipset add circularpool 100.64.1.142
+
+## Create iptable rules
+iptables -t raw    -F
+iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
+iptables -t filter -F
+iptables -t filter -A FORWARD -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+
+
+# BASIC FLOWS FOR TESTING
+## Create OVS flows
+ovs-ofctl del-flows -O OpenFlow13 br-synproxy
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=10,arp actions=NORMAL"
+### Downstream
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,in_port=1,ip,nw_dst=100.64.1.128/25,tcp actions=mod_dl_dst=00:00:00:aa:bb:cc,output:100"
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,in_port=100,ip,nw_dst=100.64.1.128/25,tcp actions=mod_dl_dst=6e:3d:80:92:8d:20,mod_dl_src=82:8d:48:d9:ae:f2,output:2"
+### Upstream
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,in_port=2,ip,nw_src=100.64.1.128/25,tcp actions=mod_dl_dst=00:00:00:aa:bb:cc,output:100"
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,in_port=100,ip,nw_src=100.64.1.128/25,tcp actions=mod_dl_dst=82:8d:48:d9:ae:f2,mod_dl_src=6e:3d:80:92:8d:20,output:1"
+
+
+
+###########################################################
+#### EXAMPLE OF DUAL INTERFACE (UPSTREAM & DOWNSTREAM) ####
+
+# Restart OpenvSwitch service
+systemctl restart openvswitch-switch
+
+## Create OVS bridges
+ovs-vsctl del-br br-synproxy
+ovs-vsctl add-br br-synproxy
+
+ovs-vsctl add-port br-synproxy wan0
+ovs-vsctl add-port br-synproxy wan0p
+ovs-vsctl add-port br-synproxy mitm0 -- set interface mitm0 ofport_request=100 -- set interface mitm0 type=internal # Connected to *WAN*
+ovs-vsctl add-port br-synproxy mitm1 -- set interface mitm1 ofport_request=101 -- set interface mitm1 type=internal # Connected to *WAN_proxied*
+
+# Bring up the interfaces
+ip link set dev wan0 up
+ip link set dev wan0p up
+ip link set dev mitm0 up
+ip link set dev mitm1 up
+
+# Configure Man-In-The-Middle interface
+ip link set dev mitm0 arp off
+ip link set dev mitm1 arp off
+ip link set dev mitm0 address 00:00:00:aa:bb:cc
+ip link set dev mitm1 address 00:00:00:dd:ee:ff
+ip route add default dev mitm0
+ip route add 100.64.1.130/32 dev mitm1
+ip route add 100.64.1.131/32 dev mitm1
+ip route add 100.64.1.132/32 dev mitm1
+ip route add 100.64.1.133/32 dev mitm1
+ip route add 100.64.1.134/32 dev mitm1
+ip route add 100.64.1.135/32 dev mitm1
+ip route add 100.64.1.136/32 dev mitm1
+ip route add 100.64.1.137/32 dev mitm1
+ip route add 100.64.1.138/32 dev mitm1
+ip route add 100.64.1.139/32 dev mitm1
+ip route add 100.64.1.140/32 dev mitm1
+ip route add 100.64.1.141/32 dev mitm1
+ip route add 100.64.1.142/32 dev mitm1
+
+# Setup flows & rules
+## Create ipset for matching
+ipset create circularpool hash:ip -!
+ipset flush  circularpool
+ipset add circularpool 100.64.1.131
+ipset add circularpool 100.64.1.132
+ipset add circularpool 100.64.1.133
+ipset add circularpool 100.64.1.134
+ipset add circularpool 100.64.1.135
+ipset add circularpool 100.64.1.136
+ipset add circularpool 100.64.1.137
+ipset add circularpool 100.64.1.138
+ipset add circularpool 100.64.1.139
+ipset add circularpool 100.64.1.140
+ipset add circularpool 100.64.1.141
+ipset add circularpool 100.64.1.142
+
+# Setting up TCP SYNPROXY in NS-PROXY - ipt_SYNPROXY
+# https://r00t-services.net/knowledgebase/14/Homemade-DDoS-Protection-Using-IPTables-SYNPROXY.html
+sysctl -w net.ipv4.tcp_syncookies=1
+sysctl -w net.ipv4.tcp_timestamps=1 # This is not available in the network namespace
+sysctl -w net.netfilter.nf_conntrack_tcp_loose=0
+# Disable sending ICMP redirects
+sysctl -w net.ipv4.conf.all.send_redirects=0
+sysctl -w net.ipv4.conf.default.send_redirects=0
+sysctl -w net.ipv4.conf.lo.send_redirects=0
+
+## Create iptable rules
+iptables -t raw    -F
+iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
+iptables -t filter -F
+iptables -t filter -A FORWARD -i mitm0 -o mitm1 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+### Add packet marks for downstream/upstream
+### NB: They don't seem to be visible in OVS
+#iptables -t mangle -F POSTROUTING
+#iptables -t mangle -A POSTROUTING -o mitm1 -m set --match-set circularpool dst -p tcp -j MARK --set-mark 0x0A -m comment --comment "Downstream mark"
+#iptables -t mangle -A POSTROUTING -o mitm0 -m set --match-set circularpool src -p tcp -j MARK --set-mark 0x0B -m comment --comment "Upstream mark"
+
+
+# OpenvSwitch setup
+## Create OVS flows
+ovs-ofctl del-flows -O OpenFlow13 br-synproxy
+### Go to ARP MAC Learning table
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0806,           actions=goto_table:1"
+### Go to TCP Forwading table
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800,nw_proto=6 actions=goto_table:2"
+### Default flow
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                             actions=NORMAL"
+
+### ARP MAC Learning Learning table 1
+## TODO: MAC learning and flow update
+### Q1: Should we do MAC learning via ARP ?
+### Q2: Overwrite learned flows via ARP responses ?
+### Q3: How to handle GARP?
+### Q4: Keep a separate table with IP matching for MAC-only rewriting? The problem with this is that we cannot use negative matching
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=1                             actions=NORMAL"
+
+### TCP Forwading table 2
+# This is a self-populated learning table. Set default flow to go to TCP Learning table 3
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=1                             actions=goto_table:3"
+
+### TCP Learning table 3
+# NB: Decide on idle_timeout / hard_timeout of learned flows
+# Learn new flows coming from WAN
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=1,dl_type=0x0800 \
+        actions=load:0x0064->NXM_NX_REG0[0..15],load:0x0001->NXM_NX_REG1[0..15],load:0x0002->NXM_NX_REG2[0..15],load:0x0065->NXM_NX_REG3[0..15],\
+                learn(table=2,idle_timeout=15,priority=100,in_port=1,  dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:0x000000aabbcc->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG0[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=100,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],output:NXM_NX_REG1[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=101,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],output:NXM_NX_REG2[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=2  ,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:0x000000ddeeff->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG3[0..15]), \
+                resubmit(,2)"
+
+# Learn new flows coming from WAN_proxied
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=2,dl_type=0x0800 \
+        actions=load:0x0064->NXM_NX_REG0[0..15],load:0x0001->NXM_NX_REG1[0..15],load:0x0002->NXM_NX_REG2[0..15],load:0x0065->NXM_NX_REG3[0..15],\
+                learn(table=2,idle_timeout=15,priority=100,in_port=1,  dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:0x000000aabbcc->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG0[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=100,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],output:NXM_NX_REG1[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=101,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],output:NXM_NX_REG2[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=2  ,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:0x000000ddeeff->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG3[0..15]), \
+                resubmit(,2)"
+
+
+## hints for MAC learning from ARP packets
+#
+#sh ovs-ofctl add-flow -OOpenFlow13 s1 "table=105, dl_type=0x0806, nw_dst=10.10.10.1, actions=move:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[], mod_dl_src:00:00:5E:00:02:01, load:0x2->NXM_OF_ARP_OP[], move:NXM_NX_ARP_SHA[]->NXM_NX_ARP_THA[], move:NXM_OF_ARP_SPA[]->NXM_OF_ARP_TPA[], load:0x00005e000201->NXM_NX_ARP_SHA[], load:0x0a0a0a01->NXM_OF_ARP_SPA[], in_port"
+#sh ovs-ofctl add-flow -OOpenFlow13 s1 "table=105,  dl_type=0x0806, nw_dst=10.10.20.1, actions=move:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],  mod_dl_src:00:00:5E:00:02:02, load:0x2->NXM_OF_ARP_OP[], move:NXM_NX_ARP_SHA[]->NXM_NX_ARP_THA[], move:NXM_OF_ARP_SPA[]->NXM_OF_ARP_TPA[], load:0x00005e000202->NXM_NX_ARP_SHA[], load:0xa0a1401->NXM_OF_ARP_SPA[], in_port"
+#sh ovs-ofctl add-flow -OOpenFlow13 s1 "table=105,  dl_type=0x0806, nw_dst=172.16.1.1, actions=move:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],  mod_dl_src:00:00:5E:00:02:03, load:0x2->NXM_OF_ARP_OP[], move:NXM_NX_ARP_SHA[]->NXM_NX_ARP_THA[], move:NXM_OF_ARP_SPA[]->NXM_OF_ARP_TPA[], load:0x00005e000203->NXM_NX_ARP_SHA[], load:0xac100101->NXM_OF_ARP_SPA[], in_port"
+## Proxy ARP for all floating IPs go below
+#sh ovs-ofctl add-flow -OOpenFlow13 s1 "table=105, dl_type=0x0806, nw_dst=172.16.1.10, actions=move:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[], mod_dl_src:00:00:5E:00:02:03, load:0x2->NXM_OF_ARP_OP[], move:NXM_NX_ARP_SHA[]->NXM_NX_ARP_THA[], move:NXM_OF_ARP_SPA[]->NXM_OF_ARP_TPA[], load:0x00005e000203->NXM_NX_ARP_SHA[], load:0xac10010a->NXM_OF_ARP_SPA[], in_port"
+## if we made it here, the arp packet is to be handled as any other regular L2 packet
+#sh ovs-ofctl add-flow -OOpenFlow13 s1 "table=105, priority=0, action=resubmit(,20)"
+
+
+
+
+
+
+############################################################
+##### DEPLOYING TRANSPARENT SYNPROXY FOR BENCHMARKING ######
+############################################################
+
+# Create network namespace configuration
+ln -s /proc/1/ns/net /var/run/netns/default > /dev/null 2> /dev/null
+for i in nsproxy ns0 ns1; do
+    #Remove and create new namespaces
+    ip netns del $i > /dev/null 2> /dev/null
+    ip netns add $i
+    #Configure sysctl options
+    ip netns exec $i sysctl -w "net.ipv4.ip_forward=1"                 > /dev/null 2> /dev/null
+    ip netns exec $i sysctl -w "net.ipv6.conf.all.disable_ipv6=1"      > /dev/null 2> /dev/null
+    ip netns exec $i sysctl -w "net.ipv6.conf.default.disable_ipv6=1"  > /dev/null 2> /dev/null
+    ip netns exec $i sysctl -w "net.ipv6.conf.lo.disable_ipv6=1"       > /dev/null 2> /dev/null
+    #Configure the loopback interface in namespace
+    ip netns exec $i ip address add 127.0.0.1/8 dev lo
+    ip netns exec $i ip link set dev lo up
+    #Create new /etc mount point
+    mkdir -p  /etc/netns/$i
+    echo $i > /etc/netns/$i/hostname
+    touch     /etc/netns/$i/resolv.conf
+done
+
+# Create veth pairs
+ip link add mitm0 type veth peer name mitm0s
+ip link add mitm1 type veth peer name mitm1s
+ip link add veth0 type veth peer name veth0s
+ip link add veth1 type veth peer name veth1s
+
+# Disable offloading in veths
+for NIC in mitm0 mitm0s mitm1 mitm1s veth0 veth0s veth1 veth1s; do
+    disableOffload $NIC
+done
+
+# Move veths to network namespaces
+ip link set dev mitm0 netns nsproxy
+ip link set dev mitm1 netns nsproxy
+ip link set dev veth0 netns ns0
+ip link set dev veth1 netns ns1
+
+# Configure network in namespaces
+## nsproxy
+ip netns exec nsproxy ip link set dev mitm0 arp     off
+ip netns exec nsproxy ip link set dev mitm0 address 00:00:00:aa:bb:cc
+ip netns exec nsproxy ip link set dev mitm0 up
+ip netns exec nsproxy ip link set dev mitm1 arp     off
+ip netns exec nsproxy ip link set dev mitm1 address 00:00:00:dd:ee:ff
+ip netns exec nsproxy ip link set dev mitm1 up
+
+ip netns exec nsproxy ip route add default dev mitm0
+ip netns exec nsproxy ip route add 100.64.1.130/32 dev mitm1
+ip netns exec nsproxy ip route add 100.64.1.131/32 dev mitm1
+ip netns exec nsproxy ip route add 100.64.1.132/32 dev mitm1
+ip netns exec nsproxy ip route add 100.64.1.133/32 dev mitm1
+ip netns exec nsproxy ip route add 100.64.1.134/32 dev mitm1
+ip netns exec nsproxy ip route add 100.64.1.135/32 dev mitm1
+
+### Setup iptables rules
+#### Create ipset for matching
+ip netns exec nsproxy ipset create circularpool hash:ip -!
+ip netns exec nsproxy ipset flush  circularpool
+ip netns exec nsproxy ipset add circularpool 100.64.1.131
+ip netns exec nsproxy ipset add circularpool 100.64.1.132
+ip netns exec nsproxy ipset add circularpool 100.64.1.133
+ip netns exec nsproxy ipset add circularpool 100.64.1.134
+ip netns exec nsproxy ipset add circularpool 100.64.1.135
+
+
+# Setting up TCP SYNPROXY in NS-PROXY - ipt_SYNPROXY
+# https://r00t-services.net/knowledgebase/14/Homemade-DDoS-Protection-Using-IPTables-SYNPROXY.html
+ip netns exec nsproxy sysctl -w net.ipv4.tcp_syncookies=1
+ip netns exec nsproxy sysctl -w net.ipv4.tcp_timestamps=1 # This is not available in the network namespace
+ip netns exec nsproxy sysctl -w net.netfilter.nf_conntrack_tcp_loose=0
+# Disable sending ICMP redirects
+ip netns exec nsproxy sysctl -w net.ipv4.conf.all.send_redirects=0
+ip netns exec nsproxy sysctl -w net.ipv4.conf.default.send_redirects=0
+ip netns exec nsproxy sysctl -w net.ipv4.conf.lo.send_redirects=0
+
+## Create iptable rules
+ip netns exec nsproxy iptables -t raw    -F
+ip netns exec nsproxy iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
+ip netns exec nsproxy iptables -t filter -F
+ip netns exec nsproxy iptables -t filter -A FORWARD -i mitm0 -o mitm1 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
+ip netns exec nsproxy iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+
+
+## ns0 - TRAFFIC SOURCE
+ip netns exec ns0 ip link set dev veth0 up
+ip netns exec ns0 ip address add dev veth0 100.64.1.1/24
+### Add more IP addresses to represent different source hosts in the same network
+ip netns exec ns0 ip address add dev veth0 100.64.1.2/24
+ip netns exec ns0 ip address add dev veth0 100.64.1.3/24
+ip netns exec ns0 ip address add dev veth0 100.64.1.4/24
+ip netns exec ns0 ip address add dev veth0 100.64.1.5/24
+
+## ns1 - TRAFFIC DESTINATION
+ip netns exec ns1 ip link set dev veth1 up
+### The *host* IP address has not been configured to be protected by the SYNPROXY
+ip netns exec ns1 ip address add dev veth1 100.64.1.130/24
+### Add more IP addresses to represent the Circular Pool that are protected by the SYNPROXY
+ip netns exec ns1 ip address add dev veth1 100.64.1.131/24
+ip netns exec ns1 ip address add dev veth1 100.64.1.132/24
+ip netns exec ns1 ip address add dev veth1 100.64.1.133/24
+ip netns exec ns1 ip address add dev veth1 100.64.1.134/24
+ip netns exec ns1 ip address add dev veth1 100.64.1.135/24
+
+
+
+# Create OpenvSwitch configuration
+
+## Restart OpenvSwitch service
+systemctl restart openvswitch-switch
+
+## Create OVS bridges
+ovs-vsctl del-br br-synproxy
+ovs-vsctl add-br br-synproxy
+
+ovs-vsctl add-port br-synproxy veth0s -- set interface veth0s ofport_request=1
+ovs-vsctl add-port br-synproxy veth1s -- set interface veth1s ofport_request=2
+ovs-vsctl add-port br-synproxy mitm0s -- set interface mitm0s ofport_request=100
+ovs-vsctl add-port br-synproxy mitm1s -- set interface mitm1s ofport_request=101
+
+## Bring up the interfaces
+ip link set dev mitm0s up
+ip link set dev mitm1s up
+ip link set dev veth0s up
+ip link set dev veth1s up
+
+## Create OVS flows
+ovs-ofctl del-flows -O OpenFlow13 br-synproxy
+### Go to ARP MAC Learning table
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0806,           actions=goto_table:1"
+### Go to TCP Forwading table
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800,nw_proto=6 actions=goto_table:2"
+### Default flow
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                             actions=NORMAL"
+
+### ARP MAC Learning Learning table 1
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=1                             actions=NORMAL"
+
+### TCP Forwading table 2
+# This is a self-populated learning table. Set default flow to go to TCP Learning table 3
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=1                             actions=goto_table:3"
+
+
+### TCP Learning table 3
+# NB: Decide on idle_timeout / hard_timeout of learned flows
+# Learn new flows coming from WAN
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=1,dl_type=0x0800 \
+        actions=load:0x0064->NXM_NX_REG0[0..15],load:0x0001->NXM_NX_REG1[0..15],load:0x0002->NXM_NX_REG2[0..15],load:0x0065->NXM_NX_REG3[0..15],\
+                learn(table=2,idle_timeout=15,priority=100,in_port=1,  dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:0x000000aabbcc->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG0[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=100,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],output:NXM_NX_REG1[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=101,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],output:NXM_NX_REG2[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=2  ,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:0x000000ddeeff->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG3[0..15]), \
+                resubmit(,2)"
+
+# Learn new flows coming from WAN_proxied
+ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=2,dl_type=0x0800 \
+        actions=load:0x0064->NXM_NX_REG0[0..15],load:0x0001->NXM_NX_REG1[0..15],load:0x0002->NXM_NX_REG2[0..15],load:0x0065->NXM_NX_REG3[0..15],\
+                learn(table=2,idle_timeout=15,priority=100,in_port=1,  dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:0x000000aabbcc->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG0[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=100,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],output:NXM_NX_REG1[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=101,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],output:NXM_NX_REG2[0..15]), \
+                learn(table=2,idle_timeout=15,priority=100,in_port=2  ,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:0x000000ddeeff->NXM_OF_ETH_DST[],                                          output:NXM_NX_REG3[0..15]), \
+                resubmit(,2)"
+
+# $$$ Performance figures in R720 $$$
+#iperf -P 1:  110.55k pps / 1.25 Gbit/sec
+#iperf -P 10: 765.41k pps / 8.73 Gbit/sec
