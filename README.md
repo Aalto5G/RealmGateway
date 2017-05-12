@@ -134,23 +134,23 @@ We can quickly create a large number of subscriber based on a pre-defined templa
 Create a template file e.g. ```template.gwa.cesproto.re2ee.org.yaml```:
 
 ```
-REPLACE_UENAME.gwa.cesproto.re2ee.org.:
+REPLACE_UENAME3.gwa.cesproto.re2ee.org.:
     ID:
-        FQDN:   ['REPLACE_UENAME.gwa.cesproto.re2ee.org.']
-        IPV4:   ['192.168.145.REPLACE_SEQ3']
+        FQDN:   ['REPLACE_UENAME3.gwa.cesproto.re2ee.org.']
+        IPV4:   ['192.168.145.REPLACE_SEQ']
         MSISDN: ['358145000REPLACE_SEQ3']
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
         - {max: 3 }
     SFQDN:
-        - {fqdn:          'REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
-        - {fqdn:      'www.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
-        - {fqdn:     'icmp.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
-        - {fqdn:      'tcp.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 0    }
-        - {fqdn:      'udp.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 0    }
-        - {fqdn:     'sctp.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 0    }
-        - {fqdn:      'ssh.REPLACE_UENAME.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
+        - {fqdn:          'REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:     'icmp.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
+        - {fqdn:      'tcp.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 0    }
+        - {fqdn:      'udp.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 0    }
+        - {fqdn:     'sctp.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 0    }
+        - {fqdn:      'ssh.REPLACE_UENAME3.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
     FIREWALL:
         FIREWALL_ADMIN:
             - {'priority': 0,   'direction': 'EGRESS',  'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
@@ -159,14 +159,15 @@ REPLACE_UENAME.gwa.cesproto.re2ee.org.:
             - {'priority': 100, 'direction': 'INGRESS', 'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
 ```
 
+
 Then, in a bash console we will create users ue001 to ue254 as follows:
 
 ```
-for i in $(seq -f "%03g" 1 254); do
-    cp "template.gwa.cesproto.re2ee.org.yaml" "ue$i.gwa.cesproto.re2ee.org.yaml"
-	sed -i "s/REPLACE_UENAME/ue$i/g" ue$i.gwa.cesproto.re2ee.org.yaml
-	sed -i "s/192.168.145.REPLACE_SEQ3/192.168.145.$i/g" ue$i.gwa.cesproto.re2ee.org.yaml
-	sed -i "s/358145000REPLACE_SEQ3/358145000$i/g" ue$i.gwa.cesproto.re2ee.org.yaml
+for i in $(seq 1 254); do
+    i3=$(printf %03d $i)
+    cp template.gwa.cesproto.re2ee.org.yaml ue$i3.gwa.cesproto.re2ee.org.yaml
+	sed -i "s/REPLACE_UENAME3/ue$i3/g" ue$i3.gwa.cesproto.re2ee.org.yaml
+	sed -i "s/192.168.145.REPLACE_SEQ/192.168.145.$i/g" ue$i3.gwa.cesproto.re2ee.org.yaml
+	sed -i "s/358145000REPLACE_SEQ3/358145000$i3/g" ue$i3.gwa.cesproto.re2ee.org.yaml
 done
-
 ```
