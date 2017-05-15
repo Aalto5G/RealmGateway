@@ -59,7 +59,7 @@ class DataRepository(object):
             return {}
         data_d = {}
         try:
-            self._logger.info('Loading file <{}>'.format(filename))
+            self._logger.debug('Loading file <{}>'.format(filename))
             data_d = yaml.load(open(filename,'r'))
         except FileNotFoundError:
             self._logger.warning('Repository file not found <{}>'.format(filename))

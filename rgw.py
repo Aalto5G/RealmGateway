@@ -22,6 +22,8 @@ Run as:
                              GROUP_POLICY CUSTOMER_POLICY                    \
                              ADMIN_POLICY ADMIN_POLICY_DHCP                  \
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
+          --ipt-markdnat                                                     \
+          --ipt-flush                                                        \
           --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/                   \
           --repository-policy-file       gwa.policy.yaml                     \
@@ -43,6 +45,7 @@ import os
 
 import signal
 import sys
+import time
 import traceback
 import yaml
 import pprint
@@ -313,11 +316,13 @@ class RealmGateway(object):
     @asyncio.coroutine
     def _init_subscriberdata(self):
         self._logger.info('Initializing subscriber data')
+        tzero = time.time()
         for subs_id, subs_data in self._datarepository.getall_subscriber(default = {}).items():
             ipaddr = subs_data['ID']['IPV4'][0]
             fqdn = subs_data['ID']['FQDN'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
+        self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(time.time()-tzero))
 
     @asyncio.coroutine
     def _init_cleanup_cpool(self, delay):

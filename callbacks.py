@@ -29,6 +29,9 @@ from connection import ConnectionLegacy
 
 from loglevel import LOGLEVEL_DNSCALLBACK, LOGLEVEL_PACKETCALLBACK
 
+# For debugging
+import time
+
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
@@ -86,6 +89,10 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
+        #tzero = time.time()
+        #tsplits = []
+        #tnorm = lambda x,y: (y-x)*1000
+
         # TODO: Move all this complexity to network module? Maybe it's more fitting...
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
@@ -94,24 +101,51 @@ class DNSCallbacks(object):
             self._logger.info('Generating default subscriber data for {}'.format(fqdn))
             user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
 
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
         host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
+
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
         # Create network resources
         hostname = ipaddr
         self.network.ipt_add_user(hostname, ipaddr)
+
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
         ## Add all user groups
         user_groups = host_obj.get_service('GROUP', [])
         self.network.ipt_add_user_groups(hostname, ipaddr, user_groups)
+
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
         ## Add all firewall rules
         fw_d = host_obj.get_service('FIREWALL', {})
         admin_fw = fw_d.setdefault('FIREWALL_ADMIN', [])
         user_fw  = fw_d.setdefault('FIREWALL_USER', [])
         self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin', admin_fw)
         self.network.ipt_add_user_fwrules(hostname, ipaddr, 'user', user_fw)
+
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
         ## Carrier Grade services if available
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
             self.network.ipt_add_user_carriergrade(hostname, carriergrade_ipt)
+
+        # TIME SPLIT
+        #tsplits.append(time.time())
+
+        #times = '\t\t[{:.3f}]\t|\t'.format(tnorm(tzero,tsplits[-1]))
+        #for ts in tsplits:
+        #    times += '{:.3f}\t'.format(tnorm(tzero, ts))
+        #self._logger.info('Registered new user {} @ {} || {}'.format(fqdn, ipaddr, times))
 
     @asyncio.coroutine
     def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
