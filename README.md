@@ -79,7 +79,7 @@ The packet mark can be controlled as well from a user space application via NFQU
 Installing the kernel module
 
 ```
-$ cd ./iptables_devel/kernel
+$ cd ./iptables_devel
 $ make
 # make install_MARKDNAT
 ```
