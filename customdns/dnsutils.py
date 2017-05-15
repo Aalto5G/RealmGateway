@@ -1,7 +1,9 @@
 import dns
 import dns.message
+import dns.name
 import dns.zone
 import dns.rcode
+import dns.reversename
 
 from dns.exception import DNSException
 from dns.rdataclass import *
@@ -15,6 +17,13 @@ try:
 except AttributeError:
     pass
 '''
+
+# Use dns.reversename functions and return a string instead of dns.Name object
+## '1.2.3.4' -> '4.3.2.1.in-addr.arpa.'
+from_address = lambda x: dns.reversename.from_address(x).to_text()
+## '4.3.2.1.in-addr.arpa.' -> '1.2.3.4'
+to_address = lambda x: dns.reversename.to_address(dns.name.from_text(x)).decode()
+
 def debug_data(data):
     return('({} bytes) "{}"'.format(len(data), data))
 

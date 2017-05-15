@@ -3,13 +3,13 @@ import pprint
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
+from customdns.dnsutils import from_address as ptr_from_address
 from loglevel import LOGLEVEL_HOST
 
 KEY_HOST = 0
 KEY_HOST_FQDN = 1
 KEY_HOST_IPV4 = 2
 KEY_HOST_SERVICE = 3
-KEY_HOST_NS = 4
 KEY_SERVICE_SFQDN = 'SFQDN'
 KEY_SERVICE_CIRCULARPOOL = 'CIRCULARPOOL'
 KEY_SERVICE_FIREWALL = 'FIREWALL'
@@ -85,6 +85,8 @@ class HostEntry(container3.ContainerNode):
         # Add SFQDN key(s)
         for data in self.services[KEY_SERVICE_SFQDN]:
             keys.append(((KEY_HOST_SERVICE, data['fqdn']), True))
+        # Add Reverse IPv4 key entry as KEY_HOST_SERVICE
+        keys.append(((KEY_HOST_SERVICE, ptr_from_address(self.ipv4)), True))
         return keys
 
     def get_service_sfqdn(self, fqdn):

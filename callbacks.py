@@ -169,7 +169,10 @@ class DNSCallbacks(object):
         host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
         if rdtype == 1:
             # Resolve A type and answer with IPv4 address of the host
-            response = dnsutils.make_response_answer_rr(query, fqdn, 1, host_obj.ipv4, rdclass=1, ttl=30)
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, host_obj.ipv4, rdclass=1, ttl=30)
+        elif rdtype == 12:
+            # Resolve PTR type and answer with FQDN of the host
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, host_obj.fqdn, rdclass=1, ttl=30)
         else:
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
