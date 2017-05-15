@@ -57,8 +57,8 @@ class Network(object):
         self._nfqueues = []
         # Configure MARKDNAT
         self._setup_MARKDNAT()
-        # Flush conntrack
-        self.ipt_flush_conntrack()
+        # Flushing
+        self._ipt_flush()
         # Initialize ipsets
         self.ips_init()
         # Initialize iptables
@@ -111,11 +111,19 @@ class Network(object):
                 except:
                     self._logger.error('#{} Failed to add to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
 
-    def ipt_flush_conntrack(self):
+    def _ipt_flush(self):
+        # Flush conntrack
         if self._do_subprocess_call('conntrack -F', False, False):
             self._logger.info('Successfully flushed connection tracking information')
-            return
-        self._logger.warning('Failed to flush connection tracking information')
+        else:
+            self._logger.warning('Failed to flush connection tracking information')
+
+        # Flush iptables & ipset
+        if self.ipt_flush:
+            iptc_helper3.flush_all()
+            self._logger.info('Successfully flushed iptables')
+            iproute2_helper3.ipset_flush()
+            self._logger.info('Successfully flushed ipset')
 
     def ipt_flush_chain(self, table, chain):
         iptc_helper3.flush_chain(table, chain)

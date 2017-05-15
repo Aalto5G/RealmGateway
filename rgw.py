@@ -134,9 +134,10 @@ def parse_arguments():
     parser.add_argument('--ipt-policy-order', nargs='*', type=str,
                         metavar=('IPT_POLICY_ORDER'),
                         help='Iptables install policy order')
-    #parser.add_argument('--no-ipt-markdnat', dest='ipt_markdnat', action='store_false')
     parser.add_argument('--ipt-markdnat', dest='ipt_markdnat', action='store_true',
                         help='Use iptables MARKDNAT target')
+    parser.add_argument('--ipt-flush', dest='ipt_flush', action='store_true',
+                        help='Flush iptables & ipset previous parameters')
 
     # Data repository parameters
     ## Subscriber information
@@ -214,6 +215,7 @@ class RealmGateway(object):
                                         ipt_host_unknown = self._config.ipt_host_unknown,
                                         ipt_policy_order = self._config.ipt_policy_order,
                                         ipt_markdnat     = self._config.ipt_markdnat,
+                                        ipt_flush        = self._config.ipt_flush,
                                         datarepository   = self._datarepository)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
