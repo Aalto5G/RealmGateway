@@ -5,6 +5,7 @@
 This version of Customer Edge Switching v2.0 has been developed under
 Ubuntu 16.04 and python3 for asynchronous calls.
 
+This repository contains a submodule. Clone with ```git clone ssh://git@gitlab.cloud.mobilesdn.org:60022/CES/customer_edge_switching_v2.git --recursive```
 
 ## Install package dependencies
 
