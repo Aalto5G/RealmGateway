@@ -162,13 +162,13 @@ class Network(object):
     def ipt_add_user_fwrules(self, hostname, ipaddr, chain, fwrules):
         host_chain = 'HOST_{}_{}'.format(hostname, chain.upper())
         self._logger.debug('Add fwrules for user {}/{} to chain <{}> ({})'.format(hostname, ipaddr, host_chain, len(fwrules)))
+        rules_batch = []
         # Sort list by priority of the rules
-        sorted_fwrules = sorted(fwrules, key=lambda rule: rule['priority'])
-        # Flush chain before inserting the lot
-        iptc_helper3.flush_chain('filter', host_chain)
-        for rule in sorted_fwrules:
+        for rule in sorted(fwrules, key=lambda rule: rule['priority']):
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
-            iptc_helper3.add_rule('filter', host_chain, xlat_rule)
+            rules_batch.append((host_chain, xlat_rule, 0))
+        # Use new batch function
+        iptc_helper3.batch_add_rules('filter', rules_batch)
 
     def ipt_add_user_groups(self, hostname, ipaddr, groups):
         self._logger.debug('Registering groups for user {}/{} <{}>'.format(hostname, ipaddr, groups))
@@ -278,23 +278,25 @@ class Network(object):
         host_chain_user     = 'HOST_{}_USER'.format(hostname)
         host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
-        # Create basic chains for host policy
-        for chain in [host_chain, host_chain_admin, host_chain_user, host_chain_ces]:
-            self._ipt_create_chain('filter', chain)
+        # Create & flush basic chains for host policy
+        # Use new batch function
+        iptc_helper3.batch_add_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces), True)
 
+        rules_batch = []
         # 1. Register triggers in global host policy chain
         ## Add rules to iptables
-        chain = self.ipt_host_chain
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain})
+        rules_batch.append((self.ipt_host_chain,{'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain},0))
+        rules_batch.append((self.ipt_host_chain,{'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain},0))
 
         # 2. Register triggers in host chain
         ## Add rules to iptables
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_admin})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_user})
-        iptc_helper3.add_rule('filter', host_chain, {'target':host_chain_ces, 'mark':{'mark':MASK_HOST_CES}})
+        rules_batch.append((host_chain, {'target':host_chain_admin}, 0))
+        rules_batch.append((host_chain, {'target':host_chain_user}, 0))
+        rules_batch.append((host_chain, {'target':host_chain_ces, 'mark':{'mark':MASK_HOST_CES}}, 0))
         # Add a variable for default host policy
-        iptc_helper3.add_rule('filter', host_chain, {'target':self.ipt_host_unknown})
+        rules_batch.append((host_chain, {'target':self.ipt_host_unknown}, 0))
+        # Use new batch function
+        iptc_helper3.batch_add_rules('filter', rules_batch)
 
     def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -303,33 +305,45 @@ class Network(object):
         host_chain_user     = 'HOST_{}_USER'.format(hostname)
         host_chain_ces      = 'HOST_{}_CES'.format(hostname)
 
+        rules_batch = []
         # 1. Remove triggers in global host policy chain
         ## Add rules to iptables
-        chain = self.ipt_host_chain
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, True)
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}))
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
+        # Use new batch functions
+        iptc_helper3.batch_delete_rules('filter', rules_batch)
 
         # 2. Remove host chains
-        for chain in [host_chain, host_chain_admin, host_chain_user, host_chain_ces]:
-            self._ipt_remove_chain('filter', chain)
+        # Use new batch function
+        iptc_helper3.batch_delete_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces))
+
 
     def _add_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
+
+        rules_batch = []
         # 1. Register triggers in global host policy chain
         ## Add rules to iptables
-        chain = self.ipt_host_chain
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain})
-        iptc_helper3.add_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain})
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, 0))
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, 0))
+        # Use new batch function
+        iptc_helper3.batch_add_rules('filter', rules_batch)
 
     def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
         host_chain          = 'HOST_{}'.format(hostname)
+
+        rules_batch = []
         # 1. Register triggers in global host policy chain
         ## Add rules to iptables
-        chain = self.ipt_host_chain
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, True)
-        iptc_helper3.delete_rule('filter', chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, True)
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}))
+        rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
+        # Use new batch functions
+        iptc_helper3.batch_delete_rules('filter', rules_batch)
+
+    '''
+        ### Not in use since the addition of batch processing ###
 
     def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
@@ -341,7 +355,7 @@ class Network(object):
         # Flush and delete to ensure the table is removed
         iptc_helper3.flush_chain(table, chain, silent=True)
         iptc_helper3.delete_chain(table, chain, silent=True)
-
+    '''
     def _ipt_xlat_rule(self, chain, rule):
         ret = dict(rule)
         # Translate direction value into packet mark
