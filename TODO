@@ -1,11 +1,4 @@
-1. Add time elapsed when releasing an IP address from the Circular Pool
-
-```
-2017-05-16 06:25:47,431 - PacketCallbacks - INFO - DNAT to vepc1.gwa.cesproto.re2ee.org. @ 192.168.0.2 via 195.148.125.202: [130.233.145.94:49516 195.148.125.202:22 [6] (TTL 64)]
-2017-05-16 06:25:47,432 - DNSCallbacks - INFO - Released IP address to Circular Pool: 195.148.125.202 ((vepc1.gwa.cesproto.re2ee.org.) [0] 192.168.0.2 <- 195.148.125.202 (2.0 sec) | FQDN vepc1.gwa.cesproto.re2ee.org. | DNS 195.148.125.200 <- None)
-```
-
-2. Add TCP flags to the log when a packet finds no match in the Circular Pool
+1. Add TCP flags to the log when a packet finds no match in the Circular Pool
 
 ```
 2017-05-16 06:35:48,483 - PacketCallbacks - INFO - No connection reserved for IP 195.148.125.204: [118.97.122.130:49570 195.148.125.204:3389 [6] (TTL 64)]

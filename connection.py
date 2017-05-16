@@ -136,6 +136,10 @@ class ConnectionLegacy(container3.ContainerNode):
         else:
             return True
 
+    @property
+    def age(self):
+        return time.time() - self.timestamp_zero
+
     def __repr__(self):
         ret = ''
         ret += '({})'.format(self.id)

@@ -494,10 +494,10 @@ class DNSCallbacks(object):
         ipaddr = conn.outbound_ip
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
-            self._logger.info('Cannot release IP address to Circular Pool: {} ({}) still in use'.format(ipaddr, conn.fqdn))
+            self._logger.info('Cannot release IP address to Circular Pool: {} ({}) still in use for {:.5f} sec'.format(ipaddr, conn.fqdn, conn.age))
             return
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {} ({})'.format(ipaddr, conn))
+        self._logger.info('Released IP address to Circular Pool: {} ({}) in {:.5f} sec'.format(ipaddr, conn, conn.age))
 
     def _do_callback(self, query, addr, response=None):
         try:
