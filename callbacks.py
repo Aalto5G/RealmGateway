@@ -569,6 +569,7 @@ class PacketCallbacks(object):
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
             self._logger.info('No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
+            self.network.ipt_nfpacket_drop(packet)
             return
 
         # Lookup connection in table with rest of the keys
