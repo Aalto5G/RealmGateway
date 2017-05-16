@@ -524,9 +524,20 @@ class PacketCallbacks(object):
         utils3.set_attributes(self, **kwargs)
 
     def _format_5tuple(self, packet_fields):
-        return '{}:{} {}:{} [{}] (TTL {})'.format(packet_fields['src'], packet_fields['sport'],
-                                                  packet_fields['dst'], packet_fields['dport'],
-                                                  packet_fields['proto'], packet_fields['ttl'])
+        if packet_fields['proto'] == 6:
+            return '{}:{} {}:{} [{}] (TTL {}) flags/{:08b}'.format(packet_fields['src'], packet_fields['sport'],
+                                                                  packet_fields['dst'], packet_fields['dport'],
+                                                                  packet_fields['proto'], packet_fields['ttl'],
+                                                                  packet_fields['tcp_flags'])
+        elif packet_fields['proto'] == 132:
+            return '{}:{} {}:{} [{}] (TTL {}) tag/{:x}'.format(packet_fields['src'], packet_fields['sport'],
+                                                                packet_fields['dst'], packet_fields['dport'],
+                                                                packet_fields['proto'], packet_fields['ttl'],
+                                                                packet_fields['stcp_tag'])
+        else:
+            return '{}:{} {}:{} [{}] (TTL {})'.format(packet_fields['src'], packet_fields['sport'],
+                                                      packet_fields['dst'], packet_fields['dport'],
+                                                      packet_fields['proto'], packet_fields['ttl'])
 
     def packet_in_circularpool(self, packet):
         # Get IP data
