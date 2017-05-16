@@ -533,7 +533,7 @@ class PacketCallbacks(object):
             return '{}:{} {}:{} [{}] (TTL {}) tag/{:x}'.format(packet_fields['src'], packet_fields['sport'],
                                                                 packet_fields['dst'], packet_fields['dport'],
                                                                 packet_fields['proto'], packet_fields['ttl'],
-                                                                packet_fields['stcp_tag'])
+                                                                packet_fields['sctp_tag'])
         else:
             return '{}:{} {}:{} [{}] (TTL {})'.format(packet_fields['src'], packet_fields['sport'],
                                                       packet_fields['dst'], packet_fields['dport'],
