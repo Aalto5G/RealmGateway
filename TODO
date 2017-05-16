@@ -1,5 +1,0 @@
-1. Add TCP flags to the log when a packet finds no match in the Circular Pool
-
-```
-2017-05-16 06:35:48,483 - PacketCallbacks - INFO - No connection reserved for IP 195.148.125.204: [118.97.122.130:49570 195.148.125.204:3389 [6] (TTL 64)]
-```
