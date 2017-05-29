@@ -141,6 +141,7 @@ class Network(object):
         self._add_basic_hostpolicy(hostname, ipaddr)
         # Add user's IP address to ipset for registered hosts
         if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+            self._logger.info('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
             iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
 
     def ipt_remove_user(self, hostname, ipaddr):
@@ -151,6 +152,7 @@ class Network(object):
         self._remove_basic_hostpolicy(hostname, ipaddr)
         # Remove user's IP address from ipset of registered hosts
         if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+            self._logger.info('Removing host {} from ipset {}'.format(ipaddr, self.ips_hosts))
             iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
 
     def ipt_add_user_carriergrade(self, hostname, cgaddrs):
@@ -164,6 +166,7 @@ class Network(object):
             self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
             # Add user's IP address to ipset for registered hosts
             if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                self._logger.info('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
                 iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
 
     def ipt_remove_user_carriergrade(self, hostname, cgaddrs):
@@ -177,6 +180,7 @@ class Network(object):
             self._remove_basic_hostpolicy_carriergrade(hostname, ipaddr)
             # Remove user's IP address from ipset of registered hosts
             if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                self._logger.info('Removing host {} from ipset {}'.format(ipaddr, self.ips_hosts))
                 iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
 
     def ipt_add_user_fwrules(self, hostname, ipaddr, chain, fwrules):

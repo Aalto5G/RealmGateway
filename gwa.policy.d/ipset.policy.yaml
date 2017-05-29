@@ -1,31 +1,31 @@
 IPSET:
     requires:
-        - {'name': 'IPS_CIRCULAR_POOL',          'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_SPOOFED_NET_LAN',        'type': 'hash:net', 'create': true, 'flush': true}
-        - {'name': 'IPS_SPOOFED_NET_WAN',        'type': 'hash:net', 'create': true, 'flush': true}
-        - {'name': 'IPS_SPOOFED_NET_TUN',        'type': 'hash:net', 'create': true, 'flush': true}
-        - {'name': 'IPS_FILTER_BLACKLIST',       'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_FILTER_WHITELIST',       'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_DNS_WHITELIST',          'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_DNS_BLACKLIST',          'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_DNS_WKGREYLIST',         'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_GROUP_POSTPAID',         'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_GROUP_PREPAID1',         'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_GROUP_PREPAID2',         'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_GROUP_PREPAID3',         'type': 'hash:ip',  'create': true, 'flush': true}
-        - {'name': 'IPS_REGISTERED_SUBSCRIBERS', 'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_CIRCULAR_POOL',    'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_SPOOFED_NET_LAN',  'type': 'hash:net', 'create': true, 'flush': true}
+        - {'name': 'IPS_SPOOFED_NET_WAN',  'type': 'hash:net', 'create': true, 'flush': true}
+        - {'name': 'IPS_SPOOFED_NET_TUN',  'type': 'hash:net', 'create': true, 'flush': true}
+        - {'name': 'IPS_FILTER_BLACKLIST', 'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_FILTER_WHITELIST', 'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_DNS_WHITELIST',    'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_DNS_BLACKLIST',    'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_DNS_WKGREYLIST',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_POSTPAID',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID1',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID2',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_GROUP_PREPAID3',   'type': 'hash:ip',  'create': true, 'flush': true}
+        - {'name': 'IPS_SUBSCRIBERS',      'type': 'hash:ip',  'create': true, 'flush': true}
     rules:
-        - {'name': 'IPS_CIRCULAR_POOL',          'type': 'ip',  'items': ['100.64.1.133/32', '100.64.1.134/32', '100.64.1.135/32']}
-        - {'name': 'IPS_SPOOFED_NET_LAN',        'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '224.0.0.0/3']}
-        - {'name': 'IPS_SPOOFED_NET_WAN',        'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/3']}
-        - {'name': 'IPS_SPOOFED_NET_TUN',        'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '192.168.0.0/16', '224.0.0.0/3']}
-        - {'name': 'IPS_FILTER_BLACKLIST',       'type': 'ip',  'items': ['192.168.0.200']}
-        - {'name': 'IPS_FILTER_WHITELIST',       'type': 'ip',  'items': ['192.168.0.201']}
-        - {'name': 'IPS_DNS_WHITELIST',          'type': 'ip',  'items': []}
-        - {'name': 'IPS_DNS_BLACKLIST',          'type': 'ip',  'items': []}
-        - {'name': 'IPS_DNS_WKGREYLIST',         'type': 'ip',  'items': []}
-        - {'name': 'IPS_GROUP_POSTPAID',         'type': 'ip',  'items': []}
-        - {'name': 'IPS_GROUP_PREPAID1',         'type': 'ip',  'items': []}
-        - {'name': 'IPS_GROUP_PREPAID2',         'type': 'ip',  'items': []}
-        - {'name': 'IPS_GROUP_PREPAID3',         'type': 'ip',  'items': []}
-        - {'name': 'IPS_REGISTERED_SUBSCRIBERS', 'type': 'ip',  'items': []}
+        - {'name': 'IPS_CIRCULAR_POOL',    'type': 'ip',  'items': ['100.64.1.133/32', '100.64.1.134/32', '100.64.1.135/32']}
+        - {'name': 'IPS_SPOOFED_NET_LAN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '224.0.0.0/3']}
+        - {'name': 'IPS_SPOOFED_NET_WAN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/3']}
+        - {'name': 'IPS_SPOOFED_NET_TUN',  'type': 'net', 'items': ['0.0.0.0/8', '127.0.0.0/8', '10.0.0.0/8', '192.168.0.0/16', '224.0.0.0/3']}
+        - {'name': 'IPS_FILTER_BLACKLIST', 'type': 'ip',  'items': ['192.168.0.200']}
+        - {'name': 'IPS_FILTER_WHITELIST', 'type': 'ip',  'items': ['192.168.0.201']}
+        - {'name': 'IPS_DNS_WHITELIST',    'type': 'ip',  'items': []}
+        - {'name': 'IPS_DNS_BLACKLIST',    'type': 'ip',  'items': []}
+        - {'name': 'IPS_DNS_WKGREYLIST',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_POSTPAID',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID1',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID2',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_GROUP_PREPAID3',   'type': 'ip',  'items': []}
+        - {'name': 'IPS_SUBSCRIBERS',      'type': 'ip',  'items': []}

@@ -236,7 +236,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',   'create': false, 'flush': false}
         rules:
-            - {'table': 'nat',    'chain': 'PREROUTING',     'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'set': {'match-set': ['!', 'IPS_REGISTERED_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
+            - {'table': 'nat',    'chain': 'PREROUTING',     'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'set': {'match-set': ['!', 'IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
             - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'rule': {'tcp': {'dport': '80'}, 'protocol': 'tcp', 'comment': {'comment': 'Redirect to HTTP captive portal'}, 'target': {'DNAT': {'to-destination': '192.168.0.1'}}}}
             - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'rule': {'udp': {'dport': '53'}, 'protocol': 'udp', 'comment': {'comment': 'Redirect to local DNS'},           'target': {'DNAT': {'to-destination': '192.168.0.1'}}}}
 
@@ -245,5 +245,5 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'udp': {'dport': '67'}, 'protocol': 'udp',            'comment': {'comment': 'DHCP / Continue to local services'},    'target': 'ADMIN_POLICY'}}
             - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'comment': {'comment': 'Drop unsupported unknown traffic'}, 'target': 'DROP'}}
 
-            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['!', 'IPS_REGISTERED_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['!', 'IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'comment': {'comment': 'Drop traffic for unknown subscriber group'}, 'target': 'DROP'}}
