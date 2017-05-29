@@ -123,7 +123,6 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID1', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID1'}}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID2', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID2'}}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000002/0xFF00000F'}, 'set': {'match-set': ['IPS_GROUP_PREPAID3', 'src']}, 'comment': {'comment': 'Match group by IP src'}, 'target': 'GROUP_PREPAID3'}}
-            - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'comment': {'comment': 'Unknown subscriber'}, 'target': 'CUSTOMER_POLICY'}}
             # Set group rules for disallowed traffic
             # GROUP_POSTPAID: There are no inbound/outbound traffic restrictions, everything passes through
             - {'table': 'filter', 'chain': 'GROUP_POSTPAID',  'rule': {'comment': {'comment': 'No traffic restrictions'}, 'target': 'CUSTOMER_POLICY'}}
@@ -229,3 +228,22 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'Continue as WK-Greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Preferred WK-Greylist'}, 'hashlimit': {'hashlimit-upto': '75/sec', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '100'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Continue as Greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
+
+    GUEST_SERVICES:
+    # This policy includes the triggers to policies of local services running in CES/RGW that should be accessible on the different interfaces .e.g.: DHCP, DNS, HTTP.
+        requires:
+            - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'create': true, 'flush': true}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'create': false, 'flush': false}
+        rules:
+            - {'table': 'nat',    'chain': 'PREROUTING',     'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'set': {'match-set': ['!', 'IPS_REGISTERED_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
+            - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'rule': {'tcp': {'dport': '80'}, 'protocol': 'tcp', 'comment': {'comment': 'Redirect to HTTP captive portal'}, 'target': {'DNAT': {'to-destination': '192.168.0.1'}}}}
+            - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'rule': {'udp': {'dport': '53'}, 'protocol': 'udp', 'comment': {'comment': 'Redirect to local DNS'},           'target': {'DNAT': {'to-destination': '192.168.0.1'}}}}
+
+            - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'comment': {'comment': 'HTTP(S) / Continue to local services'}, 'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'udp': {'dport': '53'}, 'protocol': 'udp',            'comment': {'comment': 'DNS / Continue to local services'},     'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'udp': {'dport': '67'}, 'protocol': 'udp',            'comment': {'comment': 'DHCP / Continue to local services'},    'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'comment': {'comment': 'Drop unsupported unknown traffic'}, 'target': 'DROP'}}
+
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['!', 'IPS_REGISTERED_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'comment': {'comment': 'Drop traffic for unknown subscriber group'}, 'target': 'DROP'}}
