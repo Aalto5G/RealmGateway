@@ -160,7 +160,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'INPUT',        'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
             - {'table': 'filter', 'chain': 'FORWARD',      'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DHCP'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'POLICY_DHCP'}}
-            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '80,443'},    'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DNS'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'comment': {'comment': 'Accept'}, 'target': 'ACCEPT'}}
@@ -171,17 +171,17 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DHCP', 'create': true, 'flush': true}
         rules:
             - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'Accept DHCP'}, 'udp': {'sport': '68', 'dport': '67'}, 'protocol': 'udp', 'target': 'ACCEPT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_DHCP', 'rule': {'target': 'DROP'}}
 
     ADMIN_POLICY_HTTP:
     # This policy includes the rules for the HTTP/HTTPS reverse proxy server.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_HTTP', 'create': true, 'flush': true}
         rules:
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @WAN'}, 'multiport': {'dports': '80,443'}, 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @WAN'}, 'multiport': {'dports': '80,443'},    'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
             - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @WAN'}, 'multiport': {'dports': '8080,8443'}, 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff021010/0xff0ff0f0'}, 'comment': {'comment': 'Drop'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'Accept HTTP(S) @LAN'}, 'multiport': {'dports': '80,443'}, 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'ACCEPT'}}
+            - {'table': 'filter', 'chain': 'POLICY_HTTP', 'rule': {                                           'comment': {'comment': 'Drop'},  'target': 'DROP'}}
 
     ADMIN_POLICY_DNS:
     # This policy includes the rules for the DNS server. The policy defines a basic system of leaky-buckets and ultimately a contention based mechanism to admit a packet to the DNS server running in userspace.
