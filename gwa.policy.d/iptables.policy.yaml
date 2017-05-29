@@ -145,8 +145,6 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY',           'create': true, 'flush': false}
         rules:
-#            - {'table': 'filter', 'chain': 'INPUT',                  'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
-#            - {'table': 'filter', 'chain': 'FORWARD',                'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
 
     ADMIN_POLICY:
