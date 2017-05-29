@@ -20,6 +20,8 @@ echo "Starting Realm Gateway as gwa.demo"
                              GROUP_POLICY CUSTOMER_POLICY                    \
                              ADMIN_POLICY ADMIN_POLICY_DHCP                  \
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
+                             GUEST_SERVICES                                  \
+          --ips-hosts        IPS_REGISTERED_SUBSCRIBERS                      \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
           --repository-subscriber-folder gwa.subscriber.d/                   \

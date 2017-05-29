@@ -22,11 +22,11 @@ Run as:
                              GROUP_POLICY CUSTOMER_POLICY                    \
                              ADMIN_POLICY ADMIN_POLICY_DHCP                  \
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
+                             GUEST_SERVICES                                  \
+          --ips-hosts        IPS_REGISTERED_SUBSCRIBERS                      \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-file   gwa.subscriber.yaml                 \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-file       gwa.policy.yaml                     \
           --repository-policy-folder     gwa.policy.d/
 '''
 
@@ -141,6 +141,10 @@ def parse_arguments():
                         help='Use iptables MARKDNAT target')
     parser.add_argument('--ipt-flush', dest='ipt_flush', action='store_true',
                         help='Flush iptables & ipset previous parameters')
+    parser.add_argument('--ips-hosts', type=str,
+                        metavar=('IPS_HOSTS'),
+                        default='IPS_HOSTS',
+                        help='ipset type hash:ip that stores the registered hosts')
 
     # Data repository parameters
     ## Subscriber information
@@ -219,6 +223,7 @@ class RealmGateway(object):
                                         ipt_policy_order = self._config.ipt_policy_order,
                                         ipt_markdnat     = self._config.ipt_markdnat,
                                         ipt_flush        = self._config.ipt_flush,
+                                        ips_hosts        = self._config.ips_hosts,
                                         datarepository   = self._datarepository)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)

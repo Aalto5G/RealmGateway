@@ -139,6 +139,9 @@ class Network(object):
         self._add_circularpool(hostname, ipaddr)
         # Add user's firewall rules and register in global host policy chain
         self._add_basic_hostpolicy(hostname, ipaddr)
+        # Add user's IP address to ipset for registered hosts
+        if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+            iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
 
     def ipt_remove_user(self, hostname, ipaddr):
         self._logger.debug('Remove user {}/{}'.format(hostname, ipaddr))
@@ -146,6 +149,9 @@ class Network(object):
         self._remove_circularpool(hostname, ipaddr)
         # Remove user's firewall rules and deregister in global host policy chain
         self._remove_basic_hostpolicy(hostname, ipaddr)
+        # Remove user's IP address from ipset of registered hosts
+        if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+            iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
 
     def ipt_add_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Add carrier grade user {}/{}'.format(hostname, cgaddrs))
@@ -156,6 +162,9 @@ class Network(object):
             self._add_circularpool(hostname, ipaddr)
             # Add user's firewall rules and register in global host policy chain
             self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
+            # Add user's IP address to ipset for registered hosts
+            if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
 
     def ipt_remove_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Remove carrier grade user {}/{}'.format(hostname, cgaddrs))
@@ -166,6 +175,9 @@ class Network(object):
             self._remove_circularpool(hostname, ipaddr)
             # Remove user's firewall rules and register in global host policy chain
             self._remove_basic_hostpolicy_carriergrade(hostname, ipaddr)
+            # Remove user's IP address from ipset of registered hosts
+            if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
 
     def ipt_add_user_fwrules(self, hostname, ipaddr, chain, fwrules):
         host_chain = 'HOST_{}_{}'.format(hostname, chain.upper())
