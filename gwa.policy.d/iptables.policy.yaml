@@ -78,8 +78,8 @@ IPTABLES:
         rules:
             - {'table': 'filter', 'chain': 'INPUT',            'rule': {'target': 'ACCEPT', 'in-interface': 'lo'}}
             - {'table': 'filter', 'chain': 'INPUT',            'rule': {'target': 'ACCEPT', 'in-interface': 'mgt0'}}
-            - {'table': 'filter', 'chain': 'INPUT',            'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
-            - {'table': 'filter', 'chain': 'FORWARD',          'rule': {'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
+            - {'table': 'filter', 'chain': 'INPUT',            'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
+            - {'table': 'filter', 'chain': 'FORWARD',          'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_PREEMPTIVE'}, 'target': 'ADMIN_PREEMPTIVE'}}
 
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Early drop blacklisted sources'}, 'target': 'DROP'}}
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Early drop blacklisted destinations'}, 'target': 'DROP'}}
@@ -112,9 +112,8 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GROUP_PREPAID3',  'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY', 'create': true, 'flush': false}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',           'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
-            - {'table': 'filter', 'chain': 'OUTPUT',          'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
-            - {'table': 'filter', 'chain': 'FORWARD',         'rule': {'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
+            - {'table': 'filter', 'chain': 'INPUT',           'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',         'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment':{'comment': 'Continue in GROUP_POLICY'}, 'target':'GROUP_POLICY'}}
             # Set rules for group matching based on IP src/dst and IP sets
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_POSTPAID', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_POSTPAID'}}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',    'rule': {'mark': {'mark': '0xFF000020/0xFF0000F0'}, 'set': {'match-set': ['IPS_GROUP_PREPAID1', 'dst']}, 'comment': {'comment': 'Match group by IP dst'}, 'target': 'GROUP_PREPAID1'}}
@@ -146,8 +145,8 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY',           'create': true, 'flush': false}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',                  'rule': {'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
-            - {'table': 'filter', 'chain': 'FORWARD',                'rule': {'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'INPUT',                  'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',                'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in CUSTOMER_POLICY'}, 'target': 'CUSTOMER_POLICY'}}
             - {'table': 'filter', 'chain': 'CUSTOMER_POLICY_ACCEPT', 'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
 
     ADMIN_POLICY:
@@ -158,8 +157,8 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_HTTP',  'create': true, 'flush': false}
             - {'table': 'filter', 'chain': 'POLICY_DNS',   'create': true, 'flush': false}
         rules:
-            - {'table': 'filter', 'chain': 'INPUT',        'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
-            - {'table': 'filter', 'chain': 'FORWARD',      'rule': {'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'INPUT',        'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
+            - {'table': 'filter', 'chain': 'FORWARD',      'rule': {'mark': {'mark': '0xff000000/0xff000000'}, 'comment': {'comment': 'Continue in ADMIN_POLICY'}, 'target': 'ADMIN_POLICY'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DHCP'}, 'udp': {'dport': '67'}, 'protocol': 'udp', 'target': 'POLICY_DHCP'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '80,443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
