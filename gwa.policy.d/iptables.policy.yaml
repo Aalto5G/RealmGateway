@@ -246,4 +246,5 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'rule': {'comment': {'comment': 'Drop unsupported unknown traffic'}, 'target': 'DROP'}}
 
             - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['!', 'IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
-            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'comment': {'comment': 'Drop traffic for unknown subscriber group'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Drop traffic for unknown subscriber group'}, 'target': 'DROP'}}
+
