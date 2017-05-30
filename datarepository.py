@@ -123,6 +123,7 @@ class DataRepository(object):
                                    'proxy_required': proxy})
         data_d['SFQDN'] = sfqdn_services
         data_d['CIRCULARPOOL'] = [{'max':2}]
+        data_d['GROUP'] = ['IPS_GROUP_PREPAID1']
         return data_d
 
 
