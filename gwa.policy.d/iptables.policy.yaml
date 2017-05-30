@@ -230,7 +230,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Continue as Greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
 
     GUEST_SERVICES:
-    # This policy includes the triggers to policies of local services running in CES/RGW that should be accessible on the different interfaces .e.g.: DHCP, DNS, HTTP.
+    # This policy includes the set of rules that should be accessible to unregistered users .e.g.: DHCP, DNS, HTTP.
         requires:
             - {'table': 'nat',    'chain': 'GUEST_SERVICES', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'GUEST_SERVICES', 'create': true, 'flush': true}
