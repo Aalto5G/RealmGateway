@@ -49,7 +49,7 @@ Run as:
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
           --dns-resolver     127.0.0.1 54                                    \
-          --ddns-server      127.0.0.1 53                                    \
+          --ddns-server      127.0.0.2 53                                    \
           --dns-timeout      0.010 0.100 0.200                               \
           --pool-serviceip   100.64.1.130/32                                 \
           --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
@@ -61,11 +61,40 @@ Run as:
                              GROUP_POLICY CUSTOMER_POLICY                    \
                              ADMIN_POLICY ADMIN_POLICY_DHCP                  \
                              ADMIN_POLICY_HTTP ADMIN_POLICY_DNS              \
-          --repository-subscriber-file   gwa.subscriber.yaml                 \
+                             GUEST_SERVICES                                  \
+          --ips-hosts        IPS_SUBSCRIBERS                                 \
+          --ipt-markdnat                                                     \
+          --ipt-flush                                                        \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-file       gwa.policy.yaml                     \
           --repository-policy-folder     gwa.policy.d/
 ```
+
+
+## Configuring a deployment
+
+The current repository ships with a set of policies and subscriber information for basic testing.
+However, if we plan on making a new deployment there are a few things we need to take into account:
+
+* circularpool.policy: Set a sensible maximum level according the size of the Circular Pool.
+
+* ipset.policy: These are currently processed directly by iproute2, iptables, and ipset. Remember to populate the sets *IPS_CIRCULAR_POOL*, *IPS_SPOOFED_NET_xyz*, and *IPS_FILTER_xyz*.
+Setting incorrect values on these fields may make debugging quite difficult as you might need to trace packets in iptables.
+
+* iptables.policy: This is one of the most critical files that needs editing. Please pay attention to the following:
+    
+    NAT.rules: In mangle.CIRCULAR_POOL chain the targets NFQUEUE queue-num need to match the argument ```--ipt-cpool-queue``` passed to the python program.
+    
+    NAT.rules: In nat.POSTROUTING chain we use 2 rules for SNAT target that match on a different packet mark.
+The most crucial is the one indicated as ```SNAT to available pool``` and it should include the available addresses in the Circular Pool for better efficiency of outgoing connections.
+
+    ADMIN_POLICY_DNS.rules: In filter.POLICY_DNS_WAN_DOMAIN_LIMIT chain we have 2 rules for filtering incoming FQDNs that do not belong to the defined SOA zones.
+This helps protect the built-in DNS server of the python program. Replace the zone defined, e.g. '|03|gwa|04|demo|00|' with the one of your choice, adhering to the DNS name encoding.
+
+    GUEST_SERVICES.rules: In nat.GUEST_SERVICES we use redirection rules with DNAT to the private IP address of the node of the LAN interface. This is used for enabling the Captive Portal functinoality.
+Modify this if your deployment uses different private networks.
+
+    Don't forget to look for the token ```hashlimit``` that sets the limitations in different rules. You may want to modify these values based on the nature of your deployment.
+
 
 ## Build & install the iptables modules for Realm Gateway (optional)
 
@@ -89,42 +118,6 @@ Installing the user space module
 ```
 # cp ./iptables_devel/userspace/libxt_MARKDNAT.so /lib/xtables/
 $ iptables -j MARKDNAT --help
-```
-
-
-## Useful information
-
-### Create python virtual environment
-
-If you don't want to populute your system with extra libraries and modules, you can can create a python virtual environment using the following guide:
-
-http://askubuntu.com/questions/244641/how-to-set-up-and-use-a-virtual-python-environment-in-ubuntu
-
-Remember that the virtual environment shortcuts are not available when doing ```sudo``` per se, but you can achieve admin rights for your python interpreter with the following:
-
-```
-$ sudo /root/to/.virtualenvs/your_virtual_environment/bin/python
-```
-
-### Linux bridged & iptables (Not currently in use)
-
-It is very common to deploy Linux bridges to trigger iptables packet processing to that traffic.
-However, additional kernel modules need to be loaded.
-
-```
-# modprobe br_netfilter
-# modprobe xt_physdev
-```
-
-In order to send traffic from the linux bridge to iptables modify your ```/etc/sysctl.conf``` to include the following:
-
-```
-net.bridge.bridge-nf-call-arptables=1
-net.bridge.bridge-nf-call-ip6tables=1
-net.bridge.bridge-nf-call-iptables=1
-net.bridge.bridge-nf-filter-pppoe-tagged=0
-net.bridge.bridge-nf-filter-vlan-tagged=1
-net.bridge.bridge-nf-pass-vlan-input-dev=1
 ```
 
 
@@ -171,4 +164,40 @@ for i in $(seq 1 254); do
 	sed -i "s/192.168.145.REPLACE_SEQ/192.168.145.$i/g" ue$i3.gwa.cesproto.re2ee.org.yaml
 	sed -i "s/358145000REPLACE_SEQ3/358145000$i3/g" ue$i3.gwa.cesproto.re2ee.org.yaml
 done
+```
+
+
+## Other useful information
+
+### Create python virtual environment
+
+If you don't want to populute your system with extra libraries and modules, you can can create a python virtual environment using the following guide:
+
+http://askubuntu.com/questions/244641/how-to-set-up-and-use-a-virtual-python-environment-in-ubuntu
+
+Remember that the virtual environment shortcuts are not available when doing ```sudo``` per se, but you can achieve admin rights for your python interpreter with the following:
+
+```
+$ sudo /path/to/.virtualenvs/your_virtual_environment/bin/python
+```
+
+### Linux bridged & iptables (Not currently in use)
+
+It is very common to deploy Linux bridges to trigger iptables packet processing to that traffic.
+However, additional kernel modules need to be loaded.
+
+```
+# modprobe br_netfilter
+# modprobe xt_physdev
+```
+
+In order to send traffic from the linux bridge to iptables modify your ```/etc/sysctl.conf``` to include the following:
+
+```
+net.bridge.bridge-nf-call-arptables=1
+net.bridge.bridge-nf-call-ip6tables=1
+net.bridge.bridge-nf-call-iptables=1
+net.bridge.bridge-nf-filter-pppoe-tagged=0
+net.bridge.bridge-nf-filter-vlan-tagged=1
+net.bridge.bridge-nf-pass-vlan-input-dev=1
 ```
