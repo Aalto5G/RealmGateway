@@ -58,7 +58,7 @@ class Network(object):
         # Configure MARKDNAT
         self._setup_MARKDNAT()
         # Flushing
-        self._ipt_flush()
+        self._do_flushing()
         # Initialize ipsets
         self.ips_init()
         # Initialize iptables
@@ -111,7 +111,7 @@ class Network(object):
                 except:
                     self._logger.error('#{} Failed to add to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
 
-    def _ipt_flush(self):
+    def _do_flushing(self):
         # Flush conntrack
         if self._do_subprocess_call('conntrack -F', False, False):
             self._logger.info('Successfully flushed connection tracking information')
@@ -154,6 +154,17 @@ class Network(object):
         if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
             self._logger.debug('Removing host {} from ipset {}'.format(ipaddr, self.ips_hosts))
             iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
+        # Flush conntrack entries
+        ## Flush connection matching source IP address
+        if self._do_subprocess_call('conntrack -F -s {}'.format(ipaddr), False, False):
+            self._logger.debug('Successfully flushed connections: conntrack -F -s {}'.format(ipaddr))
+        else:
+            self._logger.warning('Failed to flush connections: conntrack -F -s {}'.format(ipaddr))
+        ## Flush connection matching destination IP address
+        if self._do_subprocess_call('conntrack -F -r {}'.format(ipaddr), False, False):
+            self._logger.debug('Successfully flushed connections: conntrack -F -r {}'.format(ipaddr))
+        else:
+            self._logger.warning('Failed to flush connections: conntrack -F -r {}'.format(ipaddr))
 
     def ipt_add_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Add carrier grade user {}/{}'.format(hostname, cgaddrs))
