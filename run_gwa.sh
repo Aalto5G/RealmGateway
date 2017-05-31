@@ -7,7 +7,7 @@ echo "Starting Realm Gateway as gwa.demo"
           --dns-server-local 127.0.0.1 53                                    \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
-          --dns-resolver     127.0.0.1 54                                    \
+          --dns-resolver     8.8.8.8 53                                      \
           --ddns-server      127.0.0.2 53                                    \
           --dns-timeout      0.010 0.100 0.200                               \
           --pool-serviceip   100.64.1.130/32                                 \
