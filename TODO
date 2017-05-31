@@ -1,0 +1,1 @@
+1. Improve graceful shutdown. Currently there is a coroutine that gives an error (cpool cleanup)
