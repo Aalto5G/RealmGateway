@@ -154,17 +154,13 @@ class Network(object):
         if iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
             self._logger.debug('Removing host {} from ipset {}'.format(ipaddr, self.ips_hosts))
             iproute2_helper3.ipset_delete(self.ips_hosts, ipaddr)
-        # Flush conntrack entries
-        ## Flush connection matching source IP address
-        if self._do_subprocess_call('conntrack -F -s {}'.format(ipaddr), False, False):
-            self._logger.debug('Successfully flushed connections: conntrack -F -s {}'.format(ipaddr))
-        else:
-            self._logger.warning('Failed to flush connections: conntrack -F -s {}'.format(ipaddr))
-        ## Flush connection matching destination IP address
-        if self._do_subprocess_call('conntrack -F -r {}'.format(ipaddr), False, False):
-            self._logger.debug('Successfully flushed connections: conntrack -F -r {}'.format(ipaddr))
-        else:
-            self._logger.warning('Failed to flush connections: conntrack -F -r {}'.format(ipaddr))
+        # Delete conntrack entries
+        ## Delete connection matching source IP address
+        if self._do_subprocess_call('conntrack -D --src {}'.format(ipaddr), False, True):
+            self._logger.debug('Successfully deleted connections: conntrack -D --src {}'.format(ipaddr))
+        ## Delete connection matching destination IP address
+        if self._do_subprocess_call('conntrack -D --reply-src {}'.format(ipaddr), False, True):
+            self._logger.debug('Successfully deleted connections: conntrack -D --reply-src {}'.format(ipaddr))
 
     def ipt_add_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Add carrier grade user {}/{}'.format(hostname, cgaddrs))
@@ -408,17 +404,18 @@ class Network(object):
         """ Return the integer representation of an IPv4 address """
         return struct.unpack("!I", socket.inet_aton(ipaddr))[0]
 
-    def _do_subprocess_call(self, command, raise_exc = False, supress_stdout = True):
+    def _do_subprocess_call(self, command, raise_exc = True, silent = False):
         try:
             self._logger.debug('System call: {}'.format(command))
-            if supress_stdout:
+            if silent:
                 with open(os.devnull, 'w') as f:
                     subprocess.check_call(command, shell=True, stdout=f, stderr=f)
             else:
                 subprocess.check_call(command, shell=True)
             return True
         except Exception as e:
-            self._logger.info(e)
+            if not silent:
+                self._logger.info(e)
             if raise_exc:
                 raise e
             return False
