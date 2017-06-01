@@ -545,12 +545,11 @@ class Network(object):
 
         # For testing purposes
         yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
-
         yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
 
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
@@ -631,6 +630,29 @@ class Network(object):
                            {'type':'OUTPUT', 'port':OVS_PORT_TUN_L3}]}
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
+    @asyncio.coroutine
+    def delete_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id, tun_type):
+        # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
+        if tun_type == 'gre':
+            tunnel_port = OVS_PORT_TUN_GRE
+        elif tun_type == 'vxlan':
+            tunnel_port = OVS_PORT_TUN_VXLAN
+        elif tun_type == 'geneve':
+            tunnel_port = OVS_PORT_TUN_GENEVE
+        else:
+            raise Exception('Unsupported tunneling type! {}'.format(tun_type))
+
+        # Delete outgoing unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':src, 'ipv4_dst':psrc}}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+
+        # Delete outgoing unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
+                'match':{'in_port':tunnel_port, 'eth_type':2048,
+                         'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id}}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
 '''
 # Create OpenvSwitch for CES data tunnelling
@@ -680,6 +702,5 @@ ryu-manager --ofp-listen-host 127.0.0.1 \
 sudo ovs-ofctl add-flow br-ces0 "table=2,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:5->tun_id,output:101"
 
 {"1193046": [{"table_id": 2, "priority": 10, "duration_sec": 58, "duration_nsec": 877000000, "match": {"dl_type": 2048, "nw_src": "192.168.0.100", "in_port": 100, "nw_dst": "172.16.0.1"}, "actions": ["SET_FIELD: {tun_ipv4_src:100.64.1.130}", "SET_FIELD: {tun_ipv4_dst:100.64.2.130}", "SET_FIELD: {tunnel_id:5}", "OUTPUT:101"], "idle_timeout": 0, "length": 160, "packet_count": 0, "hard_timeout": 0, "flags": 0, "cookie": 0, "byte_count": 0}]}
-
 
 '''
