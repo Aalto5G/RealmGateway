@@ -483,17 +483,17 @@ class Network(object):
 
     @asyncio.coroutine
     def wait_up(self):
-        """ Check with SDN controller the availability of the OpenvSwitch instance """
+        """ Check with SDN controller the availability of the OpenvSwitch datapath """
         while True:
-            self._logger.info('Awaiting synchronization of OpenvSwitch datapath with Ryu SDN Controller')
+            self._logger.info('Awaiting synchronization of OpenvSwitch datapath with SDN Controller')
             url = API_URL_SWITCHES
-            response = yield from self.rest_api.go_get(url, None)
+            response = yield from self.rest_api.do_get(url, None)
             if OVS_DATAPATH_ID in response:
-                self._logger.info('OpenvSwitch datapath connected to Ryu SDN Controller')
+                self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
                 self.ready = True
                 break
             else:
-                self._logger.info('OpenvSwitch datapath not connected to Ryu SDN Controller: {} != {}'.format(OVS_DATAPATH_ID, response))
+                self._logger.info('OpenvSwitch datapath not connected to SDN Controller / {} != {}'.format(OVS_DATAPATH_ID, response))
                 self.ready = False
             yield from asyncio.sleep(1)
 
