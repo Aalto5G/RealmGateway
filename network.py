@@ -10,6 +10,7 @@ from aalto_helpers import container3
 from aalto_helpers import utils3
 from aalto_helpers import iptc_helper3
 from aalto_helpers import iproute2_helper3
+from aiohttp_client import HTTPRestClient
 from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
@@ -47,6 +48,16 @@ MASK_LAN_EGRESS          = '0xFF000020/0xFF0000F0'
 MASK_WAN_EGRESS          = '0xFF000030/0xFF0000F0'
 MASK_TUN_EGRESS          = '0xFF000040/0xFF0000F0'
 
+# Define variables for SDN API
+OVS_DATAPATH_ID     = '0000000000123456'
+OVS_PORT_IN_        = 0xfffffff8
+OVS_PORT_TUN_L3     = 100
+OVS_PORT_TUN_GRE    = 101
+OVS_PORT_TUN_VXLAN  = 102
+OVS_PORT_TUN_GENEVE = 103
+OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
+OVS_PORT_TUN_L3_NET = '172.16.0.0/24'
+
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
@@ -63,6 +74,10 @@ class Network(object):
         self.ips_init()
         # Initialize iptables
         self.ipt_init()
+        # Create HTTP REST Client
+        self.rest_api_init()
+        # Create OpenvSwitch
+        self.init_openvswitch()
 
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
@@ -387,6 +402,7 @@ class Network(object):
         iptc_helper3.flush_chain(table, chain, silent=True)
         iptc_helper3.delete_chain(table, chain, silent=True)
     '''
+
     def _ipt_xlat_rule(self, chain, rule):
         ret = dict(rule)
         # Translate direction value into packet mark
@@ -419,6 +435,42 @@ class Network(object):
             if raise_exc:
                 raise e
             return False
+
+
+    def rest_api_init(self):
+        """ Create long lived HTTP session """
+        self.rest_api = HTTPRestClient(5)
+
+    def rest_api_close(self):
+        self.rest_api.close()
+
+    def init_openvswitch(self):
+        # Create OpenvSwitch for CES data tunnelling
+        ## Create OVS bridge, set datapath-id (16 hex digits) and configure controller
+        to_exec = ['ovs-vsctl --if-exists del-br br-ces0',
+                   'ovs-vsctl add-br br-ces0',
+                   'ovs-vsctl set bridge br-ces0 other-config:datapath-id={}'.format(OVS_DATAPATH_ID),
+                   'ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653']
+        for _ in to_exec:
+            self._do_subprocess_call(_)
+
+        ## Add ports
+        to_exec = ['ovs-vsctl add-port br-ces0 tun0 -- set interface tun0 ofport_request={} -- set interface tun0 type=internal'.format(OVS_PORT_TUN_L3),
+                   'ovs-vsctl add-port br-ces0 gre0-ces0 -- set interface gre0-ces0 ofport_request={} -- set interface gre0-ces0 type=gre options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_GRE),
+                   'ovs-vsctl add-port br-ces0 vxlan0-ces0 -- set interface vxlan0-ces0 ofport_request={} -- set interface vxlan0-ces0 type=vxlan options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_VXLAN),
+                   'ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request={} -- set interface geneve0-ces0 type=geneve options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_GENEVE)]
+        for _ in to_exec:
+            self._do_subprocess_call(_)
+
+        ## Configure tun0 port
+        to_exec = ['ip link set dev tun0 arp off',
+                   'ip link set dev tun0 address {}'.format(OVS_PORT_TUN_L3_MAC),
+                   'ip link set dev tun0 mtu 1400',
+                   'ip link set dev tun0 up',
+                   'ip route add {} dev tun0'.format(OVS_PORT_TUN_L3_NET)]
+        for _ in to_exec:
+            self._do_subprocess_call(_)
+
 
     '''
     # This is for CES
@@ -477,21 +529,36 @@ class Network(object):
 
         return [json.dumps(msg1), json.dumps(msg2)]
 
-    @asyncio.coroutine
-    def _sdn_api_get(self, session, url, data):
-        response = yield from session.get(url, data=data)
-        yield from response.release()
-        return response
-
-    @asyncio.coroutine
-    def _sdn_api_post(self, session, url, data):
-        response = yield from session.post(url, data=data)
-        yield from response.release()
-        return response
-
-    @asyncio.coroutine
-    def _sdn_api_delete(self, session, url, data):
-        response = yield from session.delete(url, data=data)
-        yield from response.release()
-        return response
     '''
+
+'''
+# Create OpenvSwitch for CES data tunnelling
+
+## Create OVS bridges
+ovs-vsctl --if-exists del-br br-ces0
+ovs-vsctl             add-br br-ces0
+
+## Set datapath-id (16 hex digits)
+#ovs-vsctl set bridge br-ces0 other-config:datapath-id=0000000000000001
+ovs-vsctl set bridge br-ces0 other-config:datapath-id=0000000000123456
+
+## Configure controller
+ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653
+
+
+## Add ports
+ovs-vsctl add-port br-ces0 tun0         -- set interface tun0         ofport_request=100 -- set interface tun0         type=internal
+ovs-vsctl add-port br-ces0 gre0-ces0    -- set interface gre0-ces0    ofport_request=101 -- set interface gre0-ces0    type=gre       options:key=flow options:remote_ip=flow options:local_ip=flow
+ovs-vsctl add-port br-ces0 vxlan0-ces0  -- set interface vxlan0-ces0  ofport_request=102 -- set interface vxlan0-ces0  type=vxlan     options:key=flow options:remote_ip=flow options:local_ip=flow
+ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request=103 -- set interface geneve0-ces0 type=geneve    options:key=flow options:remote_ip=flow options:local_ip=flow
+
+## Configure tun0 port
+ip link set dev tun0 arp off
+ip link set dev tun0 address 00:00:00:12:34:56
+ip link set dev tun0 mtu 1400
+ip link set dev tun0 up
+ip route add 172.16.0.0/16 dev tun0
+
+
+
+'''
