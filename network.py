@@ -534,12 +534,13 @@ class Network(object):
         while True:
             self._logger.info('Awaiting synchronization of OpenvSwitch datapath with SDN Controller')
             url = API_URL_SWITCHES
-            response = yield from self.rest_api.do_get(url, None)
-            if OVS_DATAPATH_ID in response:
+            # Returns a json encoded list of connected datapaths
+            resp = yield from self.rest_api.do_get(url, None)
+            if OVS_DATAPATH_ID in json.loads(resp):
                 self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
                 break
             else:
-                self._logger.info('OpenvSwitch datapath not connected to SDN Controller / {} != {}'.format(OVS_DATAPATH_ID, response))
+                self._logger.info('OpenvSwitch datapath not connected to SDN Controller / {} != {}'.format(OVS_DATAPATH_ID, resp))
                 self.ready = False
             yield from asyncio.sleep(1)
 
