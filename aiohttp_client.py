@@ -34,7 +34,8 @@ class HTTPRestClient(object):
     @asyncio.coroutine
     def do_post(self, url, data, timeout=None):
         with aiohttp.Timeout(timeout):
-            resp = yield from self.session.post(url, data=data)
+            headers = {'content-type': 'application/json'}
+            resp = yield from self.session.post(url, data=data, headers=headers)
             try:
                 return (yield from resp.json())
             except Exception as e:
@@ -46,7 +47,8 @@ class HTTPRestClient(object):
     @asyncio.coroutine
     def do_put(self, url, data, timeout=None):
         with aiohttp.Timeout(timeout):
-            resp = yield from self.session.put(url, data=data)
+            headers = {'content-type': 'application/json'}
+            resp = yield from self.session.put(url, data=data, headers=headers)
             try:
                 return (yield from resp.json())
             except Exception as e:
@@ -58,7 +60,8 @@ class HTTPRestClient(object):
     @asyncio.coroutine
     def do_delete(self, url, timeout=None):
         with aiohttp.Timeout(timeout):
-            resp = yield from self.session.delete(url)
+            headers = {'content-type': 'application/json'}
+            resp = yield from self.session.delete(url, headers=headers)
             try:
                 return (yield from resp.json())
             except Exception as e:
