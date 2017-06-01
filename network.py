@@ -49,7 +49,7 @@ MASK_WAN_EGRESS          = '0xFF000030/0xFF0000F0'
 MASK_TUN_EGRESS          = '0xFF000040/0xFF0000F0'
 
 # Define variables for SDN API
-OVS_DATAPATH_ID     = '0000000000123456'
+OVS_DATAPATH_ID     = 0x0000000000123456
 OVS_PORT_IN_        = 0xfffffff8
 OVS_PORT_TUN_L3     = 100
 OVS_PORT_TUN_GRE    = 101
@@ -57,6 +57,10 @@ OVS_PORT_TUN_VXLAN  = 102
 OVS_PORT_TUN_GENEVE = 103
 OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
 OVS_PORT_TUN_L3_NET = '172.16.0.0/24'
+
+API_URL_SWITCHES    = 'http://127.0.0.1:8081/stats/switches'
+API_URL_FLOW_ADD    = 'http://127.0.0.1:8081/stats/flowentry/add'
+API_URL_FLOW_DELETE = 'http://127.0.0.1:8081/stats/flowentry/delete'
 
 
 class Network(object):
@@ -78,6 +82,9 @@ class Network(object):
         self.rest_api_init()
         # Create OpenvSwitch
         self.init_openvswitch()
+
+        # Use control variable to indicate readiness
+        self.ready = False
 
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
@@ -449,7 +456,7 @@ class Network(object):
         ## Create OVS bridge, set datapath-id (16 hex digits) and configure controller
         to_exec = ['ovs-vsctl --if-exists del-br br-ces0',
                    'ovs-vsctl add-br br-ces0',
-                   'ovs-vsctl set bridge br-ces0 other-config:datapath-id={}'.format(OVS_DATAPATH_ID),
+                   'ovs-vsctl set bridge br-ces0 other-config:datapath-id={:016x}'.format(OVS_DATAPATH_ID),
                    'ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653']
         for _ in to_exec:
             self._do_subprocess_call(_)
@@ -471,6 +478,18 @@ class Network(object):
         for _ in to_exec:
             self._do_subprocess_call(_)
 
+        # Schedule task to wait for SDN Controller
+        asyncio.ensure_future(self.wait_up())
+
+    @asyncio.coroutine
+    def wait_up(self):
+        """ Check with SDN controller the availability of the OpenvSwitch instance """
+        while True:
+            self.logger.info('wait_up()')
+            url = API_URL_SWITCHES
+            response = yield from self.rest_api.go_get(url, None)
+            print(response)
+            yield from asyncio.sleep(5)
 
     '''
     # This is for CES
@@ -559,6 +578,15 @@ ip link set dev tun0 mtu 1400
 ip link set dev tun0 up
 ip route add 172.16.0.0/16 dev tun0
 
+
+# Run Ryu
+export RYU_PATH="/usr/local/lib/python3.5/dist-packages/ryu"
+ryu-manager --ofp-listen-host 127.0.0.1 \
+            --ofp-tcp-listen-port 6653  \
+            --wsapi-host 127.0.0.1      \
+            --wsapi-port 8081           \
+            --verbose                   \
+            $RYU_PATH/app/ofctl_rest.py
 
 
 '''
