@@ -56,7 +56,7 @@ OVS_PORT_TUN_GRE    = 101
 OVS_PORT_TUN_VXLAN  = 102
 OVS_PORT_TUN_GENEVE = 103
 OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
-OVS_PORT_TUN_L3_NET = '172.16.0.0/24'
+OVS_PORT_TUN_L3_NET = '172.16.0.0/16'
 
 API_URL_SWITCHES    = 'http://127.0.0.1:8081/stats/switches'
 API_URL_FLOW_ADD    = 'http://127.0.0.1:8081/stats/flowentry/add'
@@ -81,7 +81,7 @@ class Network(object):
         # Create HTTP REST Client
         self.rest_api_init()
         # Create OpenvSwitch
-        self.init_openvswitch()
+        self.ovs_create()
 
         # Use control variable to indicate readiness
         self.ready = False
@@ -451,7 +451,7 @@ class Network(object):
     def rest_api_close(self):
         self.rest_api.close()
 
-    def init_openvswitch(self):
+    def ovs_create(self):
         # Create OpenvSwitch for CES data tunnelling
         ## Create OVS bridge, set datapath-id (16 hex digits) and configure controller
         to_exec = ['ovs-vsctl --if-exists del-br br-ces0',
@@ -482,6 +482,53 @@ class Network(object):
         asyncio.ensure_future(self.wait_up())
 
     @asyncio.coroutine
+    def ovs_init_flowtable(self):
+        self._logger.warning('ovs_init_flowtable')
+
+        # Remove all existing flows
+        data = {'dpid': OVS_DATAPATH_ID}
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, data)
+
+        # Populate TABLE 0
+        ## Install miss flow as DROP
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':0, 'match':{}, 'actions':[]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        ## Outgoing CES-Local & CES-CES / Go to table 1
+        data = {'dpid':OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048, 'ipv4_dst':OVS_PORT_TUN_L3_NET},
+                'actions':[{'type':'GOTO_TABLE', 'table_id':1}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        ## Incoming CES-CES from tunneling ports / Go to table 2
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_GRE},
+                'actions':[{'type':'GOTO_TABLE','table_id':2}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_VXLAN},
+                'actions':[{'type':'GOTO_TABLE','table_id':2}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_GENEVE},
+                'actions':[{'type':'GOTO_TABLE','table_id':2}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        # Populate TABLE 1
+        ## Install miss flow as DROP
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':0, 'match':{}, 'actions':[]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        # Populate TABLE 2
+        ## Install miss flow as DROP
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':0, 'match':{}, 'actions':[]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+
+        self._logger.warning('/ovs_init_flowtable')
+
+    @asyncio.coroutine
     def wait_up(self):
         """ Check with SDN controller the availability of the OpenvSwitch datapath """
         while True:
@@ -490,12 +537,14 @@ class Network(object):
             response = yield from self.rest_api.do_get(url, None)
             if OVS_DATAPATH_ID in response:
                 self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
-                self.ready = True
                 break
             else:
                 self._logger.info('OpenvSwitch datapath not connected to SDN Controller / {} != {}'.format(OVS_DATAPATH_ID, response))
                 self.ready = False
             yield from asyncio.sleep(1)
+
+        yield from self.ovs_init_flowtable()
+        self.ready = True
 
     '''
     # This is for CES
