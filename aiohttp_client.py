@@ -15,7 +15,7 @@ class HTTPRestClient(object):
         self.session.close()
 
     @asyncio.coroutine
-    def do_get(self, url, params, timeout=None):
+    def do_get(self, url, params=None, timeout=None):
         with aiohttp.Timeout(timeout):
             resp = yield from self.session.get(url, params=params)
             try:
@@ -73,12 +73,11 @@ def run_tests(rest_cli):
         loop.create_task(rest_cli.do_get('http://httpbin.org/get', {'seq':i}))
         #loop.create_task(rest_cli.do_get('https://api.github.com/events', {'seq':i}))
 
+loop = asyncio.get_event_loop()
+loop.set_debug(True)
 
 if __name__ == '__main__':
     try:
-        loop = asyncio.get_event_loop()
-        loop.set_debug(True)
-
         rest_cli = HTTPRestClient(20)
         run_tests(rest_cli)
         loop.run_forever()
