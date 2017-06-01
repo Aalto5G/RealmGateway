@@ -543,8 +543,11 @@ class Network(object):
         yield from self.ovs_init_flowtable()
         self.ready = True
 
+        # For testing purposes
         yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
@@ -570,64 +573,47 @@ class Network(object):
                            {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
-    '''
-    # This is for CES
+    @asyncio.coroutine
+    def add_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id, tun_type):
+        # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
+        if tun_type == 'gre':
+            tunnel_port = OVS_PORT_TUN_GRE
+        elif tun_type == 'vxlan':
+            tunnel_port = OVS_PORT_TUN_VXLAN
+        elif tun_type == 'geneve':
+            tunnel_port = OVS_PORT_TUN_GENEVE
+        else:
+            raise Exception('Unsupported tunneling type! {}'.format(tun_type))
 
-    def create_tunnel(self):
-        pass
+        # For security, zero IPv4 src and dst fields / TEID <=> tun_id
+        zero_mac  = '00:00:00:00:00:00'
+        zero_ipv4 = '0.0.0.0'
 
-    def delete_tunnel(self):
-        pass
+        # Create outgoing unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':src, 'ipv4_dst':psrc},
+                'actions':[{'type':'SET_FIELD', 'field':'eth_src', 'value':zero_mac},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':zero_mac},
+                           {'type':'SET_FIELD', 'field':'ipv4_src', 'value':zero_ipv4},
+                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':zero_ipv4},
+                           {'type':'SET_FIELD', 'field':'tun_ipv4_src', 'value':tun_src},
+                           {'type':'SET_FIELD', 'field':'tun_ipv4_dst', 'value':tun_dst},
+                           {'type':'SET_FIELD', 'field':'tunnel_id', 'value':tun_id},
+                           {'type':'OUTPUT', 'port':tunnel_port}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
-    def create_connection(self, connection):
+        # Create outgoing unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
+                'match':{'in_port':tunnel_port, 'eth_type':2048,
+                         'tunnel_id':tun_id, 'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src},
+                'actions':[{'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'SET_FIELD', 'field':'ipv4_src', 'value':psrc},
+                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':src},
+                           {'type':'OUTPUT', 'port':OVS_PORT_TUN_L3}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
-        if isinstance(connection, ConnectionCESLocal):
-            msgs = self._flow_add_local(connection)
-
-            for m in msgs:
-                print('Sending...\n',m)
-                self._loop.create_task(self._sdn_api_post(self._session, self._sdn['add'], m))
-
-
-    def delete_connection(self, connection):
-        pass
-
-    def _flow_add_local(self, conn):
-        #TODO: Add timeouts
-
-        mac_src = '00:00:00:00:00:00'
-        mac_dst = self._ports['vtep']['mac']
-
-        msg1 = {}
-        msg1['dpid'] = 1
-        msg1['table_id'] = 1
-        msg1['priority'] = 1
-        msg1['flags'] = 1
-        msg1['match'] = {'eth_type':2048, 'ipv4_src':conn.src, 'ipv4_dst':conn.psrc}
-        msg1['actions'] = [
-                           {'type':'SET_FIELD', 'field':'ipv4_src', 'value':conn.pdst},
-                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':conn.dst},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_src},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_dst},
-                           {'type':'OUTPUT', 'port':4294967288}
-                           ]
-
-        msg2 = {}
-        msg2['dpid'] = 1
-        msg2['table_id'] = 1
-        msg2['priority'] = 1
-        msg2['flags'] = 1
-        msg2['match'] = {'eth_type':2048, 'ipv4_src':conn.dst, 'ipv4_dst':conn.pdst}
-        msg2['actions'] = [{'type':'SET_FIELD', 'field':'ipv4_src', 'value':conn.psrc},
-                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':conn.src},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_src},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':mac_dst},
-                           {'type':'OUTPUT', 'port':4294967288}
-                           ]
-
-        return [json.dumps(msg1), json.dumps(msg2)]
-
-    '''
 
 '''
 # Create OpenvSwitch for CES data tunnelling
