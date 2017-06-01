@@ -50,7 +50,7 @@ MASK_TUN_EGRESS          = '0xFF000040/0xFF0000F0'
 
 # Define variables for SDN API
 OVS_DATAPATH_ID     = 0x0000000000123456
-OVS_PORT_IN_        = 0xfffffff8
+OVS_PORT_IN         = 0xfffffff8
 OVS_PORT_TUN_L3     = 100
 OVS_PORT_TUN_GRE    = 101
 OVS_PORT_TUN_VXLAN  = 102
@@ -542,6 +542,33 @@ class Network(object):
 
         yield from self.ovs_init_flowtable()
         self.ready = True
+
+        yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+
+
+    @asyncio.coroutine
+    def add_local_connection(self, src, psrc, dst, pdst):
+        # Create first unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':src, 'ipv4_dst':psrc},
+                'actions':[{'type':'SET_FIELD', 'field':'ipv4_src', 'value':pdst},
+                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':dst},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+
+        # Create second unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':dst, 'ipv4_dst':pdst},
+                'actions':[{'type':'SET_FIELD', 'field':'ipv4_src', 'value':psrc},
+                           {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':src},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
     '''
     # This is for CES
