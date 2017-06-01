@@ -60,8 +60,7 @@ class HTTPRestClient(object):
     @asyncio.coroutine
     def do_delete(self, url, timeout=None):
         with aiohttp.Timeout(timeout):
-            headers = {'content-type': 'application/json'}
-            resp = yield from self.session.delete(url, headers=headers)
+            resp = yield from self.session.delete(url)
             try:
                 return (yield from resp.json())
             except Exception as e:

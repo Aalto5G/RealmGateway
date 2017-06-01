@@ -487,44 +487,44 @@ class Network(object):
 
         # Remove all existing flows
         data = {'dpid': OVS_DATAPATH_ID}
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
         # Populate TABLE 0
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         ## Outgoing CES-Local & CES-CES / Go to table 1
         data = {'dpid':OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048, 'ipv4_dst':OVS_PORT_TUN_L3_NET},
                 'actions':[{'type':'GOTO_TABLE', 'table_id':1}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         ## Incoming CES-CES from tunneling ports / Go to table 2
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_GRE},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_VXLAN},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_GENEVE},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         # Populate TABLE 1
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         # Populate TABLE 2
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, data)
+        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         self._logger.warning('/ovs_init_flowtable')
 

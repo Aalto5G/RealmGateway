@@ -1,44 +1,44 @@
 # Test flows with Ryu and cUrl
 # Flag=1 - SEND_FLOW_REMOVED
 
-#curl -X POST -d '' http://localhost:8080/stats/flowentry/add
-#curl -X POST -d '' http://localhost:8080/stats/flowentry/delete
+#curl -X POST -d '' http://localhost:8081/stats/flowentry/add
+#curl -X POST -d '' http://localhost:8081/stats/flowentry/delete
 
 # Initialize flows
 
 # Delete all flows
-curl -X POST -d '{"dpid":1,"table_id":255,"priority":10,"flags":0,"match":{},"actions":[]}' http://localhost:8080/stats/flowentry/delete
+curl -X POST -d '{"dpid":1,"table_id":255,"priority":10,"flags":0,"match":{},"actions":[]}' http://localhost:8081/stats/flowentry/delete
 
 
 ################ Flows of TABLE-0 / PACKET CLASSIFIER ################
 
 # Miss flow - DROP
-curl -X POST -d '{"dpid":1,"table_id":0,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":0,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8081/stats/flowentry/add
 
 # Flows CES-Local & CES-to-CES Outgoing via port 1 - VTEP Goto table 1
-curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":1,"eth_type":2048,"ipv4_dst":"172.16.0.0/24"},"actions":[{"type":"GOTO_TABLE","table_id":1}]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":1,"eth_type":2048,"ipv4_dst":"172.16.0.0/24"},"actions":[{"type":"GOTO_TABLE","table_id":1}]}' http://localhost:8081/stats/flowentry/add
 
 # Flows CES-to-CES Incoming via tunneling ports - Goto table 2
-curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":10},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8080/stats/flowentry/add
-curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":11},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8080/stats/flowentry/add
-curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":12},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":10},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8081/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":11},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8081/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":0,"priority":10,"flags":0,"match":{"in_port":12},"actions":[{"type":"GOTO_TABLE","table_id":2}]}' http://localhost:8081/stats/flowentry/add
 
 ################  Flows TABLE-1 / Egress CES-Local & CES-to-CES ################
 # Miss flow - DROP
-curl -X POST -d '{"dpid":1,"table_id":1,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":1,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8081/stats/flowentry/add
 
 # Match on source and destination - mangle and forward via OFPP_IN_PORT (4294967288) for CES-Local
-curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.1"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.2"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":4294967288}]}' http://localhost:8080/stats/flowentry/add
-curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.2"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.1"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":4294967288}]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.1"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.2"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":4294967288}]}' http://localhost:8081/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.2"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.1"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":4294967288}]}' http://localhost:8081/stats/flowentry/add
 
 # Match on source and destination - zero fields and forward via L2 tunneling port with tun_ipv4_src, tun_ipv4_dst, tunnel_id for CES-to-CES
 ## TODO: Verify setting of parameters via OpenFlow of tun_ipv4_src, tun_ipv4_dst (available via ovs-ofctl)
-curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.3"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"0.0.0.0"},{"type":"SET_FIELD","field":"ipv4_dst","value":"0.0.0.0"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:00:00"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:00:00"},{"type":"SET_FIELD","field":"tunnel_id","value":4660},{"type":"OUTPUT","port":10}]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":1,"priority":10,"flags":0,"match":{"eth_type":2048,"ipv4_src":"192.168.0.101","ipv4_dst":"172.16.0.3"},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"0.0.0.0"},{"type":"SET_FIELD","field":"ipv4_dst","value":"0.0.0.0"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:00:00"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:00:00"},{"type":"SET_FIELD","field":"tunnel_id","value":4660},{"type":"OUTPUT","port":10}]}' http://localhost:8081/stats/flowentry/add
 
 
 ################  Flows TABLE-2 / Ingress CES-to-CES  ################
 # Miss flow - DROP
-curl -X POST -d '{"dpid":1,"table_id":2,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":2,"priority":1,"flags":0,"match":{},"actions":[]}' http://localhost:8081/stats/flowentry/add
 
 # Match on in_port & tunnel_id - mangle and forward via VTEP for CES-to-CES
-curl -X POST -d '{"dpid":1,"table_id":2,"priority":10,"flags":0,"match":{"in_port":10,"tunnel_id":4660,"eth_type":2048},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.3"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":1}]}' http://localhost:8080/stats/flowentry/add
+curl -X POST -d '{"dpid":1,"table_id":2,"priority":10,"flags":0,"match":{"in_port":10,"tunnel_id":4660,"eth_type":2048},"actions":[{"type":"SET_FIELD","field":"ipv4_src","value":"172.16.0.3"},{"type":"SET_FIELD","field":"ipv4_dst","value":"192.168.0.101"},{"type":"SET_FIELD","field":"eth_src","value":"00:00:00:00:01:CC"},{"type":"SET_FIELD","field":"eth_dst","value":"00:00:00:00:01:CC"},{"type":"OUTPUT","port":1}]}' http://localhost:8081/stats/flowentry/add
