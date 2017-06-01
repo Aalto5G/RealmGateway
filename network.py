@@ -549,6 +549,9 @@ class Network(object):
         yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
         yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
 
+        yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+
+
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
         # Create first unidirectional connection
@@ -572,6 +575,20 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+
+    @asyncio.coroutine
+    def delete_local_connection(self, src, psrc, dst, pdst):
+        # Delete first unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':src, 'ipv4_dst':psrc}}
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+
+        # Delete second unidirectional connection
+        data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
+                'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
+                         'ipv4_src':dst, 'ipv4_dst':pdst}}
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
     @asyncio.coroutine
     def add_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id, tun_type):
@@ -660,7 +677,7 @@ ryu-manager --ofp-listen-host 127.0.0.1 \
 
 # This command should produce the included output, however the Ryu REST API is broken
 
-sudo ovs-ofctl add-flow -O OpenFlow13 br-ces0 "table=2,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:5->tun_id,output:101"
+sudo ovs-ofctl add-flow br-ces0 "table=2,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:5->tun_id,output:101"
 
 {"1193046": [{"table_id": 2, "priority": 10, "duration_sec": 58, "duration_nsec": 877000000, "match": {"dl_type": 2048, "nw_src": "192.168.0.100", "in_port": 100, "nw_dst": "172.16.0.1"}, "actions": ["SET_FIELD: {tun_ipv4_src:100.64.1.130}", "SET_FIELD: {tun_ipv4_dst:100.64.2.130}", "SET_FIELD: {tunnel_id:5}", "OUTPUT:101"], "idle_timeout": 0, "length": 160, "packet_count": 0, "hard_timeout": 0, "flags": 0, "cookie": 0, "byte_count": 0}]}
 
