@@ -69,9 +69,6 @@ class HTTPRestClient(object):
 
 
 def run_tests(rest_cli):
-    loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-
     for i in range(0,100):
         loop.create_task(rest_cli.do_get('http://httpbin.org/get', {'seq':i}))
         #loop.create_task(rest_cli.do_get('https://api.github.com/events', {'seq':i}))
@@ -79,6 +76,9 @@ def run_tests(rest_cli):
 
 if __name__ == '__main__':
     try:
+        loop = asyncio.get_event_loop()
+        loop.set_debug(True)
+
         rest_cli = HTTPRestClient(20)
         run_tests(rest_cli)
         loop.run_forever()
