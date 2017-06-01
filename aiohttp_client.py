@@ -20,7 +20,7 @@ class HTTPRestClient(object):
             resp = yield from self.session.get(url, params=params)
             try:
                 # Any actions that may lead to error:
-                return (yield from resp.json())
+                return (yield from resp.text())
             except Exception as e:
                 # .close() on exception.
                 resp.close()
@@ -32,12 +32,12 @@ class HTTPRestClient(object):
                 yield from resp.release()
 
     @asyncio.coroutine
-    def do_post(self, url, data, timeout=None):
+    def do_post(self, url, data, content_type='application/json', timeout=None):
         with aiohttp.Timeout(timeout):
-            headers = {'content-type': 'application/json'}
+            headers = {'content-type': content_type}
             resp = yield from self.session.post(url, data=data, headers=headers)
             try:
-                return (yield from resp.json())
+                return (yield from resp.text())
             except Exception as e:
                 resp.close()
                 raise e
@@ -45,12 +45,12 @@ class HTTPRestClient(object):
                 yield from resp.release()
 
     @asyncio.coroutine
-    def do_put(self, url, data, timeout=None):
+    def do_put(self, url, data, content_type='application/json', timeout=None):
         with aiohttp.Timeout(timeout):
-            headers = {'content-type': 'application/json'}
+            headers = {'content-type': content_type}
             resp = yield from self.session.put(url, data=data, headers=headers)
             try:
-                return (yield from resp.json())
+                return (yield from resp.text())
             except Exception as e:
                 resp.close()
                 raise e
@@ -62,7 +62,7 @@ class HTTPRestClient(object):
         with aiohttp.Timeout(timeout):
             resp = yield from self.session.delete(url)
             try:
-                return (yield from resp.json())
+                return (yield from resp.text())
             except Exception as e:
                 resp.close()
                 raise e
@@ -75,11 +75,11 @@ def run_tests(rest_cli):
         loop.create_task(rest_cli.do_get('http://httpbin.org/get', {'seq':i}))
         #loop.create_task(rest_cli.do_get('https://api.github.com/events', {'seq':i}))
 
-loop = asyncio.get_event_loop()
-loop.set_debug(True)
 
 if __name__ == '__main__':
     try:
+        loop = asyncio.get_event_loop()
+        loop.set_debug(True)
         rest_cli = HTTPRestClient(20)
         run_tests(rest_cli)
         loop.run_forever()
