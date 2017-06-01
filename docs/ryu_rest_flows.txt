@@ -1,13 +1,19 @@
 # Test flows with Ryu and cUrl
 # Flag=1 - SEND_FLOW_REMOVED
 
+#curl -X GET http://localhost:8081/stats/switches
 #curl -X POST -d '' http://localhost:8081/stats/flowentry/add
 #curl -X POST -d '' http://localhost:8081/stats/flowentry/delete
 
 # Initialize flows
 
+# Get all flows
+curl -X GET -d '' http://localhost:8081/stats/flow/1
+
 # Delete all flows
 curl -X POST -d '{"dpid":1,"table_id":255,"priority":10,"flags":0,"match":{},"actions":[]}' http://localhost:8081/stats/flowentry/delete
+
+curl -X POST -d '{"dpid":1}' http://localhost:8081/stats/flowentry/delete
 
 
 ################ Flows of TABLE-0 / PACKET CLASSIFIER ################

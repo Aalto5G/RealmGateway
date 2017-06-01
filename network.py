@@ -654,4 +654,15 @@ ryu-manager --ofp-listen-host 127.0.0.1 \
             $RYU_PATH/app/ofctl_rest.py
 
 
+# Default $RYU_PATH/app/ofctl_rest.py is broken and does not parse some fields
+  * Unknown match field: tun_ipv4_dst
+  * Unknown match field: tun_ipv4_src
+
+# This command should produce the included output, however the Ryu REST API is broken
+
+sudo ovs-ofctl add-flow -O OpenFlow13 br-ces0 "table=2,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:5->tun_id,output:101"
+
+{"1193046": [{"table_id": 2, "priority": 10, "duration_sec": 58, "duration_nsec": 877000000, "match": {"dl_type": 2048, "nw_src": "192.168.0.100", "in_port": 100, "nw_dst": "172.16.0.1"}, "actions": ["SET_FIELD: {tun_ipv4_src:100.64.1.130}", "SET_FIELD: {tun_ipv4_dst:100.64.2.130}", "SET_FIELD: {tunnel_id:5}", "OUTPUT:101"], "idle_timeout": 0, "length": 160, "packet_count": 0, "hard_timeout": 0, "flags": 0, "cookie": 0, "byte_count": 0}]}
+
+
 '''
