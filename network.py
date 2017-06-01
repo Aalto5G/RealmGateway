@@ -485,11 +485,17 @@ class Network(object):
     def wait_up(self):
         """ Check with SDN controller the availability of the OpenvSwitch instance """
         while True:
-            self.logger.info('wait_up()')
+            self._logger.info('Awaiting synchronization of OpenvSwitch datapath with Ryu SDN Controller')
             url = API_URL_SWITCHES
             response = yield from self.rest_api.go_get(url, None)
-            print(response)
-            yield from asyncio.sleep(5)
+            if OVS_DATAPATH_ID in response:
+                self._logger.info('OpenvSwitch datapath connected to Ryu SDN Controller')
+                self.ready = True
+                break
+            else:
+                self._logger.info('OpenvSwitch datapath not connected to Ryu SDN Controller: {} != {}'.format(OVS_DATAPATH_ID, response))
+                self.ready = False
+            yield from asyncio.sleep(1)
 
     '''
     # This is for CES
