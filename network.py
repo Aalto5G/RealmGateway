@@ -483,8 +483,6 @@ class Network(object):
 
     @asyncio.coroutine
     def ovs_init_flowtable(self):
-        self._logger.warning('ovs_init_flowtable')
-
         # Remove all existing flows
         data = {'dpid': OVS_DATAPATH_ID}
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
@@ -525,8 +523,6 @@ class Network(object):
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':0, 'match':{}, 'actions':[]}
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
-
-        self._logger.warning('/ovs_init_flowtable')
 
     @asyncio.coroutine
     def wait_up(self):
