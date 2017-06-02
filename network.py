@@ -547,9 +547,10 @@ class Network(object):
         yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
         yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
 
-        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
         #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
         #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
+        yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
@@ -610,7 +611,7 @@ class Network(object):
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
                          'ipv4_src':src, 'ipv4_dst':psrc},
                 'actions':[{'type':'SET_FIELD', 'field':'eth_src', 'value':zero_mac},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':zero_mac},
+                           {'type':'SET_FIELD', 'field':'eth_dst', 'value':zero_mac},
                            {'type':'SET_FIELD', 'field':'ipv4_src', 'value':zero_ipv4},
                            {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':zero_ipv4},
                            {'type':'SET_FIELD', 'field':'tun_ipv4_src', 'value':tun_src},
@@ -624,7 +625,7 @@ class Network(object):
                 'match':{'in_port':tunnel_port, 'eth_type':2048,
                          'tunnel_id':tun_id, 'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src},
                 'actions':[{'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
-                           {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
+                           {'type':'SET_FIELD', 'field':'eth_dst', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'SET_FIELD', 'field':'ipv4_src', 'value':psrc},
                            {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':src},
                            {'type':'OUTPUT', 'port':OVS_PORT_TUN_L3}]}
