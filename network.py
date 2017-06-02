@@ -647,13 +647,13 @@ class Network(object):
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
                          'ipv4_src':src, 'ipv4_dst':psrc}}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
         # Delete outgoing unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
                 'match':{'in_port':tunnel_port, 'eth_type':2048,
                          'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id}}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
 '''
 # Create OpenvSwitch for CES data tunnelling
