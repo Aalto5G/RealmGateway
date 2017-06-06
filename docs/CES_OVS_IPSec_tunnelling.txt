@@ -1,0 +1,159 @@
+# IPSec configuration
+
+FILE: /etc/ipsec.conf
+
+# Configuration for IPSec via StrongSwan
+config setup
+
+conn %default
+    ikelifetime=60m
+    keylife=20m
+    rekeymargin=3m
+    keyingtries=1
+    authby=psk
+    mobike=no
+    ike=aes128-sha256-ecp256,aes256-sha384-ecp384,aes128-sha256-modp2048,aes128-sha1-modp2048,aes256-sha384-modp4096,aes256-sha256-modp4096,aes256-sha1-modp4096,aes128-sha256-modp1536,aes128-sha1-modp1536,aes256-sha384-modp2048,aes256-sha256-modp2048,aes256-sha1-modp2048,aes128-sha256-modp1024,aes128-sha1-modp1024,aes256-sha384-modp1536,aes256-sha256-modp1536,aes256-sha1-modp1536,aes256-sha384-modp1024,aes256-sha256-modp1024,aes256-sha1-modp1024!
+    esp=aes128gcm16-ecp256,aes256gcm16-ecp384,aes128-sha256-ecp256,aes256-sha384-ecp384,aes128-sha256-modp2048,aes128-sha1-modp2048,aes256-sha384-modp4096,aes256-sha256-modp4096,aes256-sha1-modp4096,aes128-sha256-modp1536,aes128-sha1-modp1536,aes256-sha384-modp2048,aes256-sha256-modp2048,aes256-sha1-modp2048,aes128-sha256-modp1024,aes128-sha1-modp1024,aes256-sha384-modp1536,aes256-sha256-modp1536,aes256-sha1-modp1536,aes256-sha384-modp1024,aes256-sha256-modp1024,aes256-sha1-modp1024,aes128gcm16,aes256gcm16,aes128-sha256,aes128-sha1,aes256-sha384,aes256-sha256,aes256-sha1!
+
+conn aalto-test
+    keyexchange=ikev2
+    left=100.64.1.130
+    leftid=100.64.1.130
+    leftsubnet=100.64.1.130/32
+    #leftfirewall=yes
+    right=100.64.2.130
+    rightid=100.64.2.130
+    rightsubnet=100.64.2.130/32
+    #rightfirewall=yes
+    auto=route
+    mark=0xee000000
+    # Traffic selection can also be done as follows, however it creates a full mesh number of policies and does not work for the tunneling. We use iptables packet MARKing for steering traffic towards StrongSwan
+    leftsubnet=100.64.1.130/32[gre],100.64.1.130/32[udp/4789],100.64.1.130/32[udp/6081]
+
+
+FILE: /etc/ipsec.secrets
+
+# This file holds shared secrets or RSA private keys for authentication.
+
+# RSA private key for this host, authenticating it to any other host
+# which knows the public part.
+
+100.64.1.130 100.64.2.130 : PSK "a2f4b0b1a5917d0be0a700ff00fdc74b"
+100.64.2.130 100.64.1.130 : PSK "a2f4b0b1a5917d0be0a700ff00fdc74b"
+
+
+# 1.a Configure iptables flow marks for steering matching traffic into IPSec tunnel - Protocol specific
+flushIptables
+conntrack -F
+
+## Sending side
+# MARKing in raw.OUTPUT does not send the packet via IPSEC (OVS 2.7.0 & strongSwan U5.3.5/K4.8.0-51-generic)
+iptables -t mangle -A OUTPUT  -p gre              -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+#iptables -t mangle -A OUTPUT  -p udp --dport 4789 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+#iptables -t mangle -A OUTPUT  -p udp --dport 6081 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+
+## Receiving side
+# MARKing in raw.PREROUTING also sends the packet via IPSEC
+iptables -t mangle -A PREROUTING -p esp              -m mark --mark 0x00           -m comment --comment "Mark packet for IPSec decapsulation / GOES TO IPSEC!" -j MARK --set-mark 0xee000000
+iptables -t mangle -A PREROUTING -p gre              -m mark --mark 0xee000000     -m comment --comment "Match IPSec decapsulated"
+#iptables -t mangle -A PREROUTING -p udp --dport 4789 -m mark --mark 0xee000000     -m comment --comment "Match IPSec decapsulated"
+#iptables -t mangle -A PREROUTING -p udp --dport 6081 -m mark --mark 0xee000000     -m comment --comment "Match IPSec decapsulated"
+
+
+# 1.b Configure iptables flow marks for steering matching traffic into IPSec tunnel - Protocol specific with traffic selection based on IP.tos
+flushIptables
+conntrack -F
+
+## Sending side
+# MARKing in raw.OUTPUT does not send the packet via IPSEC (OVS 2.7.0 & strongSwan U5.3.5/K4.8.0-51-generic)
+# Send via IPSec mangled packets in OVS via IP.tos inherit tunnel option
+iptables -t mangle -A OUTPUT  -p gre              -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+iptables -t mangle -A OUTPUT  -p udp --dport 4789 -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+iptables -t mangle -A OUTPUT  -p udp --dport 6081 -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+
+## Receiving side
+# MARKing in raw.PREROUTING also sends the packet via IPSEC
+iptables -t mangle -A PREROUTING -p esp                                -m mark --mark 0x00             -m comment --comment "Mark packet for IPSec decapsulation" -j MARK --set-mark 0xee000000
+iptables -t mangle -A PREROUTING -p gre              -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+iptables -t mangle -A PREROUTING -p udp --dport 4789 -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+iptables -t mangle -A PREROUTING -p udp --dport 6081 -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+
+
+
+###############################################################################
+###############################################################################
+
+## Create OVS bridges
+ovs-vsctl --if-exists del-br br-ces0
+ovs-vsctl             add-br br-ces0
+
+## Add ports
+ovs-vsctl add-port br-ces0 tun0         -- set interface tun0         ofport_request=100 -- set interface tun0         type=internal
+ovs-vsctl add-port br-ces0 gre0-ces0    -- set interface gre0-ces0    ofport_request=101 -- set interface gre0-ces0    type=gre       options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
+ovs-vsctl add-port br-ces0 vxlan0-ces0  -- set interface vxlan0-ces0  ofport_request=102 -- set interface vxlan0-ces0  type=vxlan     options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
+ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request=103 -- set interface geneve0-ces0 type=geneve    options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
+
+## Configure tun0 port
+ip link set dev tun0 arp off
+ip link set dev tun0 address 00:00:00:12:34:56
+ip link set dev tun0 mtu 1400
+ip link set dev tun0 up
+ip route add 172.16.0.0/16 dev tun0
+
+
+
+# Flows in CES-A
+
+sudo ovs-ofctl del-flows br-ces0
+
+# GRE - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:5->tun_id,output:101"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=101,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=5 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.1,mod_nw_dst:192.168.0.100,output:100"
+
+# VXLAN - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.2 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:6->tun_id,output:102"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=102,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=6 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.2,mod_nw_dst:192.168.0.100,output:100"
+
+# GENEVE - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.3 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:7->tun_id,output:103"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=103,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=7 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.3,mod_nw_dst:192.168.0.100,output:100"
+
+# GRE with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.11 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:50->tun_id,output:101"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=101,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=50,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.11,mod_nw_dst:192.168.0.100,output:100"
+# VXLAN with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.12 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:60->tun_id,output:102"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=102,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=60,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.12,mod_nw_dst:192.168.0.100,output:100"
+# GENEVE with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.13 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.1.130->tun_src,set_field:100.64.2.130->tun_dst,set_field:70->tun_id,output:103"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=103,ip,tun_src=100.64.2.130,tun_dst=100.64.1.130,tun_id=70,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.13,mod_nw_dst:192.168.0.100,output:100"
+
+
+
+# Flows in CES-B
+
+sudo ovs-ofctl del-flows br-ces0
+
+# GRE - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.1 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:5->tun_id,output:101"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=101,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=5 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.1,mod_nw_dst:192.168.0.100,output:100"
+
+# VXLAN - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.2 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:6->tun_id,output:102"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=102,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=6 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.2,mod_nw_dst:192.168.0.100,output:100"
+
+# GENEVE - test
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.3 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:7->tun_id,output:103"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=103,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=7 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.3,mod_nw_dst:192.168.0.100,output:100"
+
+# GRE with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.11 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:50->tun_id,output:101"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=101,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=50,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.11,mod_nw_dst:192.168.0.100,output:100"
+# VXLAN with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.12 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:60->tun_id,output:102"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=102,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=60,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.12,mod_nw_dst:192.168.0.100,output:100"
+# GENEVE with TOS
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.13 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:70->tun_id,output:103"
+sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=103,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=70,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.13,mod_nw_dst:192.168.0.100,output:100"
+
+
