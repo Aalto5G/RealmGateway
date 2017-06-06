@@ -50,7 +50,8 @@ MASK_WAN_EGRESS          = '0xFF000030/0xFF0000F0'
 MASK_TUN_EGRESS          = '0xFF000040/0xFF0000F0'
 
 # Define variables for SDN API
-OVS_DATAPATH_ID     = 0x0000000000123456
+OVS_DATAPATH_ID     = 0x0000000000000001
+#OVS_DATAPATH_ID     = 0x0000000000123456
 OVS_PORT_IN         = 0xfffffff8
 OVS_PORT_TUN_L3     = 100
 OVS_PORT_TUN_GRE    = 101
@@ -58,6 +59,7 @@ OVS_PORT_TUN_VXLAN  = 102
 OVS_PORT_TUN_GENEVE = 103
 OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
 OVS_PORT_TUN_L3_NET = '172.16.0.0/16'
+OVS_DIFFSERV_MARK   = 10 #DSCP10 AF11 priority traffic & low drop probability / Sets 6 bits field IP.dscp
 
 API_URL_SWITCHES    = 'http://127.0.0.1:8081/stats/switches'
 API_URL_FLOW_ADD    = 'http://127.0.0.1:8081/stats/flowentry/add'
@@ -554,7 +556,7 @@ class Network(object):
         yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
 
         yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan', True)
         #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 70, 'geneve')
         yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
 
@@ -628,6 +630,9 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'tun_ipv4_dst', 'value':tun_dst},
                            {'type':'SET_FIELD', 'field':'tunnel_id', 'value':tun_id_out},
                            {'type':'OUTPUT', 'port':tunnel_port}]}
+        if diffserv:
+            # Add second to last action for setting IP.dscp field for DiffServ treatment
+            data['actions'].insert(-1, {'type':'SET_FIELD', 'field':'ip_dscp', 'value':OVS_DIFFSERV_MARK})
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         # Create outgoing unidirectional connection
@@ -639,6 +644,9 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'ipv4_src', 'value':psrc},
                            {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':src},
                            {'type':'OUTPUT', 'port':OVS_PORT_TUN_L3}]}
+        if diffserv:
+            # Add matching of IP.dscp field for DiffServ treatment
+            data['match']['ip_dscp'] = OVS_DIFFSERV_MARK
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
     @asyncio.coroutine
@@ -665,7 +673,11 @@ class Network(object):
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
                 'match':{'in_port':tunnel_port, 'eth_type':2048,
                          'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id_in}}
+        if diffserv:
+            # Add matching of IP.dscp field for DiffServ treatment
+            data['match']['ip_dscp'] = OVS_DIFFSERV_MARK
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+
 
 '''
 # Create OpenvSwitch for CES data tunnelling
@@ -675,8 +687,7 @@ ovs-vsctl --if-exists del-br br-ces0
 ovs-vsctl             add-br br-ces0
 
 ## Set datapath-id (16 hex digits)
-#ovs-vsctl set bridge br-ces0 other-config:datapath-id=0000000000000001
-ovs-vsctl set bridge br-ces0 other-config:datapath-id=0000000000123456
+ovs-vsctl set bridge br-ces0 other-config:datapath-id=0000000000000001
 
 ## Configure controller
 ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653
@@ -684,9 +695,9 @@ ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653
 
 ## Add ports
 ovs-vsctl add-port br-ces0 tun0         -- set interface tun0         ofport_request=100 -- set interface tun0         type=internal
-ovs-vsctl add-port br-ces0 gre0-ces0    -- set interface gre0-ces0    ofport_request=101 -- set interface gre0-ces0    type=gre       options:key=flow options:remote_ip=flow options:local_ip=flow
-ovs-vsctl add-port br-ces0 vxlan0-ces0  -- set interface vxlan0-ces0  ofport_request=102 -- set interface vxlan0-ces0  type=vxlan     options:key=flow options:remote_ip=flow options:local_ip=flow
-ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request=103 -- set interface geneve0-ces0 type=geneve    options:key=flow options:remote_ip=flow options:local_ip=flow
+ovs-vsctl add-port br-ces0 gre0-ces0    -- set interface gre0-ces0    ofport_request=101 -- set interface gre0-ces0    type=gre       options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
+ovs-vsctl add-port br-ces0 vxlan0-ces0  -- set interface vxlan0-ces0  ofport_request=102 -- set interface vxlan0-ces0  type=vxlan     options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
+ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request=103 -- set interface geneve0-ces0 type=geneve    options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit
 
 ## Configure tun0 port
 ip link set dev tun0 arp off
