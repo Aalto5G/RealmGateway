@@ -727,4 +727,24 @@ sudo ovs-ofctl add-flow br-ces0 "table=2,priority=10,in_port=101,ip,tun_src=100.
 
 {"1193046": [{"match": {"tunnel_id": 5, "tun_ipv4_dst": "100.64.1.130", "dl_type": 2048, "in_port": 101, "tun_ipv4_src": "100.64.2.130"}, "priority": 10, "flags": 4, "packet_count": 0, "hard_timeout": 0, "duration_sec": 19, "length": 184, "cookie": 0, "idle_timeout": 0, "duration_nsec": 519000000, "byte_count": 0, "actions": ["SET_FIELD: {eth_src:00:00:00:12:34:56}", "SET_FIELD: {eth_dst:00:00:00:12:34:56}", "SET_FIELD: {ipv4_src:172.16.0.2}", "SET_FIELD: {ipv4_dst:192.168.0.100}", "OUTPUT:100"], "table_id": 2}]}
 
+
+# This is a bit of info regarding the necessary iptables rules for DiffServ/IPSec
+## AF11 == DSCP.10 (6 bit) which translates into IP.tos= = 0x40 (8 bit)
+## MARK 0xee000000 as traffic selector for IPSec tunnel
+
+## Sending side
+# MARKing in raw.OUTPUT does not send the packet via IPSEC (OVS 2.7.0 & strongSwan U5.3.5/K4.8.0-51-generic)
+# Send via IPSec mangled packets in OVS via IP.tos inherit tunnel option
+iptables -t mangle -A OUTPUT  -p gre              -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+iptables -t mangle -A OUTPUT  -p udp --dport 4789 -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+iptables -t mangle -A OUTPUT  -p udp --dport 6081 -m tos --tos 0x40 -m mark --mark 0x00 -j MARK --set-mark 0xee000000 -m comment --comment "Mark packet for IPSec encapsulation"
+
+## Receiving side
+# MARKing in raw.PREROUTING also sends the packet via IPSEC
+iptables -t mangle -A PREROUTING -p esp                                -m mark --mark 0x00             -m comment --comment "Mark packet for IPSec decapsulation" -j MARK --set-mark 0xee000000
+iptables -t mangle -A PREROUTING -p gre              -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+iptables -t mangle -A PREROUTING -p udp --dport 4789 -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+iptables -t mangle -A PREROUTING -p udp --dport 6081 -m tos --tos 0x40 -m mark --mark 0xee000000       -m comment --comment "Match IPSec decapsulated / packet counter"
+
+
 '''
