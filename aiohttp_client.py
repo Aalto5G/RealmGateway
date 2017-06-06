@@ -5,6 +5,8 @@ import json
 import logging
 import time
 
+# Make this Exception importable from other modules with custom name
+from aiohttp.client_exceptions import ClientConnectorError as HTTPClientConnectorError
 
 class HTTPRestClient(object):
     def __init__(self, limit):
