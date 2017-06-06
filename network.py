@@ -11,6 +11,7 @@ from aalto_helpers import utils3
 from aalto_helpers import iptc_helper3
 from aalto_helpers import iproute2_helper3
 from aiohttp_client import HTTPRestClient
+from aiohttp_client import HTTPClientConnectorError
 from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
@@ -444,15 +445,15 @@ class Network(object):
             return False
 
 
-    def rest_api_init(self):
+    def rest_api_init(self, n=5):
         """ Create long lived HTTP session """
-        self.rest_api = HTTPRestClient(5)
+        self.rest_api = HTTPRestClient(n)
 
     def rest_api_close(self):
         self.rest_api.close()
 
     def ovs_create(self):
-        # Create OpenvSwitch for CES data tunnelling
+        self._logger.info('Create OpenvSwitch for CES data tunnelling')
         ## Create OVS bridge, set datapath-id (16 hex digits) and configure controller
         to_exec = ['ovs-vsctl --if-exists del-br br-ces0',
                    'ovs-vsctl add-br br-ces0',
@@ -463,9 +464,9 @@ class Network(object):
 
         ## Add ports
         to_exec = ['ovs-vsctl add-port br-ces0 tun0 -- set interface tun0 ofport_request={} -- set interface tun0 type=internal'.format(OVS_PORT_TUN_L3),
-                   'ovs-vsctl add-port br-ces0 gre0-ces0 -- set interface gre0-ces0 ofport_request={} -- set interface gre0-ces0 type=gre options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_GRE),
-                   'ovs-vsctl add-port br-ces0 vxlan0-ces0 -- set interface vxlan0-ces0 ofport_request={} -- set interface vxlan0-ces0 type=vxlan options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_VXLAN),
-                   'ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request={} -- set interface geneve0-ces0 type=geneve options:key=flow options:remote_ip=flow options:local_ip=flow'.format(OVS_PORT_TUN_GENEVE)]
+                   'ovs-vsctl add-port br-ces0 gre0-ces0 -- set interface gre0-ces0 ofport_request={} -- set interface gre0-ces0 type=gre options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit'.format(OVS_PORT_TUN_GRE),
+                   'ovs-vsctl add-port br-ces0 vxlan0-ces0 -- set interface vxlan0-ces0 ofport_request={} -- set interface vxlan0-ces0 type=vxlan options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit'.format(OVS_PORT_TUN_VXLAN),
+                   'ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request={} -- set interface geneve0-ces0 type=geneve options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit'.format(OVS_PORT_TUN_GENEVE)]
         for _ in to_exec:
             self._do_subprocess_call(_)
 
@@ -483,6 +484,7 @@ class Network(object):
 
     @asyncio.coroutine
     def ovs_init_flowtable(self):
+        self._logger.info('Bootstrapping OpenvSwitch flow table')
         # Remove all existing flows
         data = {'dpid': OVS_DATAPATH_ID}
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
@@ -528,17 +530,21 @@ class Network(object):
     def wait_up(self):
         """ Check with SDN controller the availability of the OpenvSwitch datapath """
         while True:
-            self._logger.info('Awaiting synchronization of OpenvSwitch datapath with SDN Controller')
+            self._logger.debug('Awaiting synchronization of OpenvSwitch datapath with SDN Controller')
             url = API_URL_SWITCHES
-            # Returns a json encoded list of connected datapaths
-            resp = yield from self.rest_api.do_get(url, None)
-            if OVS_DATAPATH_ID in json.loads(resp):
-                self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
-                break
-            else:
-                self._logger.info('OpenvSwitch datapath not connected to SDN Controller / {} != {}'.format(OVS_DATAPATH_ID, resp))
-                self.ready = False
-            yield from asyncio.sleep(1)
+            try:
+                # Returns a json encoded list of connected datapaths
+                resp = yield from self.rest_api.do_get(url, None)
+                if OVS_DATAPATH_ID in json.loads(resp):
+                    self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
+                    break
+                else:
+                    self._logger.warning('OpenvSwitch datapath not connected to SDN Controller / {} not in {}'.format(OVS_DATAPATH_ID, resp))
+                    self.ready = False
+            except HTTPClientConnectorError as e:
+                self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
+
+            yield from asyncio.sleep(2)
 
         yield from self.ovs_init_flowtable()
         self.ready = True
@@ -547,13 +553,14 @@ class Network(object):
         yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
         yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
 
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
-        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 'vxlan')
-        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 'geneve')
-        yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 'gre')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
+        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan')
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 70, 'geneve')
+        yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
+        self._logger.info('Create CES local connection {}:{} <=> {}:{}'.format(src, psrc, dst, pdst))
         # Create first unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
@@ -578,6 +585,7 @@ class Network(object):
 
     @asyncio.coroutine
     def delete_local_connection(self, src, psrc, dst, pdst):
+        self._logger.info('Delete CES local connection {}:{} <=> {}:{}'.format(src, psrc, dst, pdst))
         # Delete first unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
@@ -591,7 +599,9 @@ class Network(object):
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
     @asyncio.coroutine
-    def add_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id, tun_type):
+    def add_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv=False):
+        self._logger.info('Create CES tunnel connection {}:{} / {}:{}  tun_in={} tun_out={} [{} diffserv={}]'.format(src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv))
+
         # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
         if tun_type == 'gre':
             tunnel_port = OVS_PORT_TUN_GRE
@@ -616,14 +626,14 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'ipv4_dst', 'value':zero_ipv4},
                            {'type':'SET_FIELD', 'field':'tun_ipv4_src', 'value':tun_src},
                            {'type':'SET_FIELD', 'field':'tun_ipv4_dst', 'value':tun_dst},
-                           {'type':'SET_FIELD', 'field':'tunnel_id', 'value':tun_id},
+                           {'type':'SET_FIELD', 'field':'tunnel_id', 'value':tun_id_out},
                            {'type':'OUTPUT', 'port':tunnel_port}]}
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
         # Create outgoing unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
                 'match':{'in_port':tunnel_port, 'eth_type':2048,
-                         'tunnel_id':tun_id, 'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src},
+                         'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id_in},
                 'actions':[{'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'SET_FIELD', 'field':'eth_dst', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'SET_FIELD', 'field':'ipv4_src', 'value':psrc},
@@ -632,7 +642,9 @@ class Network(object):
         yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
 
     @asyncio.coroutine
-    def delete_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id, tun_type):
+    def delete_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv=False):
+        self._logger.info('Delete CES tunnel connection {}:{} / {}:{}  tun_in={} tun_out={} [{} diffserv={}]'.format(src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv))
+
         # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
         if tun_type == 'gre':
             tunnel_port = OVS_PORT_TUN_GRE
@@ -649,10 +661,10 @@ class Network(object):
                          'ipv4_src':src, 'ipv4_dst':psrc}}
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
-        # Delete outgoing unidirectional connection
+        # Delete incoming unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
                 'match':{'in_port':tunnel_port, 'eth_type':2048,
-                         'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id}}
+                         'tun_ipv4_src':tun_dst, 'tun_ipv4_dst':tun_src, 'tunnel_id':tun_id_in}}
         yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
 
 '''
