@@ -1,1 +1,4 @@
 1. Improve graceful shutdown. Currently there is a coroutine that gives an error (cpool cleanup)
+2. Fix bug with tunnel src/dst matches in Ryu rest API - low priority
+3. Add verbose argument to rgw.py for debugging
+4. Add a CES / RGW argument to the code for the operation mode (no SDN controller needed in RGW)
