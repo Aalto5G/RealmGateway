@@ -30,5 +30,5 @@ cd src
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder ../config.d/gwa.subscriber.d/       \
-          --repository-policy-folder     ../config.d/gwa.policy.d/
+          --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
+          --repository-policy-folder     ../config.d/gwa.demo.policy.d/
