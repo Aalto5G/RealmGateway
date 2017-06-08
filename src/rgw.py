@@ -178,14 +178,14 @@ class RealmGateway(object):
         self._capture_signal()
         # Initialize Data Repository
         self._init_datarepository()
+        # Initialize Address Pools
+        self._init_pools()
         # Initialize Host table
         self._init_hosttable()
         # Initialize Connection table
         self._init_connectiontable()
         # Initialize Network
         self._init_network()
-        # Initialize Address Pools
-        self._init_pools()
         # Initialize DNS
         self._init_dns()
         # Initialize configured subscriber data wrapped as a corutine
