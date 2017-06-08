@@ -7,7 +7,7 @@ if [[ $UID != 0 ]]; then
 fi
 
 echo "Starting Realm Gateway as gwa.demo"
-
+cd src
 ./rgw.py  --name gwa.demo                                                    \
           --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
           --dns-server-local 127.0.0.1 53                                    \
@@ -30,5 +30,5 @@ echo "Starting Realm Gateway as gwa.demo"
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder config.d/gwa.subscriber.d/          \
-          --repository-policy-folder     config.d/gwa.policy.d/
+          --repository-subscriber-folder ../config.d/gwa.subscriber.d/       \
+          --repository-policy-folder     ../config.d/gwa.policy.d/
