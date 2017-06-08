@@ -49,7 +49,7 @@ iptables -t raw    -F
 iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
 iptables -t filter -F
 iptables -t filter -A FORWARD -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
-iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+iptables -t filter -A FORWARD -p tcp -m conntrack --ctstate INVALID -j DROP
 
 
 # BASIC FLOWS FOR TESTING
@@ -138,7 +138,7 @@ iptables -t raw    -F
 iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
 iptables -t filter -F
 iptables -t filter -A FORWARD -i mitm0 -o mitm1 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
-iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+iptables -t filter -A FORWARD -p tcp -m conntrack --ctstate INVALID -j DROP
 ### Add packet marks for downstream/upstream
 ### NB: They don't seem to be visible in OVS
 #iptables -t mangle -F POSTROUTING
@@ -288,7 +288,7 @@ ip netns exec nsproxy iptables -t raw    -F
 ip netns exec nsproxy iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
 ip netns exec nsproxy iptables -t filter -F
 ip netns exec nsproxy iptables -t filter -A FORWARD -i mitm0 -o mitm1 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
-ip netns exec nsproxy iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+ip netns exec nsproxy iptables -t filter -A FORWARD -p tcp -m conntrack --ctstate INVALID -j DROP
 
 
 ## ns0 - TRAFFIC SOURCE

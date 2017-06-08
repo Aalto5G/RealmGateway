@@ -28,7 +28,7 @@ conn aalto-test
     auto=route
     mark=0xee000000
     # Traffic selection can also be done as follows, however it creates a full mesh number of policies and does not work for the tunneling. We use iptables packet MARKing for steering traffic towards StrongSwan
-    leftsubnet=100.64.1.130/32[gre],100.64.1.130/32[udp/4789],100.64.1.130/32[udp/6081]
+    #leftsubnet=100.64.1.130/32[gre],100.64.1.130/32[udp/4789],100.64.1.130/32[udp/6081]
 
 
 FILE: /etc/ipsec.secrets
@@ -155,5 +155,3 @@ sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=102,ip
 # GENEVE with TOS
 sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=100,ip,nw_src=192.168.0.100,nw_dst=172.16.0.13 actions=mod_dl_src:00:00:00:00:00:00,mod_dl_dst:00:00:00:00:00:00,mod_nw_src:0.0.0.0,mod_nw_dst:0.0.0.0,mod_nw_tos:0x04,set_field:100.64.2.130->tun_src,set_field:100.64.1.130->tun_dst,set_field:70->tun_id,output:103"
 sudo ovs-ofctl add-flow -OOpenFlow13 br-ces0 "table=0,priority=10,in_port=103,ip,tun_src=100.64.1.130,tun_dst=100.64.2.130,tun_id=70,nw_tos:0x04 actions=mod_dl_src:00:00:00:12:34:56,mod_dl_dst:00:00:00:12:34:56,mod_nw_src:172.16.0.13,mod_nw_dst:192.168.0.100,output:100"
-
-
