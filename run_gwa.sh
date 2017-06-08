@@ -24,5 +24,5 @@ echo "Starting Realm Gateway as gwa.demo"
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/
+          --repository-subscriber-folder config.d/gwa.subscriber.d/          \
+          --repository-policy-folder     config.d/gwa.policy.d/
