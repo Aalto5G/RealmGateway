@@ -162,8 +162,8 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_HTTP'}, 'multiport': {'dports': '8080,8443'}, 'protocol': 'tcp', 'target': 'POLICY_HTTP'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'mark': {'mark': '0xff001010/0xff00f0f0'}, 'comment': {'comment': 'Continue in POLICY_DNS'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS'}}
             - {'table': 'filter', 'chain': 'ADMIN_POLICY', 'rule': {'comment': {'comment': 'Accept'}, 'target': 'ACCEPT'}}
-            - {'table': 'mangle', 'chain': 'POSTROUTING',  'rule': {'mark': {'mark': '0xff222342/0xffffffff'}, 'comment': {'comment': 'TCP MSS clamp for tunnelled traffic'}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['SYN,RST','SYN']}, 'target': {'TCPMSS':{'set-mss': '1360'}}}}
-            - {'table': 'mangle', 'chain': 'POSTROUTING',  'rule': {'mark': {'mark': '0xff222332/0xffffffff'}, 'comment': {'comment': 'TCP MSS clamp for tunnelled traffic'}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['SYN,RST','SYN']}, 'target': {'TCPMSS':{'set-mss': '1360'}}}}
+            - {'table': 'mangle', 'chain': 'POSTROUTING',  'rule': {'mark': {'mark': '0xff222342/0xffffffff'}, 'comment': {'comment': 'TCP MSS clamp for tunnelled traffic'}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['SYN,RST','SYN']}, 'target': {'TCPMSS':{'clamp-mss-to-pmtu':''}}}}
+            - {'table': 'mangle', 'chain': 'POSTROUTING',  'rule': {'mark': {'mark': '0xff222332/0xffffffff'}, 'comment': {'comment': 'TCP MSS clamp for tunnelled traffic'}, 'protocol': 'tcp', 'tcp': {'tcp-flags': ['SYN,RST','SYN']}, 'target': {'TCPMSS':{'clamp-mss-to-pmtu':''}}}}
 
     ADMIN_POLICY_DHCP:
     # This policy includes the rules for the DHCP server.
@@ -250,4 +250,3 @@ IPTABLES:
 
             - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['!', 'IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Continue to GUEST_SERVICES'}, 'target': 'GUEST_SERVICES'}}
             - {'table': 'filter', 'chain': 'GROUP_POLICY',   'rule': {'mark': {'mark': '0xff121212/0xffffffff'}, 'set': {'match-set': ['IPS_SUBSCRIBERS', 'src']}, 'comment': {'comment': 'Drop traffic for unknown subscriber group'}, 'target': 'DROP'}}
-
