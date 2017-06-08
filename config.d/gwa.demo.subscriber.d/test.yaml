@@ -19,6 +19,7 @@ test.gwa.demo.:
         - {fqdn:      'ssh.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
         - {fqdn:  'tcp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 1234 }
         - {fqdn:  'udp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234, loose_packet: 3 }
+        - {fqdn:  'udp1235.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1235, loose_packet: -1 }
         - {fqdn: 'sctp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
     FIREWALL:
         FIREWALL_ADMIN:
