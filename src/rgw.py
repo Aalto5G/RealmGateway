@@ -329,8 +329,8 @@ class RealmGateway(object):
         self._logger.info('Initializing subscriber data')
         tzero = time.time()
         for subs_id, subs_data in self._datarepository.getall_subscriber(default = {}).items():
-            ipaddr = subs_data['ID']['IPV4'][0]
-            fqdn = subs_data['ID']['FQDN'][0]
+            ipaddr = subs_data['ID']['ipv4'][0]
+            fqdn = subs_data['ID']['fqdn'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
         self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(time.time()-tzero))

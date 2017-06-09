@@ -124,7 +124,7 @@ class DataRepository(object):
 
     def generate_default_subscriber(self, fqdn, ipv4):
         data_d = {}
-        data_d['ID'] = {'FQDN':fqdn, 'IPV4':ipv4}
+        data_d['ID'] = {'fqdn':fqdn, 'ipv4':ipv4}
         sfqdn_services = []
         for token, proxy in (('',False), ('www.',True), ('sip',True)):
             sfqdn_services.append({'fqdn':'{}{}'.format(token, fqdn),

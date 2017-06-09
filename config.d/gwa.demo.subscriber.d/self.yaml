@@ -1,5 +1,5 @@
 gwa.demo.:
     ID:
-        FQDN:   ['gwa.demo.']
-        IPV4:   ['100.64.1.130']
-        MSISDN: ['0000000000']
+        fqdn:   ['gwa.demo.']
+        ipv4:   ['100.64.1.130']
+        msisdn: ['0000000000']

@@ -1,8 +1,8 @@
 test102.gwa.demo.:
     ID:
-        FQDN:   ['test102.gwa.demo.']
-        IPV4:   ['192.168.0.102']
-        MSISDN: ['0000000102']
+        fqdn:   ['test102.gwa.demo.']
+        ipv4:   ['192.168.0.102']
+        msisdn: ['0000000102']
     GROUP:
         - IPS_GROUP_PREPAID2
     CIRCULARPOOL:
