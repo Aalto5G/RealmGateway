@@ -3,4 +3,5 @@
 3. Add verbose argument to rgw.py for debugging
 4. Add a CES / RGW argument to the code for the operation mode (no SDN controller needed in RGW)
 5. Use pylint to enhance python style
-6. Add Rest API to datarepository
+6. Add Rest API to datarepository - Use update_policy / update_subscriber to contact remote Policy Database, maintaining current API of datarepository
+
