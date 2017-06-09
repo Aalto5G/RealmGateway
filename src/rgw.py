@@ -166,18 +166,19 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
+    # Loglevel and verbosity
+    parser.add_argument('--verbose', dest='verbose', action='store_true')
+
     return parser.parse_args()
 
 class RealmGateway(object):
     def __init__(self, args):
         self._config = args
-        self._logger = logging.getLogger(self._config.name)
-        self._logger.setLevel(LOGLEVEL_MAIN)
 
         # Get event loop
         self._loop = asyncio.get_event_loop()
-        # Enable debugging
-        self._set_verbose()
+        # Set logging
+        self._set_logging()
         # Capture signals
         self._capture_signal()
         # Initialize Data Repository
@@ -344,11 +345,15 @@ class RealmGateway(object):
             # Update table and remove for expired connections
             self._connectiontable.update_all_rgw()
 
-    def _set_verbose(self, loglevel = LOGLEVEL_MAIN):
+    def _set_logging(self, loglevel = LOGLEVEL_MAIN):
+        if self._config.verbose:
+            loglevel = logging.DEBUG
+            self._loop.set_debug(True)
+
+        self._logger = logging.getLogger(self._config.name)
+        self._logger.setLevel(loglevel)
         self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
         logging.basicConfig(level=loglevel)
-        if loglevel <= logging.DEBUG:
-            self._loop.set_debug(True)
 
     def _signal_handler(self, signame):
         self._logger.critical('Got signal %s: exit' % signame)
