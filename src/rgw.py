@@ -147,6 +147,10 @@ def parse_arguments():
                         help='ipset type hash:ip that stores the registered hosts')
 
     # Data repository parameters
+    ## API URL information
+    parser.add_argument('--repository-api-url', type=str,
+                        metavar=('URL'),
+                        help='URL of the data repository')
     ## Subscriber information
     parser.add_argument('--repository-subscriber-file', type=str,
                         metavar=('FILENAME'),
@@ -204,8 +208,10 @@ class RealmGateway(object):
         configfolder = self._config.getdefault('repository_subscriber_folder', None)
         policyfile   = self._config.getdefault('repository_policy_file', None)
         policyfolder = self._config.getdefault('repository_policy_folder', None)
+        api_url      = self._config.getdefault('repository_api_url', None)
         self._datarepository = DataRepository(configfile = configfile, configfolder = configfolder,
-                                              policyfile = policyfile, policyfolder = policyfolder)
+                                              policyfile = policyfile, policyfolder = policyfolder,
+                                              api_url = api_url)
 
     def _init_hosttable(self):
         # Create container of Hosts

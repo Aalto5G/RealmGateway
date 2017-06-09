@@ -5,10 +5,9 @@ import os
 from contextlib import suppress
 
 from aalto_helpers import utils3
+from aiohttp_client import HTTPRestClient
+from aiohttp_client import HTTPClientConnectorError
 from loglevel import LOGLEVEL_DATAREPOSITORY
-
-SUBSCRIBER_ID='SUBSCRIBER_ID'
-SUBSCRIBER_SERVICES='SUBSCRIBER_SERVICES'
 
 
 class DataRepository(object):
@@ -20,10 +19,20 @@ class DataRepository(object):
         self.configfolder = None
         self.policyfile = None
         self.policyfolder = None
+        self.api_url = None
         utils3.set_attributes(self, override=True, **kwargs)
         self._loaded_data_subscriber = None
         self._loaded_data_policy = None
         self.reload_data()
+        # Initiate HTTP session with PolicyDatabase
+        self.rest_api_init()
+
+    def rest_api_init(self, n=5):
+        """ Create long lived HTTP session """
+        self.rest_api = HTTPRestClient(n)
+
+    def rest_api_close(self):
+        self.rest_api.close()
 
     def reload_data(self):
         self._load_data_subscriber()
