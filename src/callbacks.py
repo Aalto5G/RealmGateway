@@ -89,10 +89,6 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def ddns_register_user(self, fqdn, rdtype, ipaddr):
-        #tzero = time.time()
-        #tsplits = []
-        #tnorm = lambda x,y: (y-x)*1000
-
         # TODO: Move all this complexity to network module? Maybe it's more fitting...
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
@@ -101,28 +97,16 @@ class DNSCallbacks(object):
             self._logger.info('Generating default subscriber data for {}'.format(fqdn))
             user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
 
-        # TIME SPLIT
-        #tsplits.append(time.time())
-
         host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
-
-        # TIME SPLIT
-        #tsplits.append(time.time())
 
         # Create network resources
         hostname = ipaddr
         self.network.ipt_add_user(hostname, ipaddr)
 
-        # TIME SPLIT
-        #tsplits.append(time.time())
-
         ## Add all user groups
         user_groups = host_obj.get_service('GROUP', [])
         self.network.ipt_add_user_groups(hostname, ipaddr, user_groups)
-
-        # TIME SPLIT
-        #tsplits.append(time.time())
 
         ## Add all firewall rules
         fw_d = host_obj.get_service('FIREWALL', {})
@@ -131,21 +115,11 @@ class DNSCallbacks(object):
         self.network.ipt_add_user_fwrules(hostname, ipaddr, 'admin', admin_fw)
         self.network.ipt_add_user_fwrules(hostname, ipaddr, 'user', user_fw)
 
-        # TIME SPLIT
-        #tsplits.append(time.time())
-
-        ## Carrier Grade services if available
+        ## CarrierGrade services if available
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
             self.network.ipt_add_user_carriergrade(hostname, carriergrade_ipt)
 
-        # TIME SPLIT
-        #tsplits.append(time.time())
-
-        #times = '\t\t[{:.3f}]\t|\t'.format(tnorm(tzero,tsplits[-1]))
-        #for ts in tsplits:
-        #    times += '{:.3f}\t'.format(tnorm(tzero, ts))
-        #self._logger.info('Registered new user {} @ {} || {}'.format(fqdn, ipaddr, times))
 
     @asyncio.coroutine
     def ddns_deregister_user(self, fqdn, rdtype, ipaddr):
@@ -162,7 +136,7 @@ class DNSCallbacks(object):
         self.network.ipt_remove_user_groups(hostname, ipaddr, user_groups)
         ## Remove all firewall rules
         self.network.ipt_remove_user(hostname, ipaddr)
-        ## Carrier Grade services if available
+        ## CarrierGrade services if available
         if host_obj.has_service('CARRIERGRADE'):
             carriergrade_ipt = host_obj.get_service('CARRIERGRADE', [])
             self.network.ipt_remove_user_fwrules(hostname, carriergrade_ipt)
@@ -187,6 +161,7 @@ class DNSCallbacks(object):
             self._logger.debug('Sent DDNS response to {}:{}'.format(addr[0],addr[1]))
             cback(query, addr, response)
 
+        '''
     @asyncio.coroutine
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
@@ -211,6 +186,100 @@ class DNSCallbacks(object):
             # Answer with empty records for other types
             response = dnsutils.make_response_rcode(query)
         cback(query, addr, response)
+        '''
+
+    @asyncio.coroutine
+    def dns_process_rgw_lan_soa(self, query, addr, cback):
+        """ Process DNS query from private network of a name in a SOA zone """
+        # Forward or continue to DNS resolver
+        # Same as in dns_process_rgw_wan_soa()
+        fqdn = format(query.question[0].name)
+        rdtype = query.question[0].rdtype
+        host_obj = None
+        # The service exists in RGW
+        if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+            host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
+            service_data = host_obj.get_service_sfqdn(fqdn)
+        elif self.hosttable.has_carriergrade(fqdn):
+            host_obj = self.hosttable.get_carriergrade(fqdn)
+            service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+        elif fqdn in self.soa_list:
+            self._logger.debug('Use NS address for {}'.format(fqdn))
+            host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
+            # Create DNS Response
+            response = dnsutils.make_response_answer_rr(query, fqdn, 1, host_obj.ipv4, rdclass=1, ttl=60)
+            self._logger.debug('Send DNS response to {}:{}'.format(addr[0],addr[1]))
+            cback(query, addr, response)
+            return
+        else:
+            # FQDN not found! Answer NXDOMAIN
+            self._logger.debug('Answer {} with NXDOMAIN'.format(fqdn))
+            response = dnsutils.make_response_rcode(query, dns.rcode.NXDOMAIN)
+            cback(query, addr, response)
+            return
+
+        # Evaluate host and service
+        if service_data.setdefault('carriergrade', False) and rdtype == 1:
+            # Resolve A type with IPv4 address of the CarrierGrade host
+            # HACK: Same code as from _dns_process_rgw_wan_soa_carriergrade
+            # TODO: Make a single function to resolve and get address, so it can be called from several places
+            self._logger.debug('Process {} with CarrierGrade resolution'.format(fqdn))
+            cgresolver = uDNSResolver()
+            try:
+                cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.dns_get_timeout('a'))
+            except ConnectionRefusedError:
+                # Refused to allocate an address - Drop DNS Query
+                self._logger.warning('ConnectionRefusedError: Resolving CarrierGrade IP from {} for {}'.format(host_obj.ipv4, fqdn))
+                response = dnsutils.make_response_rcode(query, dns.rcode.REFUSED)
+                cback(query, addr, response)
+                return
+
+            if not cgresponse:
+                # Failed to allocate an address - Drop DNS Query
+                self._logger.warning('ResolutionFailure: Failed to resolve address from {} for {}'.format(host_obj.ipv4, fqdn))
+                response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+                cback(query, addr, response)
+
+            host_cgaddr = dnsutils.get_first_record(cgresponse)
+            if not host_cgaddr:
+                # Failed to allocate an address - Drop DNS Query
+                self._logger.warning('EmptyDNSResponse: Failed to obtain Carrier Grage IP from {} for {}'.format(host_obj.ipv4, fqdn))
+                response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+                cback(query, addr, response)
+                return
+
+            # Get service carriergrade and verify the IP address
+            host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
+            # Add host.ipv4 conforming to the service definition of CARRIERGRADE
+            host_cgaddrs.append({'ipv4': host_obj.ipv4})
+
+            if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
+                # Failed to verify carrier address in host pool - Drop DNS Query
+                self._logger.warning('Failed to verify CarrierGrade IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
+                response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
+                cback(query, addr, response)
+                return
+
+            self._logger.info('Obtained {} from CarrierGrade resolution of {}'.format(host_cgaddr, fqdn))
+            # Answer query with A type and answer with IPv4 address of the host
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, host_cgaddr, rdclass=1, ttl=30)
+            cback(query, addr, response)
+
+        elif rdtype == 1:
+            # Resolve A type and answer with IPv4 address of the host
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, host_obj.ipv4, rdclass=1, ttl=30)
+            cback(query, addr, response)
+
+        elif rdtype == 12:
+            # Resolve PTR type and answer with FQDN of the host
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, host_obj.fqdn, rdclass=1, ttl=30)
+            cback(query, addr, response)
+
+        else:
+            # Answer with empty records for other types
+            response = dnsutils.make_response_rcode(query)
+            cback(query, addr, response)
+
 
     @asyncio.coroutine
     def dns_process_rgw_lan_nosoa(self, query, addr, cback):
@@ -275,6 +344,7 @@ class DNSCallbacks(object):
 
         # Evaluate host and service
         if service_data.setdefault('carriergrade', False) and rdtype == 1:
+            # Resolve A type via CarrierGrade host
             self._logger.debug('Process {} with CircularPool CarrierGrade'.format(fqdn))
             yield from self._dns_process_rgw_wan_soa_carriergrade(query, addr, cback, host_obj, service_data)
         elif rdtype == 1:
@@ -298,14 +368,14 @@ class DNSCallbacks(object):
             self._logger.warning('Policy exceeded. Failed to allocate an address for {}'.format(fqdn))
             return
 
-        # Resolve A type via Carrier Grade Circular Pool
-        self._logger.debug('Carrier Grade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
+        # Resolve A type via CarrierGrade Circular Pool
+        self._logger.info('CarrierGrade resolution of {} via {}'.format(fqdn, host_obj.ipv4))
         cgresolver = uDNSResolver()
         try:
             cgresponse = yield from cgresolver.do_resolve(query, (host_obj.ipv4, 53), timeouts=self.dns_get_timeout('a'))
         except ConnectionRefusedError:
             # Refused to allocate an address - Drop DNS Query
-            self._logger.warning('ConnectionRefusedError: Resolving Carrier Grade IP from {} for {}'.format(host_obj.ipv4, fqdn))
+            self._logger.warning('ConnectionRefusedError: Resolving CarrierGrade IP from {} for {}'.format(host_obj.ipv4, fqdn))
             response = dnsutils.make_response_rcode(query, dns.rcode.REFUSED)
             cback(query, addr, response)
             return
@@ -327,9 +397,11 @@ class DNSCallbacks(object):
 
         # Get service carriergrade and verify the IP address
         host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
+        # Add host.ipv4 conforming to the service definition of CARRIERGRADE
+        host_cgaddrs.append({'ipv4': host_obj.ipv4})
         if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
             # Failed to verify carrier address in host pool - Drop DNS Query
-            self._logger.warning('Failed to verify Carrier Grage IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
+            self._logger.warning('Failed to verify CarrierGrade IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
             response = dnsutils.make_response_rcode(query, dns.rcode.SERVFAIL)
             cback(query, addr, response)
             return
