@@ -181,18 +181,23 @@ class RealmGateway(object):
         self._set_logging()
         # Capture signals
         self._capture_signal()
+        # Continue initialization in coroutine
+        self._loop.create_task(self.__init__continue())
+
+    @asyncio.coroutine
+    def __init__continue(self):
         # Initialize Data Repository
-        self._init_datarepository()
+        yield from self._init_datarepository()
         # Initialize Address Pools
-        self._init_pools()
+        yield from self._init_pools()
         # Initialize Host table
-        self._init_hosttable()
+        yield from self._init_hosttable()
         # Initialize Connection table
-        self._init_connectiontable()
+        yield from self._init_connectiontable()
         # Initialize Network
-        self._init_network()
+        yield from self._init_network()
         # Initialize DNS
-        self._init_dns()
+        yield from self._init_dns()
         # Initialize configured subscriber data wrapped as a corutine
         self._loop.create_task(self._init_subscriberdata())
         # Initialize configured subscriber data wrapped as a corutine
@@ -202,6 +207,7 @@ class RealmGateway(object):
         for signame in ('SIGINT', 'SIGTERM'):
             self._loop.add_signal_handler(getattr(signal, signame), self._signal_handler, signame)
 
+    @asyncio.coroutine
     def _init_datarepository(self):
         # Initialize Data Repository
         self._logger.info('Initializing data repository')
@@ -214,29 +220,7 @@ class RealmGateway(object):
                                               policyfile = policyfile, policyfolder = policyfolder,
                                               api_url = api_url)
 
-    def _init_hosttable(self):
-        # Create container of Hosts
-        self._hosttable = HostTable()
-
-    def _init_connectiontable(self):
-        # Create container of Connections
-        self._connectiontable = ConnectionTable()
-
-    def _init_network(self):
-        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
-                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
-                                        ipt_host_chain   = self._config.ipt_host_chain ,
-                                        ipt_host_unknown = self._config.ipt_host_unknown,
-                                        ipt_policy_order = self._config.ipt_policy_order,
-                                        ipt_markdnat     = self._config.ipt_markdnat,
-                                        ipt_flush        = self._config.ipt_flush,
-                                        ips_hosts        = self._config.ips_hosts,
-                                        datarepository   = self._datarepository)
-        # Create object for storing all PacketIn-related information
-        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
-        # Register NFQUEUE(s) callback
-        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
-
+    @asyncio.coroutine
     def _init_pools(self):
         # Create container of Address Pools
         self._pooltable = PoolContainer()
@@ -264,6 +248,33 @@ class RealmGateway(object):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
 
+    @asyncio.coroutine
+    def _init_hosttable(self):
+        # Create container of Hosts
+        self._hosttable = HostTable()
+
+    @asyncio.coroutine
+    def _init_connectiontable(self):
+        # Create container of Connections
+        self._connectiontable = ConnectionTable()
+
+    @asyncio.coroutine
+    def _init_network(self):
+        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
+                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
+                                        ipt_host_chain   = self._config.ipt_host_chain ,
+                                        ipt_host_unknown = self._config.ipt_host_unknown,
+                                        ipt_policy_order = self._config.ipt_policy_order,
+                                        ipt_markdnat     = self._config.ipt_markdnat,
+                                        ipt_flush        = self._config.ipt_flush,
+                                        ips_hosts        = self._config.ips_hosts,
+                                        datarepository   = self._datarepository)
+        # Create object for storing all PacketIn-related information
+        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
+        # Register NFQUEUE(s) callback
+        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
+
+    @asyncio.coroutine
     def _init_dns(self):
         # Create object for storing all DNS-related information
         self.dnscb = DNSCallbacks(cachetable      = None,
@@ -294,7 +305,8 @@ class RealmGateway(object):
         for ipaddr, port in self._config.ddns_server:
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            #transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from self._loop.create_task(listen_obj)
             self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
@@ -303,7 +315,8 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            #transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from self._loop.create_task(listen_obj)
             self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
@@ -312,7 +325,8 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            #transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from self._loop.create_task(listen_obj)
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
@@ -321,7 +335,8 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            #transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from self._loop.create_task(listen_obj)
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
@@ -363,6 +378,9 @@ class RealmGateway(object):
                 obj.connection_lost(None)
             # Close bound NFQUEUEs
             self._network.ipt_deregister_nfqueues()
+            # Close open aiohttp_client objects
+            self._network.rest_api_close()
+            self._datarepository.rest_api_close()
         except:
             self._logger.exception()
         finally:
@@ -392,24 +410,3 @@ if __name__ == '__main__':
         logger.exception("Exception!")
     finally:
         loop.close()
-
-'''
-class RetCodes(object):
-    POLICY_OK  = 0
-    POLICY_NOK = 1
-
-    APOOL_AVAILABLE = 0
-    APOOL_DEPLETED = 1
-
-    DNS_NOERROR  = 0    # DNS Query completed successfully
-    DNS_FORMERR  = 1    # DNS Query Format Error
-    DNS_SERVFAIL = 2    # Server failed to complete the DNS request
-    DNS_NXDOMAIN = 3    # Domain name does not exist.  For help resolving this error, read here.
-    DNS_NOTIMP   = 4    # Function not implemented
-    DNS_REFUSED  = 5    # The server refused to answer for the query
-    DNS_YXDOMAIN = 6    # Name that should not exist, does exist
-    DNS_XRRSET   = 7    # RRset that should not exist, does exist
-    DNS_NOTAUTH  = 8    # Server not authoritative for the zone
-    DNS_NOTZONE  = 9    # Name not in zone
-
-'''
