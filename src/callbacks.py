@@ -250,9 +250,6 @@ class DNSCallbacks(object):
 
             # Get service carriergrade and verify the IP address
             host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
-            # Add host.ipv4 conforming to the service definition of CARRIERGRADE
-            host_cgaddrs.append({'ipv4': host_obj.ipv4})
-
             if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
                 # Failed to verify carrier address in host pool - Drop DNS Query
                 self._logger.warning('Failed to verify CarrierGrade IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
@@ -397,8 +394,6 @@ class DNSCallbacks(object):
 
         # Get service carriergrade and verify the IP address
         host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
-        # Add host.ipv4 conforming to the service definition of CARRIERGRADE
-        host_cgaddrs.append({'ipv4': host_obj.ipv4})
         if not any(getitem(_, 'ipv4') == host_cgaddr for _ in host_cgaddrs):
             # Failed to verify carrier address in host pool - Drop DNS Query
             self._logger.warning('Failed to verify CarrierGrade IP address {} in {}'.format(host_cgaddr, host_cgaddrs))
