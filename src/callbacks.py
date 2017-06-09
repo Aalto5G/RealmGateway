@@ -450,12 +450,16 @@ class DNSCallbacks(object):
         conn_param = {'private_ip': host_ipaddr, 'private_port': service_data['port'],
                       'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
                       'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': dns_server_ip,
-                      'loose_packet': service_data.setdefault('loose_packet',0), 'id':host_obj.fqdn}
+                      'loose_packet': service_data.setdefault('loose_packet', 0), 'id':host_obj.fqdn,
+                      'autobind': service_data.setdefault('autobind', True),
+                      'timeout': service_data.setdefault('timeout', 0)}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
         # Add connection to table
         self.connectiontable.add(new_conn)
+        # Log new connection create
+        self._logger.info('Created new connection: {}'.format(new_conn))
         return allocated_ipv4
 
     def _overload_connectionentryrgw(self, port, protocol):
