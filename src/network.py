@@ -15,6 +15,7 @@ from aiohttp_client import HTTPClientConnectorError
 from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
+from global_variables import RUNNING_TASKS
 
 # Definition of PACKET MARKS
 ## Definition of specific packet MARK for traffic
@@ -488,7 +489,8 @@ class Network(object):
             self._do_subprocess_call(_, raise_exc = False, silent = False)
 
         # Schedule task to wait for SDN Controller
-        asyncio.ensure_future(self.wait_up())
+        _t = asyncio.ensure_future(self.wait_up())
+        RUNNING_TASKS.append((_t, 'network.wait_up'))
 
     @asyncio.coroutine
     def ovs_init_flowtable(self):
