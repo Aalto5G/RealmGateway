@@ -94,7 +94,7 @@ ip netns exec router iptables -t raw    -F
 ip netns exec router iptables -t raw    -A PREROUTING -i wan0 -p tcp -m tcp --syn -j CT --notrack
 ip netns exec router iptables -t filter -F
 ip netns exec router iptables -t filter -A FORWARD -i wan0 -o wan1 -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
-ip netns exec router iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+ip netns exec router iptables -t filter -A FORWARD -p tcp -m conntrack --ctstate INVALID -j DROP
 
 
 ###############################################################################
