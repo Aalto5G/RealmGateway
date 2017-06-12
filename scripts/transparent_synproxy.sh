@@ -55,7 +55,7 @@ iptables -t raw    -F
 iptables -t raw    -A PREROUTING -i mitm0 -m set --match-set circularpool dst -p tcp -m tcp --syn -j CT --notrack
 iptables -t filter -F
 iptables -t filter -A FORWARD -i mitm0 -o mitm1 -m set --match-set circularpool dst -p tcp -m tcp -m conntrack --ctstate INVALID,UNTRACKED -j SYNPROXY --sack-perm --timestamp --wscale 7 --mss 1460
-iptables -t filter -A FORWARD -m conntrack --ctstate INVALID -j DROP
+iptables -t filter -A FORWARD -p tcp -m conntrack --ctstate INVALID -j DROP
 
 
 # OpenvSwitch setup
