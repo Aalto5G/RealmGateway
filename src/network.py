@@ -87,9 +87,6 @@ class Network(object):
         # Create OpenvSwitch
         self.ovs_create()
 
-        # Use control variable to indicate readiness
-        self.ready = False
-
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
         requires = data_d.setdefault('requires', [])
@@ -550,23 +547,21 @@ class Network(object):
                     break
                 else:
                     self._logger.warning('OpenvSwitch datapath not connected to SDN Controller / {} not in {}'.format(OVS_DATAPATH_ID, resp))
-                    self.ready = False
             except HTTPClientConnectorError as e:
                 self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
 
             yield from asyncio.sleep(5)
 
         yield from self.ovs_init_flowtable()
-        self.ready = True
 
         # For testing purposes
-        yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-        yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan', True)
+        #yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+        #yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+        #
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan', True)
         #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 70, 'geneve')
-        yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
+        #yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
