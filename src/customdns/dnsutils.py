@@ -4,19 +4,12 @@ import dns.name
 import dns.zone
 import dns.rcode
 import dns.reversename
+import dns.rrset
 
 from dns.exception import DNSException
 from dns.rdataclass import *
 from dns.rdatatype import *
 
-'''
-#Hack for dnspython (1.14.0)) - Monkey patch to_text() function
-import dns.name
-try:
-    dns.name.Name.to_text = dns.name.Name.to_unicode
-except AttributeError:
-    pass
-'''
 
 # Use dns.reversename functions and return a string instead of dns.Name object
 ## '1.2.3.4' -> '4.3.2.1.in-addr.arpa.'
@@ -79,3 +72,15 @@ def get_first_record(response):
         return '{}'.format(response.answer[0][0].to_text())
     except Exception as e:
         return None
+
+def create_ddns_message(soa, name, rdtype, ttl, rdata):
+    msg = dns.message.Message()
+    msg.set_opcode(dns.opcode.UPDATE)
+    msg.set_rcode(dns.rcode.NOERROR)
+    # Zone
+    rrset = dns.rrset.from_text(soa, ttl, dns.rdataclass.IN, dns.rdatatype.SOA)
+    msg.question.append(rrset)
+    # Record
+    rrset = dns.rrset.from_text(name, ttl, dns.rdataclass.IN, rdtype, rdata)
+    msg.authority.append(rrset)
+    return msg
