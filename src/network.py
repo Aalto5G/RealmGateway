@@ -196,10 +196,16 @@ class Network(object):
             self._add_circularpool(hostname, ipaddr)
             # Add user's firewall rules and register in global host policy chain
             self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
-            # Add user's IP address to ipset for registered hosts
-            if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
-                self._logger.debug('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
-                iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
+            # HACK: There seem to be some issues when running the code in Network Namespaces
+            try:
+                # Add user's IP address to ipset for registered hosts
+                if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                    self._logger.debug('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
+                    iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
+            except Exception as e:
+                self._logger.error('Failed to add {} to {} / {}'.format(ipaddr, self.ips_hosts, e))
+                continue
+
 
     def ipt_remove_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Remove carrier grade user {}/{}'.format(hostname, cgaddrs))
