@@ -462,7 +462,7 @@ class Network(object):
                    'ovs-vsctl set bridge br-ces0 other-config:datapath-id={:016x}'.format(OVS_DATAPATH_ID),
                    'ovs-vsctl set-controller br-ces0 tcp:127.0.0.1:6653']
         for _ in to_exec:
-            self._do_subprocess_call(_)
+            self._do_subprocess_call(_, raise_exc = False, silent = False)
 
         ## Add ports
         to_exec = ['ovs-vsctl add-port br-ces0 tun0 -- set interface tun0 ofport_request={} -- set interface tun0 type=internal'.format(OVS_PORT_TUN_L3),
@@ -470,7 +470,7 @@ class Network(object):
                    'ovs-vsctl add-port br-ces0 vxlan0-ces0 -- set interface vxlan0-ces0 ofport_request={} -- set interface vxlan0-ces0 type=vxlan options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit'.format(OVS_PORT_TUN_VXLAN),
                    'ovs-vsctl add-port br-ces0 geneve0-ces0 -- set interface geneve0-ces0 ofport_request={} -- set interface geneve0-ces0 type=geneve options:key=flow options:remote_ip=flow options:local_ip=flow options:tos=inherit'.format(OVS_PORT_TUN_GENEVE)]
         for _ in to_exec:
-            self._do_subprocess_call(_)
+            self._do_subprocess_call(_, raise_exc = False, silent = False)
 
         ## Configure tun0 port
         to_exec = ['ip link set dev tun0 arp off',
@@ -479,7 +479,7 @@ class Network(object):
                    'ip link set dev tun0 up',
                    'ip route add {} dev tun0'.format(OVS_PORT_TUN_L3_NET)]
         for _ in to_exec:
-            self._do_subprocess_call(_)
+            self._do_subprocess_call(_, raise_exc = False, silent = False)
 
         # Schedule task to wait for SDN Controller
         asyncio.ensure_future(self.wait_up())
