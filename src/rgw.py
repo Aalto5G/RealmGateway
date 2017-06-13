@@ -144,12 +144,15 @@ def parse_arguments():
                         metavar=('IPS_HOSTS'),
                         default='IPS_HOSTS',
                         help='ipset type hash:ip that stores the registered hosts')
+    parser.add_argument('--network-api-url', type=str,
+                        metavar=('URL'),
+                        help='URL of the network API')
 
     # Data repository parameters
     ## API URL information
     parser.add_argument('--repository-api-url', type=str,
                         metavar=('URL'),
-                        help='URL of the data repository')
+                        help='URL of the repository API')
     ## Subscriber information
     parser.add_argument('--repository-subscriber-file', type=str,
                         metavar=('FILENAME'),
@@ -261,6 +264,7 @@ class RealmGateway(object):
                                         ipt_markdnat     = self._config.ipt_markdnat,
                                         ipt_flush        = self._config.ipt_flush,
                                         ips_hosts        = self._config.ips_hosts,
+                                        api_url          = self._config.network_api_url,
                                         datarepository   = self._datarepository)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
@@ -333,7 +337,7 @@ class RealmGateway(object):
     def _init_subscriberdata(self):
         self._logger.info('Initializing subscriber data')
         tzero = time.time()
-        for subs_id, subs_data in self._datarepository.getall_subscriber(default = {}).items():
+        for subs_id, subs_data in self._datarepository.get_policy_host_all({}).items():
             ipaddr = subs_data['ID']['ipv4'][0]
             fqdn = subs_data['ID']['fqdn'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))

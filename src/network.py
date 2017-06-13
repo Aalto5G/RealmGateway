@@ -63,9 +63,9 @@ OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
 OVS_PORT_TUN_L3_NET = '172.16.0.0/16'
 OVS_DIFFSERV_MARK   = 10 #DSCP10 AF11 priority traffic & low drop probability / Sets 6 bits field IP.dscp
 
-API_URL_SWITCHES    = 'http://127.0.0.1:8081/stats/switches'
-API_URL_FLOW_ADD    = 'http://127.0.0.1:8081/stats/flowentry/add'
-API_URL_FLOW_DELETE = 'http://127.0.0.1:8081/stats/flowentry/delete'
+API_URL_SWITCHES    = 'stats/switches'
+API_URL_FLOW_ADD    = 'stats/flowentry/add'
+API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 
 
 class Network(object):
@@ -89,7 +89,7 @@ class Network(object):
         self.ovs_create()
 
     def ips_init(self):
-        data_d = self.datarepository.get_policy('IPSET', {})
+        data_d = self.datarepository.get_policy_ces('IPSET', {})
         requires = data_d.setdefault('requires', [])
         rules = data_d.setdefault('rules', [])
         self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(requires), len(rules)))
@@ -111,7 +111,7 @@ class Network(object):
                     self._logger.error('#{} Failed to add {}'.format(i+1, e))
 
     def ipt_init(self):
-        data_d = self.datarepository.get_policy('IPTABLES', {})
+        data_d = self.datarepository.get_policy_ces('IPTABLES', {})
         for p in self.ipt_policy_order:
             if p not in data_d:
                 self._logger.critical('Not found local iptables policy <{}>'.format(p))
