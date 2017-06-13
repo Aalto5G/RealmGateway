@@ -1,9 +1,10 @@
+import asyncio
 import logging
 import yaml
 import pprint
 import os
-from contextlib import suppress
 import urllib.parse
+from contextlib import suppress
 
 from aalto_helpers import utils3
 from aiohttp_client import HTTPRestClient
@@ -104,6 +105,7 @@ class DataRepository(object):
             self._logger.warning('No data for policy <{}>'.format(policy_id))
             return default
 
+    @asyncio.coroutine
     def get_policy_host(self, subscriber_id, default = None):
         try:
             return self._get_policy_host()[subscriber_id]
@@ -118,6 +120,7 @@ class DataRepository(object):
             self._logger.warning('No data found for subscribers: {}'.format(e))
             return default
 
+    @asyncio.coroutine
     def get_policy_host_default(self, fqdn, ipv4):
         data_d = {}
         data_d['ID'] = {'fqdn':fqdn, 'ipv4':ipv4}
