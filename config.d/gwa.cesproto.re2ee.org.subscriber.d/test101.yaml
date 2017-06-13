@@ -1,8 +1,8 @@
 test101.gwa.cesproto.re2ee.org.:
     ID:
-        FQDN:   ['test101.gwa.cesproto.re2ee.org.']
-        IPV4:   ['192.168.0.101']
-        MSISDN: ['0000000101']
+        fqdn:   ['test101.gwa.cesproto.re2ee.org.']
+        ipv4:   ['192.168.0.101']
+        msisdn: ['0000000101']
     GROUP:
         - IPS_GROUP_PREPAID1
     CIRCULARPOOL:

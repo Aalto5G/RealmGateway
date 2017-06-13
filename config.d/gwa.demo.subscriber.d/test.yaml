@@ -1,8 +1,8 @@
 test.gwa.demo.:
     ID:
-        FQDN:   ['test.gwa.demo.']
-        IPV4:   ['192.168.0.100']
-        MSISDN: ['0000000100']
+        fqdn:   ['test.gwa.demo.']
+        ipv4:   ['192.168.0.100']
+        msisdn: ['0000000100']
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
@@ -19,6 +19,7 @@ test.gwa.demo.:
         - {fqdn:      'ssh.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
         - {fqdn:  'tcp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 1234 }
         - {fqdn:  'udp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234, loose_packet: 3 }
+        - {fqdn:  'udp1235.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1235, loose_packet: -1, autobind: false, timeout: 3600 }
         - {fqdn: 'sctp1234.test.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
     FIREWALL:
         FIREWALL_ADMIN:

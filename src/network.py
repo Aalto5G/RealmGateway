@@ -15,6 +15,7 @@ from aiohttp_client import HTTPClientConnectorError
 from nfqueue3 import NFQueue3
 from loglevel import LOGLEVEL_NETWORK
 
+from global_variables import RUNNING_TASKS
 
 # Definition of PACKET MARKS
 ## Definition of specific packet MARK for traffic
@@ -85,9 +86,6 @@ class Network(object):
         self.rest_api_init()
         # Create OpenvSwitch
         self.ovs_create()
-
-        # Use control variable to indicate readiness
-        self.ready = False
 
     def ips_init(self):
         data_d = self.datarepository.get_policy('IPSET', {})
@@ -196,10 +194,16 @@ class Network(object):
             self._add_circularpool(hostname, ipaddr)
             # Add user's firewall rules and register in global host policy chain
             self._add_basic_hostpolicy_carriergrade(hostname, ipaddr)
-            # Add user's IP address to ipset for registered hosts
-            if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
-                self._logger.debug('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
-                iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
+            # HACK: There seem to be some issues when running the code in Network Namespaces
+            try:
+                # Add user's IP address to ipset for registered hosts
+                if not iproute2_helper3.ipset_test(self.ips_hosts, ipaddr):
+                    self._logger.debug('Adding host {} to ipset {}'.format(ipaddr, self.ips_hosts))
+                    iproute2_helper3.ipset_add(self.ips_hosts, ipaddr)
+            except Exception as e:
+                self._logger.error('Failed to add {} to {} / {}'.format(ipaddr, self.ips_hosts, e))
+                continue
+
 
     def ipt_remove_user_carriergrade(self, hostname, cgaddrs):
         self._logger.debug('Remove carrier grade user {}/{}'.format(hostname, cgaddrs))
@@ -482,7 +486,8 @@ class Network(object):
             self._do_subprocess_call(_, raise_exc = False, silent = False)
 
         # Schedule task to wait for SDN Controller
-        asyncio.ensure_future(self.wait_up())
+        _t = asyncio.ensure_future(self.wait_up())
+        RUNNING_TASKS.append((_t, 'network.wait_up'))
 
     @asyncio.coroutine
     def ovs_init_flowtable(self):
@@ -542,23 +547,21 @@ class Network(object):
                     break
                 else:
                     self._logger.warning('OpenvSwitch datapath not connected to SDN Controller / {} not in {}'.format(OVS_DATAPATH_ID, resp))
-                    self.ready = False
             except HTTPClientConnectorError as e:
                 self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
 
-            yield from asyncio.sleep(2)
+            yield from asyncio.sleep(5)
 
         yield from self.ovs_init_flowtable()
-        self.ready = True
 
         # For testing purposes
-        yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-        yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
-
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
-        yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan', True)
+        #yield from self.add_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+        #yield from self.delete_local_connection('192.168.0.100', '172.16.0.1', '192.168.0.100', '172.16.0.1')
+        #
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
+        #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.3', '100.64.1.130', '100.64.2.130', 6, 60, 'vxlan', True)
         #yield from self.add_tunnel_connection('192.168.0.100', '172.16.0.4', '100.64.1.130', '100.64.2.130', 7, 70, 'geneve')
-        yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
+        #yield from self.delete_tunnel_connection('192.168.0.100', '172.16.0.2', '100.64.1.130', '100.64.2.130', 5, 50, 'gre')
 
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):

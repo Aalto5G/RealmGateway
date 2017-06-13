@@ -1,13 +1,14 @@
 test.gwa.cesproto.re2ee.org.:
     ID:
-        FQDN:   ['test.gwa.cesproto.re2ee.org.']
-        IPV4:   ['192.168.0.100']
-        MSISDN: ['0000000100']
+        fqdn:   ['test.gwa.cesproto.re2ee.org.']
+        ipv4:   ['192.168.0.100']
+        msisdn: ['0000000100']
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
         - {max: 100 }
     CARRIERGRADE:
+        - {ipv4: 192.168.0.100}
         - {ipv4: 192.168.0.10}
         - {ipv4: 192.168.0.11}
         - {ipv4: 192.168.0.12}

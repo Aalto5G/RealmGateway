@@ -72,15 +72,20 @@ class ConnectionLegacy(container3.ContainerNode):
         @type timeout: Integer or float
         """
         super().__init__(name, LOGLEVEL_CONNECTION)
+        # Set default values
+        self.autobind = True
+        self._autobind_flag = False
         # Set attributes
-        utils3.set_attributes(self, **kwargs)
-        # Set default unset attributes
+        utils3.set_attributes(self, override=True, **kwargs)
+        # Set default values of unset attributes
         attrlist_zero = ['private_ip', 'private_port', 'outbound_ip', 'outbound_port',
                          'remote_ip', 'remote_port', 'protocol', 'loose_packet']
-        attrlist_none = ['fqdn', 'dns_server', 'dns_client', 'id']
+        attrlist_none = ['fqdn', 'dns_server', 'dns_client', 'id', 'timeout']
         utils3.set_default_attributes(self, attrlist_zero, 0)
         utils3.set_default_attributes(self, attrlist_none, None)
-        self.timeout = ConnectionLegacy.TIMEOUT
+        # Set default timeout if not overriden
+        if not self.timeout:
+            self.timeout = ConnectionLegacy.TIMEOUT
         # Take creation timestamp
         self.timestamp_zero = time.time()
         ## Override timeout ##
@@ -122,9 +127,20 @@ class ConnectionLegacy(container3.ContainerNode):
 
     def _post_processing_nok(self, connection_table, remote_ip, remote_port):
         """ Return True if no further actions are required """
-        if self.protocol == 17 and self.loose_packet > 0:
-            # Consume loose token
+        # This is the normal case for incoming connections via RealmGateway
+        if self.loose_packet == 0:
+            return True
+        # This is a special case for opening a hole in the NAT temporarily
+        elif self.loose_packet > 0:
+            # Consume loose packet token
             self.loose_packet -= 1
+
+        # This is a special case for opening a hole in the NAT permanently
+        elif self.loose_packet < 0:
+            pass
+
+        if self.autobind and not self._autobind_flag:
+            self._logger.info('Binding connection / {}'.format(self))
             # Bind connection to 5-tuple match
             self.remote_ip, self.remote_port = remote_ip, remote_port
             self._built_lookupkeys = [(KEY_RGW, False),
@@ -132,9 +148,10 @@ class ConnectionLegacy(container3.ContainerNode):
                                       ((KEY_RGW, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True)]
             # Update keys in connection table
             connection_table.updatekeys(self)
-            return False
-        else:
-            return True
+            # Set autobind flag to True
+            self._autobind_flag = True
+
+        return False
 
     @property
     def age(self):
@@ -160,6 +177,12 @@ class ConnectionLegacy(container3.ContainerNode):
 
         if self.dns_server:
             ret += ' | DNS {} <- {}'.format(self.dns_server, self.dns_client)
+
+        if self.loose_packet:
+            ret += ' / bucket={}'.format(self.loose_packet)
+
+        if not self.autobind:
+            ret += ' / autobind={}'.format(self.autobind)
 
         return ret
 

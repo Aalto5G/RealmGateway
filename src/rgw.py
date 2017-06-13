@@ -44,11 +44,8 @@ import yaml
 import os
 
 import signal
-import sys
 import time
-import traceback
-import yaml
-import pprint
+from contextlib import suppress
 
 from datarepository import DataRepository
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
@@ -62,6 +59,8 @@ from customdns.dnsproxy import DNSProxy
 
 from aalto_helpers import utils3
 from loglevel import LOGLEVEL_MAIN
+
+from global_variables import RUNNING_TASKS
 
 def setup_logging_yaml(default_path='logging.yaml',
                        default_level=logging.INFO,
@@ -147,6 +146,10 @@ def parse_arguments():
                         help='ipset type hash:ip that stores the registered hosts')
 
     # Data repository parameters
+    ## API URL information
+    parser.add_argument('--repository-api-url', type=str,
+                        metavar=('URL'),
+                        help='URL of the data repository')
     ## Subscriber information
     parser.add_argument('--repository-subscriber-file', type=str,
                         metavar=('FILENAME'),
@@ -162,41 +165,42 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
+    # Loglevel and verbosity
+    parser.add_argument('--verbose', dest='verbose', action='store_true')
+
     return parser.parse_args()
 
 class RealmGateway(object):
     def __init__(self, args):
         self._config = args
-        self._logger = logging.getLogger(self._config.name)
-        self._logger.setLevel(LOGLEVEL_MAIN)
-
         # Get event loop
         self._loop = asyncio.get_event_loop()
-        # Enable debugging
-        self._set_verbose()
-        # Capture signals
-        self._capture_signal()
+        # Set logging
+        self._set_logging()
+
+    @asyncio.coroutine
+    def run(self):
+        self._logger.info('RealmGateway_v2 is starting...')
         # Initialize Data Repository
-        self._init_datarepository()
-        # Initialize Host table
-        self._init_hosttable()
-        # Initialize Connection table
-        self._init_connectiontable()
-        # Initialize Network
-        self._init_network()
+        yield from self._init_datarepository()
         # Initialize Address Pools
-        self._init_pools()
+        yield from self._init_pools()
+        # Initialize Host table
+        yield from self._init_hosttable()
+        # Initialize Connection table
+        yield from self._init_connectiontable()
+        # Initialize Network
+        yield from self._init_network()
         # Initialize DNS
-        self._init_dns()
-        # Initialize configured subscriber data wrapped as a corutine
-        self._loop.create_task(self._init_subscriberdata())
-        # Initialize configured subscriber data wrapped as a corutine
-        self._loop.create_task(self._init_cleanup_cpool(0.1))
+        yield from self._init_dns()
+        # Create task: CircularPool cleanup
+        _t = asyncio.ensure_future(self._init_cleanup_cpool(0.1))
+        RUNNING_TASKS.append((_t, '_init_cleanup_cpool'))
+        # Initialize Subscriber information
+        yield from self._init_subscriberdata()
 
-    def _capture_signal(self):
-        for signame in ('SIGINT', 'SIGTERM'):
-            self._loop.add_signal_handler(getattr(signal, signame), self._signal_handler, signame)
 
+    @asyncio.coroutine
     def _init_datarepository(self):
         # Initialize Data Repository
         self._logger.info('Initializing data repository')
@@ -204,32 +208,12 @@ class RealmGateway(object):
         configfolder = self._config.getdefault('repository_subscriber_folder', None)
         policyfile   = self._config.getdefault('repository_policy_file', None)
         policyfolder = self._config.getdefault('repository_policy_folder', None)
+        api_url      = self._config.getdefault('repository_api_url', None)
         self._datarepository = DataRepository(configfile = configfile, configfolder = configfolder,
-                                              policyfile = policyfile, policyfolder = policyfolder)
+                                              policyfile = policyfile, policyfolder = policyfolder,
+                                              api_url = api_url)
 
-    def _init_hosttable(self):
-        # Create container of Hosts
-        self._hosttable = HostTable()
-
-    def _init_connectiontable(self):
-        # Create container of Connections
-        self._connectiontable = ConnectionTable()
-
-    def _init_network(self):
-        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
-                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
-                                        ipt_host_chain   = self._config.ipt_host_chain ,
-                                        ipt_host_unknown = self._config.ipt_host_unknown,
-                                        ipt_policy_order = self._config.ipt_policy_order,
-                                        ipt_markdnat     = self._config.ipt_markdnat,
-                                        ipt_flush        = self._config.ipt_flush,
-                                        ips_hosts        = self._config.ips_hosts,
-                                        datarepository   = self._datarepository)
-        # Create object for storing all PacketIn-related information
-        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
-        # Register NFQUEUE(s) callback
-        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
-
+    @asyncio.coroutine
     def _init_pools(self):
         # Create container of Address Pools
         self._pooltable = PoolContainer()
@@ -257,6 +241,33 @@ class RealmGateway(object):
             self._logger.info('Adding resource(s) to pool {} @ <{}>'.format(ipaddr, ap))
             ap.add_to_pool(ipaddr)
 
+    @asyncio.coroutine
+    def _init_hosttable(self):
+        # Create container of Hosts
+        self._hosttable = HostTable()
+
+    @asyncio.coroutine
+    def _init_connectiontable(self):
+        # Create container of Connections
+        self._connectiontable = ConnectionTable()
+
+    @asyncio.coroutine
+    def _init_network(self):
+        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
+                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
+                                        ipt_host_chain   = self._config.ipt_host_chain ,
+                                        ipt_host_unknown = self._config.ipt_host_unknown,
+                                        ipt_policy_order = self._config.ipt_policy_order,
+                                        ipt_markdnat     = self._config.ipt_markdnat,
+                                        ipt_flush        = self._config.ipt_flush,
+                                        ips_hosts        = self._config.ips_hosts,
+                                        datarepository   = self._datarepository)
+        # Create object for storing all PacketIn-related information
+        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
+        # Register NFQUEUE(s) callback
+        self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
+
+    @asyncio.coroutine
     def _init_dns(self):
         # Create object for storing all DNS-related information
         self.dnscb = DNSCallbacks(cachetable      = None,
@@ -287,7 +298,7 @@ class RealmGateway(object):
         for ipaddr, port in self._config.ddns_server:
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from asyncio.ensure_future(listen_obj)
             self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
@@ -296,7 +307,7 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from asyncio.ensure_future(listen_obj)
             self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
@@ -305,7 +316,7 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from asyncio.ensure_future(listen_obj)
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
@@ -314,7 +325,7 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = self._loop.run_until_complete(listen_obj)
+            transport, protocol = yield from asyncio.ensure_future(listen_obj)
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
@@ -323,8 +334,8 @@ class RealmGateway(object):
         self._logger.info('Initializing subscriber data')
         tzero = time.time()
         for subs_id, subs_data in self._datarepository.getall_subscriber(default = {}).items():
-            ipaddr = subs_data['ID']['IPV4'][0]
-            fqdn = subs_data['ID']['FQDN'][0]
+            ipaddr = subs_data['ID']['ipv4'][0]
+            fqdn = subs_data['ID']['fqdn'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
         self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(time.time()-tzero))
@@ -338,67 +349,74 @@ class RealmGateway(object):
             # Update table and remove for expired connections
             self._connectiontable.update_all_rgw()
 
-    def _set_verbose(self, loglevel = LOGLEVEL_MAIN):
-        self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
-        logging.basicConfig(level=loglevel)
-        if loglevel <= logging.DEBUG:
+    def _set_logging(self, loglevel = LOGLEVEL_MAIN):
+        if self._config.verbose:
+            loglevel = logging.DEBUG
             self._loop.set_debug(True)
+        logging.basicConfig(level=loglevel)
+        self._logger = logging.getLogger(self._config.name)
+        self._logger.setLevel(loglevel)
+        self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
 
-    def _signal_handler(self, signame):
-        self._logger.critical('Got signal %s: exit' % signame)
-        try:
-            #TODO: Close all sockets?
-            for obj in self.dnscb.get_object(None):
-                obj.connection_lost(None)
-            # Close bound NFQUEUEs
-            self._network.ipt_deregister_nfqueues()
-        except:
-            self._logger.exception()
-        finally:
-            self._loop.stop()
+    @asyncio.coroutine
+    def shutdown(self):
+        self._logger.info('RealmGateway_v2 is shutting down...')
+        # Close registered sockets in callback module
+        for obj in self.dnscb.get_object(None):
+            obj.connection_lost(None)
+        # Close bound NFQUEUEs
+        self._network.ipt_deregister_nfqueues()
+        # Close open aiohttp_client objects
+        self._network.rest_api_close()
+        self._datarepository.rest_api_close()
 
-    def begin(self):
-        self._logger.info('RealmGateway_v2 is starting...')
-        self._loop.run_forever()
+        for task_obj, task_name in RUNNING_TASKS:
+            with suppress(asyncio.CancelledError):
+                self._logger.info('Cancelling {} task'.format(task_name))
+                task_obj.cancel()
+                yield from asyncio.sleep(1)
+                yield from task_obj
+                self._logger.info('>> Cancelled {} task'.format(task_name))
+
 
 if __name__ == '__main__':
     # Parse arguments
     args = parse_arguments()
     # Overload Namespace object with getdefault function
     args.getdefault = lambda name, default: getattr(args, name, default)
-
     # Use function to configure logging from file
     setup_logging_yaml()
-
     # Change logging dynamically
     logging.getLogger().setLevel(logging.DEBUG)
+    logger = logging.getLogger(__name__)
+    # Get event loop
+    loop = asyncio.get_event_loop()
     try:
-        loop = asyncio.get_event_loop()
-        rgw = RealmGateway(args)
-        rgw.begin()
+        # Create object instance
+        obj = RealmGateway(args)
+        loop.run_until_complete(obj.run())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        logger.warning('Keyboard interrupt')
     except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.exception("Exception!")
+        logger.exception('Exception happened', exc_info=True)
     finally:
-        loop.close()
+        loop.run_until_complete(obj.shutdown())
 
-'''
-class RetCodes(object):
-    POLICY_OK  = 0
-    POLICY_NOK = 1
+    #This is not ideal, the obj.shutdown should cleanup the tasks
+    # Let's also cancel all running tasks:
+    all_tasks = asyncio.Task.all_tasks()
+    logger.warning('Removing remaining tasks ({})'.format(len(all_tasks)))
+    for i, task in enumerate(all_tasks):
+        logger.warning('#{} {}'.format(i+1, task))
+        with suppress(Exception):
+            task.cancel()
+            time.sleep(1)
+        # Now we should await task to execute it's cancellation.
+        # Cancelled task raises asyncio.CancelledError that we can suppress:
+        #with suppress(asyncio.CancelledError):
+        #with suppress(Exception):
+        #    loop.run_until_complete(task)
 
-    APOOL_AVAILABLE = 0
-    APOOL_DEPLETED = 1
-
-    DNS_NOERROR  = 0    # DNS Query completed successfully
-    DNS_FORMERR  = 1    # DNS Query Format Error
-    DNS_SERVFAIL = 2    # Server failed to complete the DNS request
-    DNS_NXDOMAIN = 3    # Domain name does not exist.  For help resolving this error, read here.
-    DNS_NOTIMP   = 4    # Function not implemented
-    DNS_REFUSED  = 5    # The server refused to answer for the query
-    DNS_YXDOMAIN = 6    # Name that should not exist, does exist
-    DNS_XRRSET   = 7    # RRset that should not exist, does exist
-    DNS_NOTAUTH  = 8    # Server not authoritative for the zone
-    DNS_NOTZONE  = 9    # Name not in zone
-
-'''
+    loop.stop()
+    loop.close()

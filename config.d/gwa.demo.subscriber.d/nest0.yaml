@@ -1,13 +1,14 @@
 nest0.gwa.demo.:
     ID:
-        FQDN:   ['nest0.gwa.demo.']
-        IPV4:   ['192.168.0.10']
-        MSISDN: ['0000000010']
+        fqdn:   ['nest0.gwa.demo.']
+        ipv4:   ['192.168.0.10']
+        msisdn: ['0000000010']
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
         - {max: 100 }
     CARRIERGRADE:
+        - {ipv4: 192.168.0.10}
         - {ipv4: 192.168.0.11}
         - {ipv4: 192.168.0.12}
         - {ipv4: 192.168.0.13}

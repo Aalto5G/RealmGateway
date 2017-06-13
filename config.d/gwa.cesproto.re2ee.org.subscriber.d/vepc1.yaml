@@ -1,8 +1,8 @@
 vepc1.gwa.cesproto.re2ee.org.:
     ID:
-        FQDN:   ['vepc1.gwa.cesproto.re2ee.org.']
-        IPV4:   ['192.168.0.2']
-        MSISDN: ['0000000002']
+        fqdn:   ['vepc1.gwa.cesproto.re2ee.org.']
+        ipv4:   ['192.168.0.2']
+        msisdn: ['0000000002']
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:

@@ -1,5 +1,5 @@
 gwa.cesproto.re2ee.org.:
     ID:
-        FQDN:   ['gwa.cesproto.re2ee.org.']
-        IPV4:   ['195.148.125.201']
-        MSISDN: ['0000000000']
+        fqdn:   ['gwa.cesproto.re2ee.org.']
+        ipv4:   ['195.148.125.201']
+        msisdn: ['0000000000']
