@@ -5,6 +5,7 @@ import logging
 import socket, struct
 import os, subprocess
 import random, string
+import urllib.parse
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
@@ -62,9 +63,9 @@ OVS_PORT_TUN_L3_MAC = '00:00:00:12:34:56'
 OVS_PORT_TUN_L3_NET = '172.16.0.0/16'
 OVS_DIFFSERV_MARK   = 10 #DSCP10 AF11 priority traffic & low drop probability / Sets 6 bits field IP.dscp
 
-API_URL_SWITCHES    = 'http://127.0.0.1:8081/stats/switches'
-API_URL_FLOW_ADD    = 'http://127.0.0.1:8081/stats/flowentry/add'
-API_URL_FLOW_DELETE = 'http://127.0.0.1:8081/stats/flowentry/delete'
+API_URL_SWITCHES    = 'stats/switches'
+API_URL_FLOW_ADD    = 'stats/flowentry/add'
+API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 
 
 class Network(object):
@@ -88,7 +89,7 @@ class Network(object):
         self.ovs_create()
 
     def ips_init(self):
-        data_d = self.datarepository.get_policy('IPSET', {})
+        data_d = self.datarepository.get_policy_ces('IPSET', {})
         requires = data_d.setdefault('requires', [])
         rules = data_d.setdefault('rules', [])
         self._logger.info('Installing local ipset policy: {} requirements and {} rules'.format(len(requires), len(rules)))
@@ -110,7 +111,7 @@ class Network(object):
                     self._logger.error('#{} Failed to add {}'.format(i+1, e))
 
     def ipt_init(self):
-        data_d = self.datarepository.get_policy('IPTABLES', {})
+        data_d = self.datarepository.get_policy_ces('IPTABLES', {})
         for p in self.ipt_policy_order:
             if p not in data_d:
                 self._logger.critical('Not found local iptables policy <{}>'.format(p))
@@ -492,55 +493,60 @@ class Network(object):
     @asyncio.coroutine
     def ovs_init_flowtable(self):
         self._logger.info('Bootstrapping OpenvSwitch flow table')
+
+        # Build URL for add and delete operations
+        url_add    = urllib.parse.urljoin(self.api_url, API_URL_FLOW_ADD)
+        url_delete = urllib.parse.urljoin(self.api_url, API_URL_FLOW_DELETE)
+
         # Remove all existing flows
         data = {'dpid': OVS_DATAPATH_ID}
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+        yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
         # Populate TABLE 0
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         ## Outgoing CES-Local & CES-CES / Go to table 1
         data = {'dpid':OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048, 'ipv4_dst':OVS_PORT_TUN_L3_NET},
                 'actions':[{'type':'GOTO_TABLE', 'table_id':1}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         ## Incoming CES-CES from tunneling ports / Go to table 2
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_GRE},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_VXLAN},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':0, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_GENEVE},
                 'actions':[{'type':'GOTO_TABLE','table_id':2}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         # Populate TABLE 1
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         # Populate TABLE 2
         ## Install miss flow as DROP
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':0, 'match':{}, 'actions':[]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
     @asyncio.coroutine
     def wait_up(self):
         """ Check with SDN controller the availability of the OpenvSwitch datapath """
         while True:
             self._logger.debug('Awaiting synchronization of OpenvSwitch datapath with SDN Controller')
-            url = API_URL_SWITCHES
             try:
                 # Returns a json encoded list of connected datapaths
+                url = urllib.parse.urljoin(self.api_url, API_URL_SWITCHES)
                 resp = yield from self.rest_api.do_get(url, None)
                 if OVS_DATAPATH_ID in json.loads(resp):
                     self._logger.info('OpenvSwitch datapath connected to SDN Controller / {}'.format(OVS_DATAPATH_ID))
@@ -566,6 +572,10 @@ class Network(object):
     @asyncio.coroutine
     def add_local_connection(self, src, psrc, dst, pdst):
         self._logger.info('Create CES local connection {}:{} <=> {}:{}'.format(src, psrc, dst, pdst))
+
+        # Build URL for add operations
+        url_add    = urllib.parse.urljoin(self.api_url, API_URL_FLOW_ADD)
+
         # Create first unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
@@ -575,7 +585,7 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         # Create second unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
@@ -586,26 +596,33 @@ class Network(object):
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'SET_FIELD', 'field':'eth_src', 'value':OVS_PORT_TUN_L3_MAC},
                            {'type':'OUTPUT', 'port':OVS_PORT_IN}]}
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
     @asyncio.coroutine
     def delete_local_connection(self, src, psrc, dst, pdst):
         self._logger.info('Delete CES local connection {}:{} <=> {}:{}'.format(src, psrc, dst, pdst))
+
+        # Build URL for delete operations
+        url_delete = urllib.parse.urljoin(self.api_url, API_URL_FLOW_DELETE)
+
         # Delete first unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
                          'ipv4_src':src, 'ipv4_dst':psrc}}
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+        yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
         # Delete second unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
                          'ipv4_src':dst, 'ipv4_dst':pdst}}
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+        yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
     @asyncio.coroutine
     def add_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv=False):
         self._logger.info('Create CES tunnel connection {}:{} / {}:{}  tun_in={} tun_out={} [{} diffserv={}]'.format(src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv))
+
+        # Build URL for add operations
+        url_add    = urllib.parse.urljoin(self.api_url, API_URL_FLOW_ADD)
 
         # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
         if tun_type == 'gre':
@@ -636,7 +653,7 @@ class Network(object):
         if diffserv:
             # Add second to last action for setting IP.dscp field for DiffServ treatment
             data['actions'].insert(-1, {'type':'SET_FIELD', 'field':'ip_dscp', 'value':OVS_DIFFSERV_MARK})
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
         # Create outgoing unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
@@ -650,11 +667,14 @@ class Network(object):
         if diffserv:
             # Add matching of IP.dscp field for DiffServ treatment
             data['match']['ip_dscp'] = OVS_DIFFSERV_MARK
-        yield from self.rest_api.do_post(API_URL_FLOW_ADD, json.dumps(data))
+        yield from self.rest_api.do_post(url_add, json.dumps(data))
 
     @asyncio.coroutine
     def delete_tunnel_connection(self, src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv=False):
         self._logger.info('Delete CES tunnel connection {}:{} / {}:{}  tun_in={} tun_out={} [{} diffserv={}]'.format(src, psrc, tun_src, tun_dst, tun_id_in, tun_id_out, tun_type, diffserv))
+
+        # Build URL for delete operations
+        url_delete = urllib.parse.urljoin(self.api_url, API_URL_FLOW_DELETE)
 
         # This function performs the encapsulation of user data within the supported tunnels, GRE, VXLAN, GENEVE
         if tun_type == 'gre':
@@ -670,7 +690,7 @@ class Network(object):
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':1, 'priority':10,
                 'match':{'in_port':OVS_PORT_TUN_L3, 'eth_type':2048,
                          'ipv4_src':src, 'ipv4_dst':psrc}}
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+        yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
         # Delete incoming unidirectional connection
         data = {'dpid': OVS_DATAPATH_ID, 'table_id':2, 'priority':10,
@@ -679,7 +699,7 @@ class Network(object):
         if diffserv:
             # Add matching of IP.dscp field for DiffServ treatment
             data['match']['ip_dscp'] = OVS_DIFFSERV_MARK
-        yield from self.rest_api.do_post(API_URL_FLOW_DELETE, json.dumps(data))
+        yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
 
 '''

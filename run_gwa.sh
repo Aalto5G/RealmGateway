@@ -30,5 +30,7 @@ cd src
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
+          --network-api-url  http://127.0.0.1:8081/                          \
           --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
-          --repository-policy-folder     ../config.d/gwa.demo.policy.d/
+          --repository-policy-folder     ../config.d/gwa.demo.policy.d/      \
+          --repository-api-url  http://127.0.0.1:8082/

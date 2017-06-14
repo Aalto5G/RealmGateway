@@ -92,10 +92,10 @@ class DNSCallbacks(object):
         # TODO: Move all this complexity to network module? Maybe it's more fitting...
         self._logger.info('Register new user {} @ {}'.format(fqdn, ipaddr))
         # Download user data
-        user_data = self.datarepository.get_subscriber(fqdn, default = None)
+        user_data = yield from self.datarepository.get_policy_host(fqdn, default = None)
         if user_data is None:
             self._logger.info('Generating default subscriber data for {}'.format(fqdn))
-            user_data = self.datarepository.generate_default_subscriber(fqdn, ipaddr)
+            user_data = yield from self.datarepository.get_policy_host_default(fqdn, ipaddr)
 
         host_obj = HostEntry(name=fqdn, fqdn=fqdn, ipv4=ipaddr, services=user_data)
         self.hosttable.add(host_obj)
@@ -470,7 +470,7 @@ class DNSCallbacks(object):
 
     def _check_policyrgw(self, host_obj, dns_server_ip, dns_client_ip):
         # Get RGW and host objects
-        rgw_policies = self.datarepository.get_policy('CIRCULARPOOL', [])
+        rgw_policies = self.datarepository.get_policy_ces('CIRCULARPOOL', [])
         if not rgw_policies:
             self._logger.warning('RealmGateway CIRCULARPOOL policy not found!')
             return False
