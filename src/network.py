@@ -556,7 +556,7 @@ class Network(object):
             except HTTPClientConnectorError as e:
                 self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
 
-            yield from asyncio.sleep(5)
+            yield from asyncio.sleep(10)
 
         yield from self.ovs_init_flowtable()
 
