@@ -17,6 +17,8 @@ from_address = lambda x: dns.reversename.from_address(x).to_text()
 ## '4.3.2.1.in-addr.arpa.' -> '1.2.3.4'
 to_address = lambda x: dns.reversename.to_address(dns.name.from_text(x)).decode()
 
+make_query = dns.message.make_query
+
 def debug_data(data):
     return('({} bytes) "{}"'.format(len(data), data))
 
