@@ -67,10 +67,10 @@ def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60, recu
     response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
     return response
 
-def get_first_record(response):
+def get_section_record(section, n):
     try:
-        return '{}'.format(response.answer[0][0].to_text())
-    except Exception as e:
+        return format(section[n].to_text())
+    except:
         return None
 
 def create_ddns_message(soa, name, rdtype, ttl, rdata):

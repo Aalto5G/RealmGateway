@@ -108,6 +108,8 @@ def parse_arguments():
                         help='Default timeouts for DNS A resolution (sec)')
     parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS AAAA resolution (sec)')
+    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+                        help='Default timeouts for DNS SRV resolution (sec)')
     parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS NAPTR resolution (sec)')
 
@@ -285,6 +287,7 @@ class RealmGateway(object):
         self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_a, 1)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_aaaa, 28)
+        self.dnscb.dns_register_timeout(self._config.dns_timeout_srv, 33)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_naptr, 35)
 
         # Register defined SOA zones
