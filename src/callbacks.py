@@ -10,6 +10,7 @@ from aalto_helpers import network_helper3
 
 import customdns
 from customdns import dnsutils
+from customdns import edns0
 from customdns.dnsresolver import DNSResolver, uDNSResolver
 
 import dns
@@ -17,7 +18,6 @@ import dns.message
 import dns.zone
 import dns.rcode
 
-from dns.exception import DNSException
 from dns.rdataclass import *
 from dns.rdatatype import *
 
@@ -163,7 +163,7 @@ class DNSCallbacks(object):
 
 
     @asyncio.coroutine
-    def _do_resolve_carriergrade(self, query, host_addr):
+    def _do_resolve_carriergrade(self, query, host_addr, circular_pool = False):
         """ Resolve DNS query with host_addr. Return (dns_rcode, fqdn, rrdata) """
         # Obtain FQDN from query
         fqdn = format(query.question[0].name)
@@ -171,8 +171,7 @@ class DNSCallbacks(object):
         rdtype = query.question[0].rdtype
         # Obtain timeouts for given query type
         timeouts=self.dns_get_timeout(rdtype)
-        self._logger.warning('Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
-        print(query)
+        self._logger.debug('Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
 
         # Initiate DNS resolution
         try:
@@ -197,17 +196,24 @@ class DNSCallbacks(object):
 
         ## Record type A
         if rdtype == 1:
-            ipaddr = rrdata_answer
+            _name, _ttl, _rdataclass, _rdatatype, _target = rrdata_answer.split()
+            ipaddr = _target
             return (dns.rcode.NOERROR, fqdn, ipaddr)
-        elif rdtype == 33:
-            priority, weight, port, sfqdn = rrdata_answer.split()
-            ipaddr = dnsutils.get_section_record(response.additional, 0)
-            if not ipaddr:
+        elif rdtype == 33 and circular_pool:
+            _, _, _, _, _target_prio, _target_weight, _target_port, _target_sfqdn = rrdata_answer.split()
+            rrdata_additional = dnsutils.get_section_record(response.additional, 0)
+            if not rrdata_additional:
                 # Additional section is empty
                 self._logger.warning('EmptyResponseAdditional: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
                 return (dns.rcode.SERVFAIL, None, None)
-            else:
-                return (dns.rcode.NOERROR, sfqdn, ipaddr)
+
+            _name, _ttl, _rdataclass, _rdatatype, _target_ipaddr = rrdata_additional.split()
+            if _target_sfqdn != _name:
+                # Additional section record does not match SRV target domain
+                self._logger.warning('WrongRecord: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
+                return (dns.rcode.SERVFAIL, None, None)
+            # Return A target record
+            return (dns.rcode.NOERROR, _name, _target_ipaddr)
         else:
             self._logger.warning('UnsupportedType: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
             return (dns.rcode.SERVFAIL, None, None)
@@ -251,12 +257,12 @@ class DNSCallbacks(object):
             self._logger.debug('Process {} with CarrierGrade resolution'.format(fqdn))
             _rcode, _fqdn, _rdata = yield from self._do_resolve_carriergrade(query, host_obj.ipv4)
 
-            if _rcode != dns.rcode.NOERROR:
+            if not _rdata:
                 response = dnsutils.make_response_rcode(query, _rcode, recursion_available=True)
                 cback(query, addr, response)
                 return
 
-            # Get service carriergrade and verify the IP address
+            # Get service carriergrade and verify the IP address is owned by the host
             host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
             if not any(getitem(_, 'ipv4') == _rdata for _ in host_cgaddrs):
                 # Failed to verify carrier address in host pool - Drop DNS Query
@@ -357,7 +363,7 @@ class DNSCallbacks(object):
             self._logger.debug('Process {} with CircularPool (A)'.format(fqdn))
             yield from self._dns_process_rgw_wan_soa_a(query, addr, cback, host_obj, service_data)
         elif rdtype == 33:
-            # Resolve SRV type via Circular Pool
+            # Resolve SRV type via Circular Pool - Special processing for nested scenarios
             self._logger.debug('Process {} with CircularPool (SRV)'.format(fqdn))
             yield from self._dns_process_rgw_wan_soa_srv(query, addr, cback, host_obj, service_data)
         else:
@@ -378,15 +384,17 @@ class DNSCallbacks(object):
             return
 
         # Initiate SRV resolution towards CarrierGrade host
-        query_srv = dnsutils.make_query(fqdn, dns.rdatatype.SRV)
-        _rcode, _fqdn, _rdata =  yield from self._do_resolve_carriergrade(query_srv, host_obj.ipv4)
+        ## Add EDNS0 ECS option to query
+        edns0_opt = edns0.EDNS0_ECSOption(addr[0], 32, 0)
+        query_srv = dnsutils.make_query(fqdn, dns.rdatatype.SRV, options=[edns0_opt])
 
-        if _rcode != dns.rcode.NOERROR:
+        _rcode, _fqdn, _rdata =  yield from self._do_resolve_carriergrade(query_srv, host_obj.ipv4, True)
+        if not _rdata:
             response = dnsutils.make_response_rcode(query, _rcode, recursion_available=True)
             cback(query, addr, response)
             return
 
-        # Get service carriergrade and verify the IP address
+        # Get service carriergrade and verify the IP address is owned by the host
         host_cgaddrs = host_obj.get_service('CARRIERGRADE', [])
         if not any(getitem(_, 'ipv4') == _rdata for _ in host_cgaddrs):
             # Failed to verify carrier address in host pool - Drop DNS Query
@@ -503,7 +511,7 @@ class DNSCallbacks(object):
 
     @asyncio.coroutine
     def _dns_process_rgw_wan_soa_srv(self, query, addr, cback, host_obj, service_data):
-        """ Process DNS query from public network of a name in a SOA zone """
+        """ Process DNS query from public network of a name in a SOA zone. This is a special case for nested scenarios """
         allocated_ipv4 = None
         # Get host object
         fqdn = format(query.question[0].name)
@@ -602,7 +610,7 @@ class DNSCallbacks(object):
         if allocated_ipv4:
             self._logger.info('Overloading reserved address: {} @ {}'.format(fqdn, allocated_ipv4))
         else:
-            self._logger.info('Cannot overload address for {}'.format(fqdn))
+            self._logger.debug('Cannot overload address for {}'.format(fqdn))
             allocated_ipv4 = ap_cpool.allocate()
             if allocated_ipv4 is None:
                 return None
@@ -620,7 +628,7 @@ class DNSCallbacks(object):
         # Add connection to table
         self.connectiontable.add(new_conn)
         # Log
-        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, host_ipaddr, new_conn.timeout*1000))
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, new_conn.timeout*1000))
         self._logger.info('New Circular Pool connection: {}'.format(new_conn))
         return new_conn
 
