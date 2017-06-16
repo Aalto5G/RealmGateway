@@ -192,7 +192,7 @@ class DNSCallbacks(object):
         if not rrdata_answer:
             # Response is empty
             self._logger.warning('EmptyResponse: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
-            return (dns.rcode.SERVFAIL, None, None)
+            return (dns.rcode.NOERROR, None, None)
 
         ## Record type A
         if rdtype == 1:
@@ -205,18 +205,18 @@ class DNSCallbacks(object):
             if not rrdata_additional:
                 # Additional section is empty
                 self._logger.warning('EmptyResponseAdditional: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
-                return (dns.rcode.SERVFAIL, None, None)
+                return (dns.rcode.NOERROR, None, None)
 
             _name, _ttl, _rdataclass, _rdatatype, _target_ipaddr = rrdata_additional.split()
             if _target_sfqdn != _name:
                 # Additional section record does not match SRV target domain
                 self._logger.warning('WrongRecord: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
-                return (dns.rcode.SERVFAIL, None, None)
+                return (dns.rcode.NOERROR, None, None)
             # Return A target record
             return (dns.rcode.NOERROR, _name, _target_ipaddr)
         else:
             self._logger.warning('UnsupportedType: Resolve CarrierGrade domain: [{}] {} via {}'.format(rdtype, fqdn, host_addr))
-            return (dns.rcode.SERVFAIL, None, None)
+            return (dns.rcode.NOERROR, None, None)
 
 
     @asyncio.coroutine
@@ -273,7 +273,7 @@ class DNSCallbacks(object):
 
             self._logger.info('Completed CarrierGrade resolution: {} @ {}'.format(fqdn, _rdata))
             # Answer query with A type and answer with IPv4 address of the host
-            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, _rdata, rdclass=1, ttl=30, recursion_available=True)
+            response = dnsutils.make_response_answer_rr(query, fqdn, rdtype, _rdata, rdclass=1, ttl=0, recursion_available=True)
             cback(query, addr, response)
 
         elif rdtype == 1:
@@ -288,7 +288,7 @@ class DNSCallbacks(object):
 
         else:
             # Answer with empty records for other types
-            response = dnsutils.make_response_rcode(query, recursion_available=True)
+            response = dnsutils.make_response_rcode(query, dns.rcode.NOERROR, recursion_available=True)
             cback(query, addr, response)
 
 
