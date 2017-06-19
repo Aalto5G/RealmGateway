@@ -1,5 +1,4 @@
 - Fix bug with tunnel src/dst matches in Ryu rest API - low priority
-- Add verbose argument to rgw.py for debugging. Needs rework of logging levels
 - Use pylint to enhance python style
 - Add Rest API to datarepository - Use update_policy / update_subscriber to contact remote Policy Database, maintaining current API of datarepository
 - Add eDNS0 extensions to carrier grade resolution
