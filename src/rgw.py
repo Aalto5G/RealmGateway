@@ -9,7 +9,7 @@ Run as:
           --dns-server-local 127.0.0.1 53                                    \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
-          --dns-resolver     127.0.0.1 54                                    \
+          --dns-resolver     8.8.8.8 53                                      \
           --ddns-server      127.0.0.2 53                                    \
           --dns-timeout      0.010 0.100 0.200                               \
           --pool-serviceip   100.64.1.130/32                                 \
@@ -26,8 +26,11 @@ Run as:
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/
+          --network-api-url  http://127.0.0.1:8081/                          \
+          --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
+          --repository-policy-folder     ../config.d/gwa.demo.policy.d/      \
+          --repository-api-url  http://127.0.0.1:8082/                       \
+          --mode rgw
 '''
 
 import argparse
@@ -165,8 +168,8 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
-    # Loglevel and verbosity
-    parser.add_argument('--verbose', dest='verbose', action='store_true')
+    # Operation mode
+    parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
     return parser.parse_args()
 
