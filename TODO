@@ -3,3 +3,4 @@
 - Add Rest API to datarepository - Use update_policy / update_subscriber to contact remote Policy Database, maintaining current API of datarepository
 - Add eDNS0 extensions to carrier grade resolution
 - Use message.find_rrset() functions in dnspython for obtaining records from message section
+- Add mode selector for RGW or CES (DNS functions needs to be changed)
