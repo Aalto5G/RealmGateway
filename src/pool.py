@@ -5,7 +5,6 @@ import logging
 import random
 
 from aalto_helpers import container3
-from loglevel import LOGLEVEL_POOL
 
 def _calculate_address_pool(addrmask, ipv6=False):
     """
@@ -24,13 +23,13 @@ def _calculate_address_pool(addrmask, ipv6=False):
 class PoolContainer(container3.Container):
     def __init__(self, name='PoolContainer'):
         """ Initialize as a Container """
-        super().__init__(name, LOGLEVEL_POOL)
+        super().__init__(name)
 
 
 class NamePool(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='NamePool'):
         """ Initialize as a ContainerNode """
-        super().__init__(name, LOGLEVEL_POOL)
+        super().__init__(name)
         self._key = key
         self._pool = set()
 
@@ -54,7 +53,7 @@ class NamePool(container3.ContainerNode):
 class AddressPoolShared(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='AddressPoolShared'):
         """ Initialize as a ContainerNode """
-        super().__init__(name, LOGLEVEL_POOL)
+        super().__init__(name)
         self._key = key
         self._pool = _AddressPoolUnit('{}{}'.format(name,'Unit'))
         if addrmask:
@@ -104,7 +103,7 @@ class AddressPoolShared(container3.ContainerNode):
 class AddressPoolUser(container3.ContainerNode):
     def __init__(self, key, addrmask=None, name='AddressPoolUser'):
         """ Initialize as a ContainerNode """
-        super().__init__(name, LOGLEVEL_POOL)
+        super().__init__(name)
         self._key = key
         self._pool = {}
         self._addrpool = []
@@ -174,7 +173,6 @@ class _AddressPoolUnit_set(object):
     def __init__(self, name='_AddressPoolUnit'):
         """ Initialize the _AddressPoolUnit """
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVEL_POOL)
         self._pool = set()
         self._allocated = set()
         self._available = set()
@@ -229,7 +227,6 @@ class _AddressPoolUnit_list(object):
     def __init__(self, name='_AddressPoolUnit'):
         """ Initialize the _AddressPoolUnit """
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVEL_POOL)
         self._pool = []
         self._allocated = []
         self._available = []

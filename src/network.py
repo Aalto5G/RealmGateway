@@ -14,7 +14,6 @@ from aalto_helpers import iproute2_helper3
 from aiohttp_client import HTTPRestClient
 from aiohttp_client import HTTPClientConnectorError
 from nfqueue3 import NFQueue3
-from loglevel import LOGLEVEL_NETWORK
 
 from global_variables import RUNNING_TASKS
 
@@ -71,7 +70,6 @@ API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVEL_NETWORK)
         utils3.set_attributes(self, **kwargs)
         # Initialize nfqueues list
         self._nfqueues = []

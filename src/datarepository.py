@@ -9,14 +9,12 @@ from contextlib import suppress
 from aalto_helpers import utils3
 from aiohttp_client import HTTPRestClient
 from aiohttp_client import HTTPClientConnectorError
-from loglevel import LOGLEVEL_DATAREPOSITORY
 
 
 class DataRepository(object):
     def __init__(self, name='DataRepository', **kwargs):
         """ Initialize """
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(LOGLEVEL_DATAREPOSITORY)
         self.configfile = None
         self.configfolder = None
         self.policyfile = None

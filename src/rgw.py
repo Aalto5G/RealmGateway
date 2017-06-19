@@ -34,16 +34,13 @@ import argparse
 import asyncio
 import pool
 import configparser
-import dns
 import network
 
 import logging
 import logging.config
-import logging.handlers
 import yaml
 import os
 
-import signal
 import time
 from contextlib import suppress
 
@@ -58,8 +55,6 @@ from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy
 
 from aalto_helpers import utils3
-from loglevel import LOGLEVEL_MAIN
-
 from global_variables import RUNNING_TASKS
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -180,8 +175,8 @@ class RealmGateway(object):
         self._config = args
         # Get event loop
         self._loop = asyncio.get_event_loop()
-        # Set logging
-        self._set_logging()
+        # Get logger
+        self._logger = logging.getLogger(self._config.name)
 
     @asyncio.coroutine
     def run(self):
@@ -356,15 +351,6 @@ class RealmGateway(object):
             # Update table and remove for expired connections
             self._connectiontable.update_all_rgw()
 
-    def _set_logging(self, loglevel = LOGLEVEL_MAIN):
-        if self._config.verbose:
-            loglevel = logging.DEBUG
-            self._loop.set_debug(True)
-        logging.basicConfig(level=loglevel)
-        self._logger = logging.getLogger(self._config.name)
-        self._logger.setLevel(loglevel)
-        self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
-
     @asyncio.coroutine
     def shutdown(self):
         self._logger.info('RealmGateway_v2 is shutting down...')
@@ -393,11 +379,10 @@ if __name__ == '__main__':
     args.getdefault = lambda name, default: getattr(args, name, default)
     # Use function to configure logging from file
     setup_logging_yaml()
-    # Change logging dynamically
-    logging.getLogger().setLevel(logging.DEBUG)
     logger = logging.getLogger(__name__)
     # Get event loop
     loop = asyncio.get_event_loop()
+    loop.set_debug(True)
     try:
         # Create object instance
         obj = RealmGateway(args)

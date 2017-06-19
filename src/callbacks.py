@@ -27,15 +27,10 @@ from host import HostEntry
 import connection
 from connection import ConnectionLegacy
 
-from loglevel import LOGLEVEL_DNSCALLBACK, LOGLEVEL_PACKETCALLBACK
-
-# For debugging
-import time
 
 class DNSCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('DNSCallbacks')
-        self._logger.setLevel(LOGLEVEL_DNSCALLBACK)
         self._dns_timeout = {None:[0]} # Default single blocking query
         utils3.set_attributes(self, **kwargs)
         self.loop = asyncio.get_event_loop()
@@ -698,7 +693,6 @@ class DNSCallbacks(object):
 class PacketCallbacks(object):
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('PacketCallbacks')
-        self._logger.setLevel(LOGLEVEL_PACKETCALLBACK)
         utils3.set_attributes(self, **kwargs)
 
     def _format_5tuple(self, packet_fields):

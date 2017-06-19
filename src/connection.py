@@ -5,14 +5,12 @@ import pprint
 from aalto_helpers import container3
 from aalto_helpers import utils3
 
-from loglevel import LOGLEVEL_CONNECTION
-
 KEY_RGW = 0
 
 class ConnectionTable(container3.Container):
     def __init__(self, name='ConnectionTable'):
         """ Initialize as a Container """
-        super().__init__(name, LOGLEVEL_CONNECTION)
+        super().__init__(name)
 
     def _update_set(self, s):
         myset = set(s)
@@ -71,7 +69,7 @@ class ConnectionLegacy(container3.ContainerNode):
         @param timeout: Time to live (sec).
         @type timeout: Integer or float
         """
-        super().__init__(name, LOGLEVEL_CONNECTION)
+        super().__init__(name)
         # Set default values
         self.autobind = True
         self._autobind_flag = False
