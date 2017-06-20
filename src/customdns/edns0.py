@@ -277,7 +277,13 @@ class EDNS0_EDomainRate(dns.edns.Option):
             return 0
         return -1
 
-# Register extensions in dnspython dns.edns module
+# Add extensions to dnspython dns.edns module
+dns.edns._type_to_class[ENSID] = EDNS0_ENSIDOption
+dns.edns._type_to_class[ECS]   = EDNS0_ECSOption
+dns.edns._type_to_class[ECI]   = EDNS0_EClientInfoOption
+dns.edns._type_to_class[ECID]  = EDNS0_EClientID
+dns.edns._type_to_class[EDR]   = EDNS0_EDomainRate
+'''
 dns.edns._type_to_class = {
     ENSID: EDNS0_ENSIDOption,
     ECS:   EDNS0_ECSOption,
@@ -285,6 +291,7 @@ dns.edns._type_to_class = {
     ECID:  EDNS0_EClientID,
     EDR:   EDNS0_EDomainRate
 }
+'''
 
 def fqdn_ipt_match(domain):
     # http://stackoverflow.com/questions/12638408/decorating-hex-function-to-pad-zeros

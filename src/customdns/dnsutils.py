@@ -17,6 +17,8 @@ from_address = lambda x: dns.reversename.from_address(x).to_text()
 ## '4.3.2.1.in-addr.arpa.' -> '1.2.3.4'
 to_address = lambda x: dns.reversename.to_address(dns.name.from_text(x)).decode()
 
+make_query = dns.message.make_query
+
 def debug_data(data):
     return('({} bytes) "{}"'.format(len(data), data))
 
@@ -56,21 +58,21 @@ def sanitize_response(query, response):
         return False
     return True
 
-def make_response_rcode(query, rcode = dns.rcode.NOERROR):
-    response = dns.message.make_response(query, recursion_available=True)
+def make_response_rcode(query, rcode = dns.rcode.NOERROR, recursion_available=False):
+    response = dns.message.make_response(query, recursion_available=recursion_available)
     response.set_rcode(rcode)
     return response
 
-def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60):
-    response = dns.message.make_response(query, recursion_available=True)
+def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60, recursion_available=False):
+    response = dns.message.make_response(query, recursion_available=recursion_available)
 #    response.flags |= dns.flags.CD
     response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]
     return response
 
-def get_first_record(response):
+def get_section_record(section, n):
     try:
-        return '{}'.format(response.answer[0][0].to_text())
-    except Exception as e:
+        return format(section[n].to_text())
+    except:
         return None
 
 def create_ddns_message(soa, name, rdtype, ttl, rdata):

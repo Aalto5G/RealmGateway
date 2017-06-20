@@ -9,7 +9,7 @@ Run as:
           --dns-server-local 127.0.0.1 53                                    \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
-          --dns-resolver     127.0.0.1 54                                    \
+          --dns-resolver     8.8.8.8 53                                      \
           --ddns-server      127.0.0.2 53                                    \
           --dns-timeout      0.010 0.100 0.200                               \
           --pool-serviceip   100.64.1.130/32                                 \
@@ -26,24 +26,24 @@ Run as:
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/
+          --network-api-url  http://127.0.0.1:8081/                          \
+          --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
+          --repository-policy-folder     ../config.d/gwa.demo.policy.d/      \
+          --repository-api-url  http://127.0.0.1:8082/                       \
+          --mode rgw
 '''
 
 import argparse
 import asyncio
 import pool
 import configparser
-import dns
 import network
 
 import logging
 import logging.config
-import logging.handlers
 import yaml
 import os
 
-import signal
 import time
 from contextlib import suppress
 
@@ -58,8 +58,6 @@ from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy
 
 from aalto_helpers import utils3
-from loglevel import LOGLEVEL_MAIN
-
 from global_variables import RUNNING_TASKS
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -108,6 +106,8 @@ def parse_arguments():
                         help='Default timeouts for DNS A resolution (sec)')
     parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS AAAA resolution (sec)')
+    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+                        help='Default timeouts for DNS SRV resolution (sec)')
     parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS NAPTR resolution (sec)')
 
@@ -168,8 +168,8 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
-    # Loglevel and verbosity
-    parser.add_argument('--verbose', dest='verbose', action='store_true')
+    # Operation mode
+    parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
     return parser.parse_args()
 
@@ -178,8 +178,8 @@ class RealmGateway(object):
         self._config = args
         # Get event loop
         self._loop = asyncio.get_event_loop()
-        # Set logging
-        self._set_logging()
+        # Get logger
+        self._logger = logging.getLogger(self._config.name)
 
     @asyncio.coroutine
     def run(self):
@@ -285,6 +285,7 @@ class RealmGateway(object):
         self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_a, 1)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_aaaa, 28)
+        self.dnscb.dns_register_timeout(self._config.dns_timeout_srv, 33)
         self.dnscb.dns_register_timeout(self._config.dns_timeout_naptr, 35)
 
         # Register defined SOA zones
@@ -353,15 +354,6 @@ class RealmGateway(object):
             # Update table and remove for expired connections
             self._connectiontable.update_all_rgw()
 
-    def _set_logging(self, loglevel = LOGLEVEL_MAIN):
-        if self._config.verbose:
-            loglevel = logging.DEBUG
-            self._loop.set_debug(True)
-        logging.basicConfig(level=loglevel)
-        self._logger = logging.getLogger(self._config.name)
-        self._logger.setLevel(loglevel)
-        self._logger.warning('Setting loglevel {}'.format(logging.getLevelName(loglevel)))
-
     @asyncio.coroutine
     def shutdown(self):
         self._logger.info('RealmGateway_v2 is shutting down...')
@@ -390,11 +382,10 @@ if __name__ == '__main__':
     args.getdefault = lambda name, default: getattr(args, name, default)
     # Use function to configure logging from file
     setup_logging_yaml()
-    # Change logging dynamically
-    logging.getLogger().setLevel(logging.DEBUG)
     logger = logging.getLogger(__name__)
     # Get event loop
     loop = asyncio.get_event_loop()
+    loop.set_debug(True)
     try:
         # Create object instance
         obj = RealmGateway(args)
