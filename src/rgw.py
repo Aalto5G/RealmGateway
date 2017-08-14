@@ -322,16 +322,17 @@ class RealmGateway(object):
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = yield from asyncio.ensure_future(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
+            self._logger.info('Creating DNS LAN Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
         ## DNS Proxy for Local
         for ipaddr, port in self._config.dns_server_local:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+            #cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+            cb_nosoa = None
             listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             transport, protocol = yield from asyncio.ensure_future(listen_obj)
-            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
+            self._logger.info('Creating DNS LOCAL Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
     @asyncio.coroutine
