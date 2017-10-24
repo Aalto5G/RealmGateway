@@ -121,37 +121,37 @@ class Network(object):
             # Install requirements
             for i, entry in enumerate(requires):
                 self._logger.debug('#{} requires {}.{}'.format(i+1, entry['table'], entry['chain']))
-                if entry.setdefault('create',False) and not iptc_helper3.has_chain(entry['table'], entry['chain']):
-                    iptc_helper3.add_chain(entry['table'], entry['chain'], silent=False)
+                if entry.setdefault('create',False) and not iptc_helper3.has_chain(entry['table'], entry['chain'], ipv6=False):
+                    iptc_helper3.add_chain(entry['table'], entry['chain'], ipv6=False, silent=False)
                 if entry.setdefault('flush',False):
-                    iptc_helper3.flush_chain(entry['table'], entry['chain'])
+                    iptc_helper3.flush_chain(entry['table'], entry['chain'], ipv6=False)
             # Install rules
             for i, entry in enumerate(rules):
                 try:
                     self._logger.debug('#{} Adding to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
-                    iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'])
+                    iptc_helper3.add_rule(entry['table'], entry['chain'], entry['rule'], ipv6=False)
                 except:
                     self._logger.error('#{} Failed to add to {}.{} {}'.format(i+1, entry['table'], entry['chain'], entry['rule']))
 
     def _do_flushing(self):
         # Flush conntrack
         if self._do_subprocess_call('conntrack -F', False, False):
-            self._logger.info('Successfully flushed connection tracking information')
+            self._logger.info('Successfully flushed connection tracking information')            
         else:
             self._logger.warning('Failed to flush connection tracking information')
 
         # Flush iptables & ipset
         if self.ipt_flush:
-            iptc_helper3.flush_all()
+            iptc_helper3.flush_all(ipv6=False)
             self._logger.info('Successfully flushed iptables')
             iproute2_helper3.ipset_flush()
             self._logger.info('Successfully flushed ipset')
 
     def ipt_flush_chain(self, table, chain):
-        iptc_helper3.flush_chain(table, chain)
+        iptc_helper3.flush_chain(table, chain, ipv6=False)
 
     def ipt_zero_chain(self, table, chain):
-        iptc_helper3.zero_chain(table, chain)
+        iptc_helper3.zero_chain(table, chain, ipv6=False)
 
     def ipt_add_user(self, hostname, ipaddr):
         self._logger.debug('Add user {}/{}'.format(hostname, ipaddr))
@@ -227,7 +227,7 @@ class Network(object):
             xlat_rule = self._ipt_xlat_rule(host_chain, rule)
             rules_batch.append((host_chain, xlat_rule, 0))
         # Use new batch function
-        iptc_helper3.batch_add_rules('filter', rules_batch)
+        iptc_helper3.batch_add_rules('filter', rules_batch, ipv6=False)
 
     def ipt_add_user_groups(self, hostname, ipaddr, groups):
         self._logger.debug('Registering groups for user {}/{} <{}>'.format(hostname, ipaddr, groups))
@@ -290,11 +290,11 @@ class Network(object):
             table = 'nat'
             chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
             rule_l = [['target',{'MARKDNAT':{'or-mark':'0'}}]]
-            while iptc_helper3.has_chain(table, chain):
+            while iptc_helper3.has_chain(table, chain, ipv6=False):
                 chain = ''.join(random.choice(string.ascii_lowercase) for _ in range(25))
-            iptc_helper3.add_chain(table, chain)
-            iptc_helper3.add_rule(table, chain, rule_l)
-            if iptc_helper3.dump_chain(table, chain):
+            iptc_helper3.add_chain(table, chain, ipv6=False)
+            iptc_helper3.add_rule(table, chain, rule_l, ipv6=False)
+            if iptc_helper3.dump_chain(table, chain, ipv6=False):
                 self._logger.debug('MARKDNAT capable')
                 ret = True
             else:
@@ -304,8 +304,8 @@ class Network(object):
             ret = False
         finally:
             # Delete temporary chain
-            iptc_helper3.flush_chain(table, chain)
-            iptc_helper3.delete_chain(table, chain)
+            iptc_helper3.flush_chain(table, chain, ipv6=False)
+            iptc_helper3.delete_chain(table, chain, ipv6=False)
             return ret
 
     def _add_circularpool(self, hostname, ipaddr):
@@ -317,7 +317,7 @@ class Network(object):
         chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
-        iptc_helper3.add_rule(table, chain, rule)
+        iptc_helper3.add_rule(table, chain, rule, ipv6=False)
 
     def _remove_circularpool(self, hostname, ipaddr):
         # Do not delete specific rule if MARKDNAT is enabled
@@ -328,7 +328,7 @@ class Network(object):
         chain = self.ipt_cpool_chain
         mark = self._gen_pktmark_cpool(ipaddr)
         rule = {'mark':{'mark':hex(mark)}, 'target':{'DNAT':{'to-destination':ipaddr}}}
-        iptc_helper3.delete_rule(table, chain, rule, True)
+        iptc_helper3.delete_rule(table, chain, rule, ipv6=False, silent=True)
 
     def _add_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -339,7 +339,7 @@ class Network(object):
 
         # Create & flush basic chains for host policy
         # Use new batch function
-        iptc_helper3.batch_add_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces), True)
+        iptc_helper3.batch_add_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces), ipv6=False, flush=True)
 
         rules_batch = []
         # 1. Register triggers in global host policy chain
@@ -355,7 +355,7 @@ class Network(object):
         # Add a variable for default host policy
         rules_batch.append((host_chain, {'target':self.ipt_host_unknown}, 0))
         # Use new batch function
-        iptc_helper3.batch_add_rules('filter', rules_batch)
+        iptc_helper3.batch_add_rules('filter', rules_batch, ipv6=False)
 
     def _remove_basic_hostpolicy(self, hostname, ipaddr):
         # Define host tables
@@ -370,11 +370,11 @@ class Network(object):
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}))
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
         # Use new batch functions
-        iptc_helper3.batch_delete_rules('filter', rules_batch)
+        iptc_helper3.batch_delete_rules('filter', rules_batch, ipv6=False)
 
         # 2. Remove host chains
         # Use new batch function
-        iptc_helper3.batch_delete_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces))
+        iptc_helper3.batch_delete_chains('filter', (host_chain, host_chain_admin, host_chain_user, host_chain_ces), ipv6=False)
 
 
     def _add_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
@@ -387,7 +387,7 @@ class Network(object):
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}, 0))
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}, 0))
         # Use new batch function
-        iptc_helper3.batch_add_rules('filter', rules_batch)
+        iptc_helper3.batch_add_rules('filter', rules_batch, ipv6=False)
 
     def _remove_basic_hostpolicy_carriergrade(self, hostname, ipaddr):
         # Define host tables
@@ -399,21 +399,21 @@ class Network(object):
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}))
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
         # Use new batch functions
-        iptc_helper3.batch_delete_rules('filter', rules_batch)
+        iptc_helper3.batch_delete_rules('filter', rules_batch, ipv6=False)
 
     '''
         ### Not in use since the addition of batch processing ###
 
     def _ipt_create_chain(self, table, chain, flush = False):
         # Create and flush to ensure an empty table
-        iptc_helper3.add_chain(table, chain)
+        iptc_helper3.add_chain(table, chain, ipv6=False)
         if flush:
-            iptc_helper3.flush_chain(table, chain, silent=True)
+            iptc_helper3.flush_chain(table, chain, ipv6=False, silent=True)
 
     def _ipt_remove_chain(self, table, chain):
         # Flush and delete to ensure the table is removed
-        iptc_helper3.flush_chain(table, chain, silent=True)
-        iptc_helper3.delete_chain(table, chain, silent=True)
+        iptc_helper3.flush_chain(table, chain, silent=True, ipv6=False)
+        iptc_helper3.delete_chain(table, chain, silent=True, ipv6=False)
     '''
 
     def _ipt_xlat_rule(self, chain, rule):
