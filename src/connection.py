@@ -78,7 +78,7 @@ class ConnectionLegacy(container3.ContainerNode):
         # Set default values of unset attributes
         attrlist_zero = ['private_ip', 'private_port', 'outbound_ip', 'outbound_port',
                          'remote_ip', 'remote_port', 'protocol', 'loose_packet']
-        attrlist_none = ['fqdn', 'dns_server', 'dns_client', 'id', 'timeout']
+        attrlist_none = ['fqdn', 'dns_server', 'dns_client', 'host_fqdn', 'timeout']
         utils3.set_default_attributes(self, attrlist_zero, 0)
         utils3.set_default_attributes(self, attrlist_none, None)
         # Set default timeout if not overriden
@@ -101,8 +101,10 @@ class ConnectionLegacy(container3.ContainerNode):
         self._built_lookupkeys = []
         # Basic indexing
         self._built_lookupkeys.append((KEY_RGW, False))
+        # Host FQDN based indexing
+        self._built_lookupkeys.append(((KEY_RGW, self.host_fqdn), False))
         # Private IP-based indexing
-        self._built_lookupkeys.append(((KEY_RGW, self.id), False))
+        self._built_lookupkeys.append(((KEY_RGW, self.private_ip), False))
         # Outbound IP-based indexing
         self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip), False))
         # 3-tuple semi-fledged based indexing
@@ -157,7 +159,7 @@ class ConnectionLegacy(container3.ContainerNode):
 
     def __repr__(self):
         ret = ''
-        ret += '({})'.format(self.id)
+        ret += '({})'.format(self.host_fqdn)
         ret += ' [{}]'.format(self.protocol)
 
         if self.private_port:
