@@ -72,7 +72,7 @@ class EDNS0_ECSOption(dns.edns.Option):
         else:
             raise ValueError('Bad ip family')
 
-        self.address = address
+        self.address = address.decode() if type(address) is bytes else address
         self.srclen = srclen
         self.scopelen = scopelen
 
