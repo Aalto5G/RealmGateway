@@ -1,16 +1,63 @@
 import logging
 import time
-import pprint
+from functools import partial
+
+import ipaddress
 
 from aalto_helpers import container3
 from aalto_helpers import utils3
-from aalto_helpers import network_helper3
 
-KEY_DNS_IPADDR = 0
-KEY_DNS_NCID = 1
+import host
+from host import KEY_SERVICE_SFQDN
+
+import connection
+from connection import ConnectionLegacy
+
+import dns
+import dns.message
+import dns.rcode
+
+from dns.rdataclass import *
+from dns.rdatatype import *
+
+# Control variables
+ENABLED_DNS_ANTISPOOFING = True
+ENABLED_DNS_LOADPOLICING = True
+
+# Keys for uStateDNSResolver
+KEY_DNSNODE_IPADDR  = 10
+KEY_DNSHOST_NCID    = 11
+
+# Keys for uStateDNSGroup
+KEY_DNSGROUP        = 20
+KEY_DNSGROUP_ID     = 21
+KEY_DNSGROUP_IPADDR = 22
+
+# Keys for uDNSQueryTimer
+KEY_TIMER           = 30
+KEY_TIMER_FQDN      = 31
+
+# Keys for uStateDNSHost
+KEY_DNSHOST_IPADDR  = 40
+
+
+#HACK: Added this to define initial reputation value
+INITIAL_REPUTATION = {'init_rep_ok': 1, 'init_rep_nok': 3, 'init_rep_neutral':5}
+
+# Load levels in 100% (Use -1 value to disable step)
+SYSTEMLOAD_MAX       = 100
+SYSTEMLOAD_VERY_HIGH = 90
+SYSTEMLOAD_HIGH      = 60
+SYSTEMLOAD_MEDIUM    = 40
+SYSTEMLOAD_LOW       = 30
+SYSTEMLOAD_VERY_LOW  = 0
+SYSTEMLOAD_MIN       = 0
+SYSTEMLOAD_ENABLED   = lambda x: x>0
 
 
 class uReputation(object):
+    # TODO: Add counters for trusted event, untrusted event ?
+
     # These values define penalty/reward factor for higher loads of traffic
     # The factor is used as the exponent using the total number of events as the base
     OK_FACTOR = 0
@@ -19,11 +66,12 @@ class uReputation(object):
     # Define an initial reputation value when we do not have any data
     UNKNOWN_REPUTATION = 0.45
 
-    def __init__(self, identifier, ok=0, nok=0, neutral=0):
-        self.identifier = identifier
+    def __init__(self, name, ok=0, nok=0, neutral=0, badmouth=0):
+        self.name = name
         self.ok = ok
         self.nok = nok
         self.neutral = neutral
+        self.badmouth = badmouth
         self.total = ok + nok + neutral
 
     def event_ok(self):
@@ -37,6 +85,9 @@ class uReputation(object):
     def event_neutral(self):
         self.neutral += 1
         self.total += 1
+
+    def event_badmouth(self):
+        self.badmouth += 1
 
     @property
     def _ok_factor(self):
@@ -55,7 +106,7 @@ class uReputation(object):
 
     @property
     def reputation(self):
-        ''' Calculate reputation value based only on locally recorded events '''
+        """ Calculate reputation value based only on locally recorded events """
         try:
             rep = 0.5 * self._ok_factor * (self.ok / self.total) - \
                   0.5 * self._nok_factor * (self.nok / self.total) + \
@@ -72,19 +123,126 @@ class uReputation(object):
             return rep
 
     def __repr__(self):
-        return 'identifier={} neutral={} ok={} nok={} reputation={:.3f}'.format(self.identifier, self.neutral, self.ok, self.nok, self.reputation)
+        return '[{}] neutral={} ok={} nok={} reputation={:.3f} / badmouth={}'.format(self.name, self.neutral, self.ok, self.nok, self.reputation, self.badmouth)
 
 
-class ReputationStateDNSNode(container3.ContainerNode):
-    ''' This class stores the state information available for any DNS node (resolver or requestor) '''
+class uDNSQueryTimer(container3.ContainerNode):
+    TIMEOUT = 8.0
+
+    def __init__(self, query, ipaddr, fqdn, service, timeout=0):
+        """ Initialize as a ContainerNode """
+        # Initialize super
+        super().__init__('uDNSQueryTimer')
+        self.query = query
+        self.ipaddr = ipaddr
+        self.fqdn = fqdn
+        self.service = service
+        self.timeout = timeout
+        # Set default timeout if not overriden
+        if not self.timeout:
+            self.timeout = uDNSQueryTimer.TIMEOUT
+        # Take creation timestamp
+        self.timestamp_zero = time.time()
+        self.timestamp_eol = self.timestamp_zero + self.timeout
+
+    def hasexpired(self):
+        """ Return True if the timeout has expired """
+        return time.time() > self.timestamp_eol
+
+    def lookupkeys(self):
+        """ Return the lookup keys """
+        return [((KEY_TIMER), False),
+                ((KEY_TIMER_FQDN, self.fqdn), True)]
+
+    def show(self):
+        # Pretty(ier) print of the host information
+        print('### uDNSQueryTimer ##')
+        #print('> Query: {}'.format(self.query))
+        print('> Resolver: {}'.format(self.ipaddr))
+        print('> FQDN: {}'.format(self.fqdn))
+        print('> Service: {}'.format(self.service))
+        print('> Lookupkeys: {}'.format(self.lookupkeys()))
+        print('################')
+
+    def __repr__(self):
+        return '[{}] resolver={} fqdn={} service={} timeout={} sec'.format(self._name, self.ipaddr, self.fqdn, self.service, self.timeout)
+
+class uStateDNSHost(container3.ContainerNode):
+    """ This class stores the state information representing a requestor DNS node """
     def __init__(self, **kwargs):
-        super().__init__('ReputationStateDNSNode')
+        super().__init__('uStateDNSHost')
+
+        # This class defines a DNS advertised node via EDNS0 ClientSubnet / Extended Client Information / Name Client Identifier
+        # This object
+
+        ## IP source / EDNS0 ClientSubnet / Extended Client Information
+        self.ipaddr      = None
+        self.ipaddr_mask = 32
+
+        ## EDNS0 Name Client Identifier -> Tuple of (tag_id, server_ipaddr)
+        #self.ncid        = None
+        #self.ncid_ipaddr = None
+
+        # Override attributes
+        utils3.set_attributes(self, override=True, **kwargs)
+
+        ## Convert IPaddr/mask to network address
+        self._ipaddr = ipaddress.ip_network('{}/{}'.format(self.ipaddr, self.ipaddr_mask), strict=False)
+        # Overwrite ipaddr with network address
+        self.ipaddr = format(self._ipaddr.network_address)
+
+        # Sanity check
+        #assert(self.ncid or self.ipaddr)
+
+    def lookupkeys(self):
+        """ Return the lookup keys """
+        # Return an iterable (key, isunique)
+        keys = []
+        # Typical keys of an advertised DNS host and data host
+        keys.append(((KEY_DNSHOST_IPADDR, self.ipaddr), True))
+        return keys
+
+    def contains(self, ipaddr):
+        """ Return True if ipaddr exists in the defined network """
+        return ipaddress.ip_address(ipaddr) in self._ipaddr
+
+    def __repr__(self):
+        return '[{}] ipaddr={} ipaddr_mask={}'.format(self._name, self.ipaddr, self.ipaddr_mask)
+
+
+class uStateDNSResolver(container3.ContainerNode):
+    """ This class stores the state information available for any DNS resolver node """
+    def __init__(self, **kwargs):
+        super().__init__('uStateDNSResolver')
+        # Set default attributes
+        self.edns0_cookie = None
+        self.supported_edns0 = []
+        self.ipaddr = None
+        # Override attributes
+        utils3.set_attributes(self, override=True, **kwargs)
+        # Sanity check
+        assert(self.ipaddr is not None)
+
+    def lookupkeys(self):
+        """ Return the lookup keys """
+        # Return an iterable (key, isunique)
+        keys = []
+        # Create unique key based on IP address literal
+        keys.append(((KEY_DNSNODE_IPADDR, self.ipaddr), True))
+        return keys
+
+    def __repr__(self):
+        return '[{}] ipaddr={}'.format(self._name, self.ipaddr)
+
+
+class uStateDNSGroup(container3.ContainerNode):
+    """ This class stores the state information available for any DNS node (resolver or requestor) """
+    def __init__(self, **kwargs):
+        super().__init__('uStateDNSGroup')
 
         # Set default attributes
         self.period_n = 0
         self.period_ts = time.time()
-        self.tcp_capable = False
-        self.supported_edns0 = []
 
         # Define weighted values for reputation calculation based on historic data
         self.weight_previous = 0.25
@@ -95,43 +253,36 @@ class ReputationStateDNSNode(container3.ContainerNode):
         self.init_rep_nok = 0
         self.init_rep_neutral = 5
 
-        # Define values for lookupkeys
-        ## EDNS0 Name Client Identifier
-        self.ncid = ''
-        ## IP source / EDNS0 ClientSubnet / Extended Client Information
-        self.ipaddr = ''
+        # Define a list for uStateDNSResolver ipaddresses
+        self.population = []
 
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
 
-        # Sanity check
-        assert(self.ncid or self.ipaddr)
-
         # Create reputation object
-        rep_identifier = '{}.#{}'.format(self.ipaddr, self.period_n)
-        self.reputation_current = uReputation(identifier = rep_identifier,
+        rep_identifier = '{}.#{}'.format(id(self), self.period_n)
+        self.reputation_current = uReputation(rep_identifier,
                                               ok = self.init_rep_ok,
                                               nok = self.init_rep_nok,
                                               neutral = self.init_rep_neutral)
         ## Create previous reputation object same as current
-        rep_identifier = '{}.#{}'.format(self.ipaddr, self.period_n - 1)
-        self.reputation_previous = uReputation(identifier = rep_identifier,
-                                              ok = self.init_rep_ok,
-                                              nok = self.init_rep_nok,
-                                              neutral = self.init_rep_neutral)
+        rep_identifier = '{}.#{}'.format(id(self), self.period_n - 1)
+        self.reputation_previous = uReputation(rep_identifier,
+                                               ok = self.init_rep_ok,
+                                               nok = self.init_rep_nok,
+                                               neutral = self.init_rep_neutral)
 
     def lookupkeys(self):
         """ Return the lookup keys """
         # Return an iterable (key, isunique)
         keys = []
-        if self.ipaddr:
+        for ipaddr in self.population:
+            # Create default key to index all same-element
+            keys.append((KEY_DNSGROUP, False))
+            # Create unique key based on ID of object
+            keys.append(((KEY_DNSGROUP_ID, id(self)), True))
             # Create unique key based on IP address literal
-            keys.append(((KEY_DNS_IPADDR, self.ipaddr), True))
-        if self.ncid:
-            # Create unique key based on IP address literal + Name Client Identifier
-            keys.append(((KEY_DNS_NCID, self.ipaddr, self.ncid), True))
-            # Create non-unique key based on IP address literal for Name Client Identifiers
-            keys.append(((KEY_DNS_NCID, self.ipaddr), False))
+            keys.append(((KEY_DNSGROUP_IPADDR, ipaddr), True))
         return keys
 
     def transition_period(self):
@@ -148,10 +299,14 @@ class ReputationStateDNSNode(container3.ContainerNode):
 
         rep_identifier = '{}.#{}'.format(self.ipaddr, self.period_n)
 
-        self.reputation_current = uReputation(identifier = rep_identifier,
+        self.reputation_current = uReputation(rep_identifier,
                                               ok = int(ok),
                                               nok = int(nok),
                                               neutral = int(neutral))
+
+    @property
+    def id(self):
+        return id(self)
 
     @property
     def reputation(self):
@@ -168,73 +323,500 @@ class ReputationStateDNSNode(container3.ContainerNode):
         self.reputation_current.event_neutral()
 
     def __repr__(self):
-        return '[{}] ipaddr={} ncid={} / reputation previous={:.3f} current={:.3f} weighted_avg={:.3f}'.format(self.period_n, self.ipaddr, self.ncid,
+        return '[{}] period={} ipaddrs={} / reputation previous={:.3f} current={:.3f} weighted_avg={:.3f}'.format(self._name, self.period_n, self.population,
                                                                                                           self.reputation_previous.reputation,
                                                                                                           self.reputation_current.reputation,
                                                                                                           self.reputation)
-    def dump(self):
-        return self.__repr__()
 
-    def debug(self):
+    def show_reputation(self):
         print(self)
         print('  >> previous: {}'.format(self.reputation_previous))
         print('  >> current:  {}'.format(self.reputation_current))
 
+    def merge(self, other):
+        self._logger.warning('Merging 2 DNS groups: {} / {}'.format(self, other))
+        # Combine population
+        for ipaddr in other.population:
+            self.population.append(ipaddr)
 
-class ReputationStateDataNode(object):
-    pass
+        # Calculate last period value and transition reputations to catch up
+        last_period_n = max(self.period_n, other.period_n)
+        ## Age myself to catch up with last period
+        for i in range(self.period_n, last_period_n):
+            self.transition_period()
+        ## Age other to catch up with last period
+        for i in range(other.period_n, last_period_n):
+            other.transition_period()
+
+        # Update self reputation values with other
+        ## Previous reputation period
+        [self.reputation_previous.event_ok() for i in range(other.reputation_previous.ok)]
+        [self.reputation_previous.event_nok() for i in range(other.reputation_previous.nok)]
+        [self.reputation_previous.event_neutral() for i in range(other.reputation_previous.neutral)]
+        ## Current reputation period
+        [self.reputation_current.event_ok() for i in range(other.reputation_current.ok)]
+        [self.reputation_current.event_nok() for i in range(other.reputation_current.nok)]
+        [self.reputation_current.event_neutral() for i in range(other.reputation_current.neutral)]
+
+
+
+
 
 class PolicyBasedResourceAllocation(container3.Container):
-    '''
-    Develop this class to be triggered from: https://gitlab.cloud.mobilesdn.org/CES/customer_edge_switching_v2/blob/master/src/callbacks.py#L323
-    '''
+    """
+    Develop this class to be triggered from DNSCallback and PacketCallbacks
+    """
+    #TODO: Create policy configuration and load it from file
 
-    def __init__(self, name='PolicyBasedResourceAllocation'):
-        ''' Initialize as a Container '''
-        super().__init__(name)
+    def __init__(self, **kwargs):
+        """ Initialize as a Container """
+        super().__init__('PolicyBasedResourceAllocation')
+        # Override attributes
+        utils3.set_attributes(self, override=True, **kwargs)
 
 
-    def load_metadata_query(self, query, addr):
-        ''' Parse DNS query and load reputation objects '''
-        # Collect metadata from DNS query related to resolver
-        ipaddr = addr[0]
-        if not self.has((KEY_DNS_IPADDR, ipaddr)):
-            self._logger.info('Create ReputationStateDNSNode for resolver ipaddr={}'.format(ipaddr))
-            meta_resolver = ReputationStateDNSNode(ipaddr = ipaddr)
-            self.add(meta_resolver)
-        # Get existing object
-        meta_resolver = self.get((KEY_DNS_IPADDR, ipaddr))
+    def cleanup_timers(self):
+        """ Perform a cleanup of expired timer objects """
+        # For debugging purposes
+        self._debug_dnsgroups()
+
+        nodes = self.lookup(KEY_TIMER, update=False, check_expire=False)
+        if nodes is None:
+            return
+        for node in list(nodes):
+            if node.hasexpired():
+                self.remove(node)
+
+    def _debug_dnsgroups(self):
+        nodes = self.lookup(KEY_DNSGROUP, update=False, check_expire=False)
+        if nodes is None:
+            return
+        [node.show_reputation() for node in nodes]
+
+    def _policy_tcp(self, query):
+        # Answer TRUNCATED
+        response = dns.message.make_response(query, recursion_available=False)
+        response.set_rcode(dns.rcode.NOERROR)
+        response.flags |= dns.flags.TC
+        return response
+
+    def _policy_cname(self, query):
+        # Answer CNAME
+        fqdn = format(query.question[0].name)
+        MAX_LENGTH_LABEL = 63
+        _fqdn = utils3.random_string(MAX_LENGTH_LABEL) + '.' + fqdn
+        ttl = 0
+        response = dns.message.make_response(query, recursion_available=False)
+        response.set_rcode(dns.rcode.NOERROR)
+        response.answer = [dns.rrset.from_text(fqdn, ttl, 1, dns.rdatatype.CNAME, _fqdn)]
+        return response, _fqdn
+
+    def dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
+        """ This function implements section: Tackling real resolutions and reputation for remote server(s) and DNS clusters """
+        # TODO: Different behavior when service_data['proxy_required'] is True?
+        # TODO: Add trusted and untrusted events to dns-group reputations?
+        #           > This can help if we see a surge of UDP traffic that is TC-answered but cluster-TCP never comes?
+
+        if ENABLED_DNS_ANTISPOOFING is False:
+            return None
+
+        fqdn = format(query.question[0].name)
+        alias = service_data['alias']
+        dnsgroup_obj = self.lookup((KEY_DNSGROUP_IPADDR, addr[0]))
+
+        # Evaluate pre-conditions
+
+        # Ensure spoofed-free communications by triggering TCP requests (by default right now)
+        if alias is False and query.transport == 'udp':
+            # Create truncated response
+            response = self._policy_tcp(query)
+            self._logger.info('Create TRUNCATED response')
+            return response
+
+        # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver
+
+        # Continue processing with *trusted* DNS query
+
+        # Gather further information from unknown DNS resolvers
+        if alias is False and dnsgroup_obj is None:
+            self._logger.info('Create CNAME response and new DNS group')
+            # Create CNAME response
+            response, _fqdn = self._policy_cname(query)
+            # Register alias service in host
+            self._register_host_alias(host_obj, service_data, _fqdn)
+            ## Create uDNSQueryTimer object
+            timer_obj = uDNSQueryTimer(query, addr[0], _fqdn, service_data)
+            # Monkey patch delete function for timer object
+            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj, _fqdn)
+            self.add(timer_obj)
+            ## Create new DNS node
+            ### Collect further metadata from query and include it in the dns node object
+            dnsnode_obj = uStateDNSResolver(ipaddr=addr[0], tcp_capable=True)
+            self.add(dnsnode_obj)
+            ## Create new DNS group with single DNS node
+            dnsgroup_obj = uStateDNSGroup()
+            dnsgroup_obj.population.append(dnsnode_obj.ipaddr)
+            self.add(dnsgroup_obj)
+            # Add neutral event ? Maybe trusted?
+            dnsgroup_obj.event_neutral()
+            # Return CNAME response
+            return response
+
+        # Gather further information from known DNS resolvers
+        if alias is False and dnsgroup_obj is not None:
+            self._logger.info('Create CNAME response for existing DNS group')
+            # Create CNAME response
+            response, _fqdn = self._policy_cname(query)
+            # Register alias service in host
+            self._register_host_alias(host_obj, service_data, _fqdn)
+            ## Create uDNSQueryTimer object
+            timer_obj = uDNSQueryTimer(query, addr[0], _fqdn, service_data)
+            # Monkey patch delete function for timer object
+            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj, _fqdn)
+            self.add(timer_obj)
+            # Add neutral event ? Maybe trusted?
+            dnsgroup_obj.event_neutral()
+            # Return CNAME response
+            return response
+
+        # We have come this far, let's not get picky if we are using UDP or TCP
+        assert(alias is True)
+
+        # Remove alias service in host and update reputation (+1)
+        self._remove_host_alias(host_obj, fqdn, dnsgroup_obj)
+
+        # Remove timer object
+        timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
+        self.remove(timer_obj)
+
+        # Evaluate seen IP addresses
+        if timer_obj.ipaddr not in dnsgroup_obj.population:
+            self._logger.info('New node detected in DNS group')
+            # Merge DNS groups
+            other_dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
+
+            self._logger.info('Merge DNS groups\n >{}\n >{}'.format(dnsgroup_obj, other_dnsgroup_obj))
+
+            dnsgroup_obj.merge(other_dnsgroup_obj)
+            self.remove(other_dnsgroup_obj)
+            self._logger.info('Merged DNS groups\n >{}'.format(dnsgroup_obj))
+
 
         # Collect metadata from DNS query related to requestor
-        meta_requestor = None
+        dnshost_obj = None
         meta_ipaddr = None
         meta_ncid = None
 
         for opt in query.options:
+            self._logger.warning('Found EDNS0: {}'.format(opt.to_text()))
             if opt.otype == 0x08 and meta_ipaddr is None:
                 #ClientSubnet
                 meta_ipaddr = opt.address
+                meta_mask   = opt.srclen
             elif opt.otype == 0xff01:
                 #ExtendedClientInformation (preferred)
                 meta_ipaddr = opt.address
+                meta_mask   = 32
             elif opt.otype == 0xff02:
                 #ExtendedClientInformation
                 meta_ncid = opt.id_data
 
-        if meta_ipaddr or meta_ncid:
-            if not self.has((KEY_DNS_NCID, meta_ipaddr, meta_ncid)):
-                self._logger.info('Create ReputationStateDNSNode for requestor ipaddr={} ncid={}'.format(meta_ipaddr, meta_ncid))
-                meta_requestor = ReputationStateDNSNode(ipaddr = meta_ipaddr, ncid = meta_ncid)
-                self.add(meta_requestor)
+
+        if meta_ipaddr:
+            ipaddr_lookup = format(ipaddress.ip_network('{}/{}'.format(meta_ipaddr, meta_mask), strict=False).network_address)
+
+            if not self.has((KEY_DNSHOST_IPADDR, ipaddr_lookup)):
+                self._logger.info('Create uStateDNSHost for requestor ipaddr={} ipaddr_mask={}'.format(meta_ipaddr, meta_mask))
+                dnshost_obj = uStateDNSHost(ipaddr = meta_ipaddr, ipaddr_mask = meta_mask)
+                self.add(dnshost_obj)
             # Get existing object
-            meta_requestor = self.get((KEY_DNS_NCID, meta_ipaddr, meta_ncid))
+            dnshost_obj = self.get((KEY_DNSHOST_IPADDR, ipaddr_lookup))
 
-        # Attach reputation object as metadata to the DNS query
-        query.reputation_resolver = meta_resolver
-        query.reputation_requestor = meta_requestor
+        # Add reputation objects to the DNS query
+        query.reputation_resolver = dnsgroup_obj
+        query.reputation_requestor = dnshost_obj
 
-    def process_data_packet(self, packet):
+    def api_data_newpacket(self, packet):
         pass
+
+    def api_dns_circularpool(self, query, addr, host_obj, service_data, node_policy, host_policy, host_ipv4):
+        """ Takes in a DNS query for CircularPool... """
+        # TODO: Implement logic for policy and reputation checking
+
+        #dns_server_id = query.reputation_requestor.id
+        #dns_client_ip = query.reputation_requestor.ipaddr
+
+        # Update table and remove expired connections
+        self.connectiontable.update_all_rgw()
+
+        # Get host usage stats of the pool - lookup because there could be none
+        rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
+        host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.fqdn)) # Use host fqdn as connection id
+
+        # Evaluate most basic policy for quick exit
+        if rgw_conns >= node_policy['max']:
+            self._logger.warning('RealmGateway global policy exceeded: {}'.format(node_policy['max']))
+            return False
+
+        if host_conns >= host_policy['max']:
+            self._logger.warning('RealmGateway host policy exceeded: {}'.format(host_policy['max']))
+            return False
+
+        # No policy has been exceeded -> Continue
+
+        # Calculate system load and find executing policy function
+        ## Get Circular Pool address pool stats
+        ap_cpool = self.pooltable.get('circularpool')
+        pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
+        ## Calculate current load in 100%
+        sysload = (pool_allocated / pool_size) * 100
+
+        ## Get executing function
+
+        ### Execute best-effort policy if DNS Load Policing is disabled
+        if ENABLED_DNS_LOADPOLICING is False:
+            allocated_ipv4 = self._policy_circularpool_verylow()
+            return allocated_ipv4
+
+        cb_f = self._get_policy_load_function(sysload)
+
+        #dnsresponse = cb_f(query, addr, host_obj, service_data, node_policy, host_policy)
+
+
+        ### Continue here for debugging -> Move to specific load policy when ready
+
+        # Obtain FQDN from query
+        fqdn = format(query.question[0].name)
+
+        # Get list of reusable addresses
+        reuse_ipaddr_l = self._connection_circularpool_get_overloadable(service_data)
+        self._logger.warning('Found {} IP(s) for reuse: {}'.format(len(reuse_ipaddr_l), reuse_ipaddr_l))
+
+        # Based on policy and load level, decide how we want to proceed
+        ## If the service is SFQDN and could reuse addresses, consider it!
+
+        if len(reuse_ipaddr_l) > 0:
+            # Use first available address from the pool
+            allocated_ipv4 = reuse_ipaddr_l[0]
+            self._logger.info('Overloading reserved address: {} @ {}'.format(fqdn, allocated_ipv4))
+        elif pool_available > 0:
+            # Allocate a new address from the pool
+            allocated_ipv4 = ap_cpool.allocate()
+            self._logger.info('Allocating new address from CircularPool: {} @ {}'.format(fqdn, allocated_ipv4))
+        else:
+            self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn))
+            return None
+
+        # Continue to creating the connection
+
+        # Create RealmGateway connection
+        conn_param = {'private_ip': host_ipv4,
+                      'private_port': service_data['port'],
+                      'outbound_ip': allocated_ipv4,
+                      'outbound_port': service_data['port'],
+                      #'remote_ip': remote_ip,
+                      #'remote_port': remote_port,
+                      'protocol': service_data['protocol'],
+                      'fqdn': fqdn,
+                      'host_fqdn': host_obj.fqdn,
+                      #'resolver_ip': None,
+                      #'requestor_ip': None,
+                      'loose_packet': service_data.setdefault('loose_packet', 0),
+                      'autobind': service_data.setdefault('autobind', True),
+                      'timeout': service_data.setdefault('timeout', 0),
+                      'query': query,
+                      }
+
+        connection_obj = ConnectionLegacy(**conn_param)
+        # Monkey patch delete function for connection object
+        connection_obj.delete = partial(self._cb_connection_expired, connection_obj)
+        # Add connection to table
+        self.connectiontable.add(connection_obj)
+        # Log
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
+        self._logger.info('New Circular Pool connection: {}'.format(connection_obj))
+        return allocated_ipv4
+
+
+    def _cb_connection_expired(self, conn):
+        # Get Circular Pool address pool
+        ap_cpool = self.pooltable.get('circularpool')
+        ipaddr = conn.outbound_ip
+        # Log connection expired
+        if conn.hasexpired():
+            self._logger.info('Connection expired: {} in {:.3f} msec '.format(conn, conn.age*1000))
+            # Blame attribution to DNS resolver and requestor
+            self._logger.info('  >> Blame attribution!')
+            pass
+
+        # Get RealmGateway connections
+        if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
+            self._logger.info('Cannot release IP address to Circular Pool: {} @ {} still in use for {:.3f} msec'.format(conn.fqdn, ipaddr, conn.age*1000))
+            return
+
+        ap_cpool.release(ipaddr)
+        self._logger.info('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
+
+
+    def _get_policy_load_function(self, sysload):
+        """ Based on current load, return callback function for policy processing """
+        # We define up to 5 different levels of system load
+        ## We can hack a way of using only 3 levels
+
+        if SYSTEMLOAD_ENABLED(SYSTEMLOAD_VERY_HIGH) and \
+          sysload >= SYSTEMLOAD_VERY_HIGH:
+            self._logger.warning('SYSTEMLOAD_VERY_HIGH ({:.2f}%%)'.format(sysload))
+            return self._policy_circularpool_veryhigh
+
+        elif SYSTEMLOAD_ENABLED(SYSTEMLOAD_HIGH) and \
+          sysload >= SYSTEMLOAD_HIGH:
+            self._logger.warning('SYSTEMLOAD_HIGH ({:.2f}%%)'.format(sysload))
+            return self._policy_circularpool_high
+
+        elif SYSTEMLOAD_ENABLED(SYSTEMLOAD_MEDIUM) and \
+          sysload >= SYSTEMLOAD_MEDIUM:
+            self._logger.warning('SYSTEMLOAD_MEDIUM ({:.2f}%%)'.format(sysload))
+            return self._policy_circularpool_medium
+
+        elif SYSTEMLOAD_ENABLED(SYSTEMLOAD_LOW) and \
+          sysload >= SYSTEMLOAD_LOW:
+            self._logger.warning('SYSTEMLOAD_LOW ({:.2f}%%)'.format(sysload))
+            return self._policy_circularpool_low
+
+        elif SYSTEMLOAD_ENABLED(SYSTEMLOAD_VERY_LOW) and \
+          sysload >= SYSTEMLOAD_VERY_LOW:
+            self._logger.warning('SYSTEMLOAD_VERY_LOW ({:.2f}%%)'.format(sysload))
+            return self._policy_circularpool_verylow
+
+
+    def _policy_circularpool_veryhigh(self, query, addr, host_obj, service_data, node_policy, host_policy):
+        self._logger.warning('_policy_circularpool_veryhigh')
+
+    def _policy_circularpool_high(self, query, addr, host_obj, service_data, node_policy, host_policy):
+        self._logger.warning('_policy_circularpool_high')
+
+    def _policy_circularpool_medium(self, query, addr, host_obj, service_data, node_policy, host_policy):
+        self._logger.warning('_policy_circularpool_medium')
+
+    def _policy_circularpool_low(self, query, addr, host_obj, service_data, node_policy, host_policy):
+        self._logger.warning('_policy_circularpool_low')
+
+    def _policy_circularpool_verylow(self, query, addr, host_obj, service_data, node_policy, host_policy):
+        self._logger.warning('_policy_circularpool_verylow')
+
+
+
+    def _connection_circularpool_allocatable(self):
+        pass
+
+    def _connection_circularpool_get_overloadable(self, service_data):
+        """ Returns a list of IPv4 address that can be overloaded """
+        port, protocol = service_data['port'], service_data['protocol']
+        self._logger.debug('Attempt to overload connection for {}:{}'.format(port, protocol))
+        # List of available addresses for reuse
+        available = []
+
+        if not self.connectiontable.has(connection.KEY_RGW):
+            return available
+
+        # Iterate all RealmGateway connections and try to reuse existing allocated IP addresses
+        rgw_conns = self.connectiontable.get(connection.KEY_RGW)
+        for conn in rgw_conns:
+            ipaddr = conn.outbound_ip
+            c_port, c_proto = conn.outbound_port, conn.protocol
+            s_port, s_proto = port, protocol
+
+            # Do not iterate already available addresses
+            if ipaddr in available:
+                continue
+
+            self._logger.warning('Comparing {} vs {} @{}'.format((c_port, c_proto),(s_port, s_proto), ipaddr))
+            # The following statements match when IP overloading cannot be performed
+            if (c_port == 0 and c_proto == 0) or (s_port == 0 and s_proto == 0):
+                self._logger.debug('0. Port & Protocol blocked')
+                continue
+            elif (c_port == s_port) and (c_proto == s_proto or c_proto == 0 or s_proto == 0):
+                self._logger.debug('1. Port blocked')
+                continue
+            elif (c_proto == s_proto) and (c_port == 0 or s_port == 0):
+                self._logger.debug('2. Port blocked')
+                continue
+
+            available.append(ipaddr)
+        # Return list of available IP addresses for overload
+        return available
+
+    def _connection_circularpool_create(self, host_obj, host_ipaddr, dns_server_ip, dns_client_ip, fqdn, service_data):
+        """ Return the created connection or None """
+        allocated_ipv4 = None
+        # Get Circular Pool address pool
+        ap_cpool = self.pooltable.get('circularpool')
+        # Check if existing connections can be overloaded
+        self._logger.debug('Overload connection for {} @ {}:{}'.format(fqdn, service_data['port'], service_data['protocol']))
+        available_overload = self._get_overload_ipaddrs(service_data['port'], service_data['protocol'])
+
+        if len(available_overload) > 0:
+            # Use first available address from the pool
+            allocated_ipv4 = available_overload[0]
+            self._logger.info('Overloading reserved address: {} @ {}'.format(fqdn, allocated_ipv4))
+        else:
+            # Attempt to allocate new address from the pool and return if not available
+            allocated_ipv4 = ap_cpool.allocate()
+            if allocated_ipv4 is None:
+                return None
+
+        # Create RealmGateway connection
+        conn_param = {'private_ip': host_ipaddr, 'private_port': service_data['port'],
+                      'outbound_ip': allocated_ipv4, 'outbound_port': service_data['port'],
+                      'protocol': service_data['protocol'], 'fqdn': fqdn, 'dns_server': dns_server_ip,
+                      'loose_packet': service_data.setdefault('loose_packet', 0), 'host_fqdn':host_obj.fqdn,
+                      'autobind': service_data.setdefault('autobind', True),
+                      'timeout': service_data.setdefault('timeout', 0)}
+        connection = ConnectionLegacy(**conn_param)
+        # Monkey patch delete function
+        connection.delete = partial(self._cb_delete_rgw_connection, connection)
+        # Add connection to table
+        self.connectiontable.add(connection)
+        # Log
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection.timeout*1000))
+        self._logger.info('New Circular Pool connection: {}'.format(connection))
+        return connection
+
+
+    def _register_host_alias(self, host_obj, service_data, fqdn):
+        # Add alias as SFQDN host service
+        #service_data = {'fqdn':'foo.', 'port':0, 'protocol':0, 'proxy_required':False, 'carriergrade':False}
+        _service_data = dict(service_data)
+        _service_data['fqdn'] = fqdn
+        _service_data['alias'] = True
+        # Add alias service to host_obj
+        host_obj.add_service(KEY_SERVICE_SFQDN, _service_data)
+        # Update lookup keys in host table
+        self.hosttable.updatekeys(host_obj)
+
+    def _remove_host_alias(self, host_obj, fqdn, dnsgroup_obj):
+        # Update reputation values
+        ## Log OK event
+        dnsgroup_obj.event_nok()
+        # Remove alias FQDN service from host
+        service_data = host_obj.get_service_sfqdn(fqdn)
+        host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
+        # Update lookup keys in host table
+        self.hosttable.updatekeys(host_obj)
+
+    def _cb_dnstimer_expired(self, timer_obj, host_obj, fqdn):
+        # Log expiration
+        if timer_obj.hasexpired():
+            self._logger.info('Timer expired {}'.format(timer_obj))
+            # Update reputation values. DNS group must exists
+            dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
+            ## Log NOK event
+            dnsgroup_obj.event_nok()
+        # Remove alias FQDN service from host
+        service_data = host_obj.get_service_sfqdn(fqdn)
+        host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
+        # Update lookup keys in host table
+        self.hosttable.updatekeys(host_obj)
 
 
 def generate_ok(obj, n):
@@ -254,7 +836,7 @@ def generate_neutral(obj, n):
 
 
 if __name__ == "__main__":
-    '''
+    """
     obj = uReputation('test1')
     print(obj)
     generate_neutral(obj, 3)
@@ -274,7 +856,7 @@ if __name__ == "__main__":
     generate_nok(obj, 10)
     generate_ok(obj, 30)
     print(obj)
-    '''
+
 
     pbra = PolicyBasedResourceAllocation()
 
@@ -306,7 +888,6 @@ if __name__ == "__main__":
     obj1.transition_period()
     obj1.debug()
 
-    print(pbra.dump())
 
     from customdns import edns0
 
@@ -323,3 +904,47 @@ if __name__ == "__main__":
     pbra.load_metadata_query(msg, ('8.8.8.8', 12345))
     print(msg.reputation_resolver)
     print(msg.reputation_requestor)
+    """
+    pbra = PolicyBasedResourceAllocation()
+
+    ipaddr1 = '1.1.1.1'
+
+    assert(not pbra.has((KEY_DNSGROUP_IPADDR, ipaddr1)))
+
+    # Create new DNS node
+    node1 = uStateDNSResolver(ipaddr=ipaddr1)
+    # Create new DNS group with single DNS node
+    group1 = uStateDNSGroup(population=[node1])
+
+    pbra.add(node1)
+    pbra.add(group1)
+
+    assert(pbra.has((KEY_DNSGROUP_IPADDR, ipaddr1)))
+
+
+
+    ipaddr2 = '1.1.1.2'
+    # Create new DNS node
+    node2 = uStateDNSResolver(ipaddr=ipaddr2)
+    pbra.add(node2)
+
+    _group = pbra.get((KEY_DNSGROUP_IPADDR, ipaddr1))
+    _group.population.append(node2)
+    pbra.updatekeys(_group)
+
+
+    ipaddr3 = '1.1.1.3'
+    # Create new DNS node
+    node3 = uStateDNSResolver(ipaddr=ipaddr3)
+    # Create new DNS group with single DNS node
+    group2 = uStateDNSGroup(population=[node3])
+
+    pbra.add(node3)
+    pbra.add(group2)
+
+    group1.merge(group2)
+    pbra.remove(group2)
+
+
+    print(group1.show_reputation())
+
