@@ -118,9 +118,11 @@ class HostEntry(container3.ContainerNode):
 
     def _normalize_service_sfqdn(self):
         for data in self.services[KEY_SERVICE_SFQDN]:
-            port = data.setdefault('port', 0)
-            protocol = data.setdefault('protocol', 0)
+            data.setdefault('port', 0)
+            data.setdefault('protocol', 0)
             data.setdefault('proxy_required', False)
+            data.setdefault('carriergrade', False)
+            data.setdefault('alias', False)
 
     def show(self):
         # Pretty(ier) print of the host information
