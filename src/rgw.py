@@ -266,7 +266,8 @@ class RealmGateway(object):
         # Create container of Reputation objects
         self._pbra = PolicyBasedResourceAllocation(pooltable       = self._pooltable,
                                                    hosttable       = self._hosttable,
-                                                   connectiontable = self._connectiontable)
+                                                   connectiontable = self._connectiontable,
+                                                   datarepository  = self._datarepository)
 
     @asyncio.coroutine
     def _init_network(self):
