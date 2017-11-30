@@ -252,7 +252,7 @@ class DNSCallbacks(object):
             return
 
         # Evaluate host and service
-        # TODO REDO this code from example of CGNAT resolution
+        # TODO REDO this code from example of CGNAT resolution for SRV then A fallback?
         if service_data['carriergrade'] is True:
             # Resolve via CarrierGrade
             self._logger.debug('Process {} with CarrierGrade resolution'.format(fqdn))
@@ -339,7 +339,7 @@ class DNSCallbacks(object):
         query.reputation_resolver = None
         query.reputation_requestor = None
 
-        self._logger.warning('WAN SOA: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.debug('WAN SOA: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
 
         # The service exists in RGW
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
@@ -441,15 +441,6 @@ class DNSCallbacks(object):
             cback(query, addr, response)
             return
 
-        try:
-            # Get Circular Pool policy for RGW
-            cpool_policy = self.datarepository.get_policy_ces('CIRCULARPOOL', [])[0]
-            # Get Circular Pool policy for host
-            host_policy = host_obj.get_service('CIRCULARPOOL')[0]
-        except Exception as ex:
-            self._logger.exception('RealmGateway CIRCULARPOOL policy not found!')
-            return
-
         # NOTES:
         ## Here we could first apply a pre-policy check, in case we are already in 100% and preserve CG-NAT addresses.
         ## However, the assumption is that real public IP addresses are more limited than CG-NAT addresses, therefore a best-effort
@@ -468,10 +459,10 @@ class DNSCallbacks(object):
             cback(query, addr, response)
             return
 
-        self._logger.warning('WAN SOA CircularPool: {} via {} for {}'.format(fqdn, host_ipv4, _service_data))
+        self._logger.debug('WAN SOA CircularPool: {} via {} for {}'.format(fqdn, host_ipv4, _service_data))
 
         # Decision making based on load level(s) and reputation
-        allocated_ipv4 = self.pbra.api_dns_circularpool(query, addr, host_obj, _service_data, cpool_policy, host_policy, host_ipv4)
+        allocated_ipv4 = self.pbra.api_dns_circularpool(query, addr, host_obj, _service_data, host_ipv4)
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query to trigger reattempt
             self._logger.warning('Failed to allocate an address for {}'.format(fqdn))

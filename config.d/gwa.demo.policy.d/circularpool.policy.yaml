@@ -1,2 +1,7 @@
 CIRCULARPOOL:
-    - {max: 1000 }
+    max: 1000
+    SYSTEM_LOAD_POLICY:
+        LOW:      {load_threshold: 0,  reputation_fqdn: 0,    reputation_sfqdn: 0}
+        MEDIUM:   {load_threshold: 20, reputation_fqdn: 0.5,  reputation_sfqdn: 0.3}
+        HIGH:     {load_threshold: 60, reputation_fqdn: 0.75, reputation_sfqdn: 0.6}
+        VERYHIGH: {load_threshold: 80, reputation_fqdn: -1,   reputation_sfqdn: 0.8}
