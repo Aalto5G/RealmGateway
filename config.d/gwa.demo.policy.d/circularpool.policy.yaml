@@ -5,3 +5,6 @@ CIRCULARPOOL:
         MEDIUM:   {load_threshold: 20, reputation_fqdn: 0.5,  reputation_sfqdn: 0.3}
         HIGH:     {load_threshold: 60, reputation_fqdn: 0.75, reputation_sfqdn: 0.6}
         VERYHIGH: {load_threshold: 80, reputation_fqdn: -1,   reputation_sfqdn: 0.8}
+    DNS_GROUP_POLICY:
+        - {'initial_reputation': 0.8, 'sla': true, 'nodes': ['1.1.1.1', '1.1.1.2', '1.1.1.3']}
+        - {'initial_reputation': 0.5, 'sla': true, 'nodes': ['2.2.2.1', '2.2.2.2', '2.2.2.3']}
