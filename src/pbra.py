@@ -25,6 +25,17 @@ PBRA_DNS_ANTI_SPOOFING = False # Enable TCPCNAME policy
 PBRA_DNS_LOAD_POLICING = True # Use load scaling for fine policy enforcement
 PBRA_DNS_LOG_UNTRUSTED = True # Log all DNS query attempts (UDP untrusted)
 
+PBRA_REPUTATION_MIDDLE = 0.45
+
+# Load levels in 100% (Use -1 value to disable step)
+##SYSTEM_LOAD_POLICY    = (load_threshold, reputation_fqdn, reputation_sfqdn)
+SYSTEM_LOAD_VERY_HIGH = (-1, -1, 0.80)
+SYSTEM_LOAD_HIGH      = (-1, 0.75, 0.60)
+SYSTEM_LOAD_MEDIUM    = (-1, 0.50, 0.30)
+SYSTEM_LOAD_LOW       = ( 0, 0, 0)
+SYSTEM_LOAD_ENABLED   = lambda x: x>=0
+
+
 # Keys for uStateDNSResolver
 KEY_DNSNODE_IPADDR  = 10
 KEY_DNSHOST_NCID    = 11
@@ -42,37 +53,33 @@ KEY_TIMER_FQDN      = 31
 KEY_DNSHOST_IPADDR  = 40
 
 
-#HACK: Added this to define initial reputation value
-INITIAL_REPUTATION = {'init_rep_ok': 1, 'init_rep_nok': 3, 'init_rep_neutral':5}
-
-# Load levels in 100% (Use -1 value to disable step)
-##SYSTEM_LOAD_POLICY    = (load_threshold, reputation_fqdn, reputation_sfqdn)
-SYSTEM_LOAD_VERY_HIGH = (-1, -1, 0.80)
-SYSTEM_LOAD_HIGH      = (-1, 0.75, 0.60)
-SYSTEM_LOAD_MEDIUM    = (-1, 0.50, 0.30)
-SYSTEM_LOAD_LOW       = ( 0, 0, 0)
-SYSTEM_LOAD_ENABLED   = lambda x: x>=0
 
 
 class uReputation(object):
-    # TODO: Add counters for trusted event, untrusted event ?
+    """
+    # Define an initial reputation value when we do not have any data
+    initial_reputation = 0.45
 
     # These values define penalty/reward factor for higher loads of traffic
     # The factor is used as the exponent using the total number of events as the base
-    OK_FACTOR = 0
-    NOK_FACTOR = 0.15
-    NEUTRAL_FACTOR = 0
-    # Define an initial reputation value when we do not have any data
-    UNKNOWN_REPUTATION = 0.45
+    ok_factor = 0
+    ok_factor = 0.15
+    neutral_factor = 0
+    """
 
-    def __init__(self, name, ok=0, nok=0, neutral=0, trusted=0, untrusted=0):
-        self.name = name
-        self.ok = ok
-        self.nok = nok
-        self.neutral = neutral
-        self.trusted = trusted
-        self.untrusted = untrusted
-        self.total = ok + nok + neutral
+    def __init__(self, initial_reputation=0.45, ok_factor=0, nok_factor=0.15, neutral_factor=0):
+        self.name = id(self)
+        self.initial_reputation = initial_reputation
+        self.ok_factor = ok_factor
+        self.nok_factor = nok_factor
+        self.neutral_factor = neutral_factor
+        # Define counters
+        self.ok = 0
+        self.nok = 0
+        self.neutral = 0
+        self.total = 0
+        self.trusted = 0
+        self.untrusted = 0
 
     def event_ok(self):
         self.ok += 1
@@ -95,17 +102,17 @@ class uReputation(object):
     @property
     def _ok_factor(self):
         # Define a ok_factor that rewards ok event
-        return self.total ** self.OK_FACTOR
+        return self.total ** self.ok_factor
 
     @property
     def _nok_factor(self):
         # Define a nok_factor that penalizes nok events
-        return self.total ** self.NOK_FACTOR
+        return self.total ** self.ok_factor
 
     @property
     def _neutral_factor(self):
         # Define a nok_factor that penalizes nok events
-        return self.total ** self.NEUTRAL_FACTOR
+        return self.total ** self.neutral_factor
 
     @property
     def reputation(self):
@@ -113,9 +120,9 @@ class uReputation(object):
         try:
             rep = 0.5 * self._ok_factor * (self.ok / self.total) - \
                   0.5 * self._nok_factor * (self.nok / self.total) + \
-                  uReputation.UNKNOWN_REPUTATION * self._neutral_factor
+                  self.initial_reputation * self._neutral_factor
         except ZeroDivisionError as e:
-            rep = self.UNKNOWN_REPUTATION
+            rep = self.initial_reputation
 
         # Normalize reputation values between [0,1]
         if rep <= 0:
@@ -177,6 +184,7 @@ class uDNSQueryTimer(container3.ContainerNode):
 
     def __repr__(self):
         return '[{}] resolver={} fqdn={} service={} timeout={} sec'.format(self._name, self.ipaddr, self.fqdn, self.service, self.timeout)
+
 
 class uStateDNSHost(container3.ContainerNode):
     """ This class stores the state information representing a requestor DNS node """
@@ -259,40 +267,32 @@ class uStateDNSGroup(container3.ContainerNode):
         self.weight_previous = 0.25
         self.weight_current = 0.75
 
-        # Define initial values for reputation object
-        self.init_rep_ok = 0
-        self.init_rep_nok = 0
-        self.init_rep_neutral = 5
+        # Define initial reputation
+        self.initial_reputation = PBRA_REPUTATION_MIDDLE
+
+        # Define flag to indicate SLA agreement for use of Extended Client Subnet / Extended Client Information
+        self.sla = False
 
         # Define a list for uStateDNSResolver ipaddresses
-        self.population = []
+        self.nodes = []
 
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
 
-        # Create reputation object
-        rep_identifier = '{}.#{}'.format(id(self), self.period_n)
-        self.reputation_current = uReputation(rep_identifier,
-                                              ok = self.init_rep_ok,
-                                              nok = self.init_rep_nok,
-                                              neutral = self.init_rep_neutral)
-        ## Create previous reputation object same as current
-        rep_identifier = '{}.#{}'.format(id(self), self.period_n - 1)
-        self.reputation_previous = uReputation(rep_identifier,
-                                               ok = self.init_rep_ok,
-                                               nok = self.init_rep_nok,
-                                               neutral = self.init_rep_neutral)
+        # Create reputation objects
+        self.reputation_current = uReputation(initial_reputation = self.initial_reputation)
+        self.reputation_previous = uReputation(initial_reputation = self.initial_reputation)
 
     def lookupkeys(self):
         """ Return the lookup keys """
         # Return an iterable (key, isunique)
         keys = []
-        for ipaddr in self.population:
-            # Create default key to index all same-element
-            keys.append((KEY_DNSGROUP, False))
-            # Create unique key based on ID of object
-            keys.append(((KEY_DNSGROUP_ID, id(self)), True))
-            # Create unique key based on IP address literal
+        # Create default key to index all same-element
+        keys.append((KEY_DNSGROUP, False))
+        # Create unique key based on ID of object
+        keys.append(((KEY_DNSGROUP_ID, id(self)), True))
+        # Create unique key based on IP address literal
+        for ipaddr in self.nodes:
             keys.append(((KEY_DNSGROUP_IPADDR, ipaddr), True))
         return keys
 
@@ -300,20 +300,22 @@ class uStateDNSGroup(container3.ContainerNode):
         # Transition to next period
         self.period_n += 1
         self.period_ts = time.time()
+        # Use current reputation for computing next period's
+        _reputation = self.reputation
+        # Transition current reputation object into previous
+        del self.reputation_previous
         self.reputation_previous = self.reputation_current
 
-        # Create reputation object for current period with weighted values
-        ok = self.reputation_previous.ok * self.weight_previous
-        nok = self.reputation_previous.nok * self.weight_previous
-        ## Adjust neutral to at least a minimum value
-        neutral = max(self.reputation_previous.neutral * self.weight_previous, self.init_rep_neutral)
+        # Calculate absolute distance for ageing
+        distance = abs(_reputation - PBRA_REPUTATION_MIDDLE)
+        ## Age reputation towards the "middle point"
+        if _reputation < PBRA_REPUTATION_MIDDLE:
+            _reputation += distance / 3
+        elif _reputation > PBRA_REPUTATION_MIDDLE:
+            _reputation -= distance / 3
 
-        rep_identifier = '{}.#{}'.format(self.ipaddr, self.period_n)
-
-        self.reputation_current = uReputation(rep_identifier,
-                                              ok = int(ok),
-                                              nok = int(nok),
-                                              neutral = int(neutral))
+        # Create new reputation object for current period
+        self.reputation_current = uReputation(initial_reputation = _reputation)
 
     @property
     def id(self):
@@ -340,7 +342,7 @@ class uStateDNSGroup(container3.ContainerNode):
         self.reputation_current.event_untrusted()
 
     def __repr__(self):
-        return '[{}] period={} ipaddrs={} / reputation previous={:.3f} current={:.3f} weighted_avg={:.3f}'.format(self._name, self.period_n, self.population,
+        return '[{}] period={} ipaddrs={} / reputation previous={:.3f} current={:.3f} weighted_avg={:.3f}'.format(self._name, self.period_n, self.nodes,
                                                                                                           self.reputation_previous.reputation,
                                                                                                           self.reputation_current.reputation,
                                                                                                           self.reputation)
@@ -352,9 +354,9 @@ class uStateDNSGroup(container3.ContainerNode):
 
     def merge(self, other):
         self._logger.warning('Merging 2 DNS groups: {} / {}'.format(self, other))
-        # Combine population
-        for ipaddr in other.population:
-            self.population.append(ipaddr)
+        # Combine nodes
+        for ipaddr in other.nodes:
+            self.nodes.append(ipaddr)
 
         # Calculate last period value and transition reputations to catch up
         last_period_n = max(self.period_n, other.period_n)
@@ -384,46 +386,57 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
         self._init_system_load_policy()
+        self._init_dns_group_policy()
 
     def _init_system_load_policy(self):
         # Initialize System Load Policy threshold values
-        self.cpool_policy = self.datarepository.get_policy_ces('CIRCULARPOOL', None)
+        cpool_policy = self.datarepository.get_policy_ces('CIRCULARPOOL', None)
 
         global SYSTEM_LOAD_VERY_HIGH
         global SYSTEM_LOAD_HIGH
         global SYSTEM_LOAD_MEDIUM
         global SYSTEM_LOAD_LOW
 
-        if self.cpool_policy is None:
+        if cpool_policy is None or 'SYSTEM_LOAD_POLICY' not in cpool_policy:
             self._logger.warning('Using default SYSTEM_LOAD_POLICY values')
         else:
             self._logger.warning('Loading SYSTEM_LOAD_POLICY values from policy file')
-
-            load_threshold = self.cpool_policy['SYSTEM_LOAD_POLICY']['VERYHIGH']['load_threshold']
-            reputation_fqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['VERYHIGH']['reputation_fqdn']
-            reputation_sfqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['VERYHIGH']['reputation_sfqdn']
-            SYSTEM_LOAD_VERY_HIGH = (load_threshold, reputation_fqdn, reputation_sfqdn)
-
-            load_threshold = self.cpool_policy['SYSTEM_LOAD_POLICY']['HIGH']['load_threshold']
-            reputation_fqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['HIGH']['reputation_fqdn']
-            reputation_sfqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['HIGH']['reputation_sfqdn']
-            SYSTEM_LOAD_HIGH = (load_threshold, reputation_fqdn, reputation_sfqdn)
-
-            load_threshold = self.cpool_policy['SYSTEM_LOAD_POLICY']['MEDIUM']['load_threshold']
-            reputation_fqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['MEDIUM']['reputation_fqdn']
-            reputation_sfqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['MEDIUM']['reputation_sfqdn']
-            SYSTEM_LOAD_MEDIUM = (load_threshold, reputation_fqdn, reputation_sfqdn)
-
-            load_threshold = self.cpool_policy['SYSTEM_LOAD_POLICY']['LOW']['load_threshold']
-            reputation_fqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['LOW']['reputation_fqdn']
-            reputation_sfqdn = self.cpool_policy['SYSTEM_LOAD_POLICY']['LOW']['reputation_sfqdn']
-            SYSTEM_LOAD_LOW = (load_threshold, reputation_fqdn, reputation_sfqdn)
+            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['VERYHIGH']
+            SYSTEM_LOAD_VERY_HIGH = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
+            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['HIGH']
+            SYSTEM_LOAD_HIGH = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
+            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['MEDIUM']
+            SYSTEM_LOAD_MEDIUM = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
+            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['LOW']
+            SYSTEM_LOAD_LOW = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
 
         self._logger.info('SYSTEM_LOAD_POLICY    = (load_threshold, reputation_fqdn, reputation_sfqdn)')
         self._logger.info('SYSTEM_LOAD_VERY_HIGH = {}'.format(SYSTEM_LOAD_VERY_HIGH))
         self._logger.info('SYSTEM_LOAD_HIGH      = {}'.format(SYSTEM_LOAD_HIGH))
         self._logger.info('SYSTEM_LOAD_MEDIUM    = {}'.format(SYSTEM_LOAD_MEDIUM))
         self._logger.info('SYSTEM_LOAD_LOW       = {}'.format(SYSTEM_LOAD_LOW))
+
+    def _init_dns_group_policy(self):
+        # Initialize DNS Group Policy with bootstrapping values
+        cpool_policy = self.datarepository.get_policy_ces('CIRCULARPOOL', None)
+
+        if cpool_policy is None or 'DNS_GROUP_POLICY' not in cpool_policy:
+            self._logger.warning('Bootstrapping CIRCULARPOOL.DNS_GROUP_POLICY not found')
+            return
+
+        for dnsgroup_kwargs in cpool_policy['DNS_GROUP_POLICY']:
+            # Create new DNS group with single DNS node
+            self._logger.debug('Create new DNS group: {}'.format(dnsgroup_kwargs))
+            dnsgroup_obj = uStateDNSGroup(**dnsgroup_kwargs)
+            self.add(dnsgroup_obj)
+
+            # Iterate node IP addresses and create new DNS nodes
+            for ipaddr in dnsgroup_obj.nodes:
+                dnsnode_obj = uStateDNSResolver(ipaddr=ipaddr)
+                self.add(dnsnode_obj)
+
+            # Update keys after nodes changes
+            self.updatekeys(dnsgroup_obj)
 
     def cleanup_timers(self):
         """ Perform a cleanup of expired timer objects """
@@ -441,7 +454,10 @@ class PolicyBasedResourceAllocation(container3.Container):
         nodes = self.lookup(KEY_DNSGROUP, update=False, check_expire=False)
         if nodes is None:
             return
+
+        [node.transition_period() for node in nodes]
         [node.show_reputation() for node in nodes]
+
 
     def _policy_tcp(self, query):
         # Answer TRUNCATED
@@ -470,7 +486,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             self.add(dnsnode_obj)
             ## Create new DNS group with single DNS node
             dnsgroup_obj = uStateDNSGroup()
-            dnsgroup_obj.population.append(dnsnode_obj.ipaddr)
+            dnsgroup_obj.nodes.append(dnsnode_obj.ipaddr)
             self.add(dnsgroup_obj)
             # Add reputation to the DNS query
             query.reputation_resolver = dnsgroup_obj
@@ -537,6 +553,10 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
         """ This function implements section: Tackling real resolutions and reputation for remote server(s) and DNS clusters """
+        # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver ?
+        # TODO: Implement TCPCNAME or CNAME based on reputation of the sender?
+        # TODO: Specify the event logging sequence, when do neutral, trusted and untrusted
+
         fqdn = format(query.question[0].name)
         alias = service_data['alias']
 
@@ -550,7 +570,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             if query.reputation_resolver is not None:
                 query.reputation_resolver.event_untrusted()
 
-
         # Evaluate pre-conditions
         if PBRA_DNS_ANTI_SPOOFING is False:
             return None
@@ -561,8 +580,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             response = self._policy_tcp(query)
             self._logger.info('Create TRUNCATED response')
             return response
-
-        # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver ?
 
         # Continue processing with *trusted* DNS query
 
@@ -621,16 +638,13 @@ class PolicyBasedResourceAllocation(container3.Container):
         self.remove(timer_obj)
 
         # Evaluate seen IP addresses for this query
-        if timer_obj.ipaddr not in query.reputation_resolver.population:
-            self._logger.warning('New node detected in DNS group')
+        if timer_obj.ipaddr not in query.reputation_resolver.nodes:
             # Merge DNS groups
+            self._logger.warning('Discover new topology for DNS group. Initiate DNS group merger')
             other_dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
-            #
-            self._logger.warning('Merging DNS groups\n >{}\n >{}'.format(query.reputation_resolver, other_dnsgroup_obj))
-            #
             query.reputation_resolver.merge(other_dnsgroup_obj)
             self.remove(other_dnsgroup_obj)
-            self._logger.warning('Merged DNS groups\n >{}'.format(query.reputation_resolver))
+            self.updatekeys(query.reputation_resolver)
 
 
     def api_data_newpacket(self, packet):
@@ -845,7 +859,8 @@ class PolicyBasedResourceAllocation(container3.Container):
 
 
     def _best_effort_allocate(self, query, addr, host_obj, service_data, host_ipv4):
-        # TODO: Improve connection creation to include DNS metadata
+        # TODO: Improve connection creation to include DNS metadata and check for SLA
+        # TODO: Define a connection KEY when creating the object to indicate what tuples need to be registered?
         self._logger.debug('_best_effort_allocate')
 
         # Obtain FQDN from query
@@ -1043,7 +1058,7 @@ if __name__ == "__main__":
     # Create new DNS node
     node1 = uStateDNSResolver(ipaddr=ipaddr1)
     # Create new DNS group with single DNS node
-    group1 = uStateDNSGroup(population=[node1])
+    group1 = uStateDNSGroup(nodes=[node1])
 
     pbra.add(node1)
     pbra.add(group1)
@@ -1058,7 +1073,7 @@ if __name__ == "__main__":
     pbra.add(node2)
 
     _group = pbra.get((KEY_DNSGROUP_IPADDR, ipaddr1))
-    _group.population.append(node2)
+    _group.nodes.append(node2)
     pbra.updatekeys(_group)
 
 
@@ -1066,7 +1081,7 @@ if __name__ == "__main__":
     # Create new DNS node
     node3 = uStateDNSResolver(ipaddr=ipaddr3)
     # Create new DNS group with single DNS node
-    group2 = uStateDNSGroup(population=[node3])
+    group2 = uStateDNSGroup(nodes=[node3])
 
     pbra.add(node3)
     pbra.add(group2)
