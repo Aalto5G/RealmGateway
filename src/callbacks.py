@@ -593,6 +593,12 @@ class PacketCallbacks(object):
                                                       packet_fields['proto'], packet_fields['ttl'])
 
     def packet_in_circularpool(self, packet):
+        # TODO: Improve lookup processing to also consider dns_bind flag of a waiting connection
+        #       > Match sending client with connection.query.reputation_resolver before claim
+        # TODO: We have modified in connection.py the way of creating the 3-tuple and 5-tuple match
+        #       > This would require up to 3 keys for the 5-tuple match, to include wildcards for remote_port and protocol
+        #       > However, we do not have any use for 5-tuple at this point, so it's probably best to remove it, as it won't be tested
+
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
         # Parse packet
@@ -608,16 +614,16 @@ class PacketCallbacks(object):
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
         key1 = (connection.KEY_RGW, dst)
-        # key2: Full fledged 5-tuple
-        key2 = (connection.KEY_RGW, dst, dport, src, sport, proto)
-        # key3: Semi-full fledged 3-tuple
+        # key2: Full fledged 5-tuple (not in use by the system, yet)
+        #key2 = (connection.KEY_RGW, dst, dport, src, sport, proto)
+        # key3: Semi-full fledged 3-tuple  (SFQDN+)
         key3 = (connection.KEY_RGW, dst, dport, proto)
-        # key4: Basic 3-tuple with wildcards
-        key4 = (connection.KEY_RGW, dst, 0, 0)
-        # key5: Basic 3-tuple with wildcards
-        key5 = (connection.KEY_RGW, dst, dport, 0)
-        # key6: Basic 3-tuple with wildcards
-        key6 = (connection.KEY_RGW, dst, 0, proto)
+        # key4: Basic 3-tuple with wildcards (SFQDN-)
+        key4 = (connection.KEY_RGW, dst, dport, 0)
+        # key5: Basic 3-tuple with wildcards (SFQDN-)
+        key5 = (connection.KEY_RGW, dst, 0, proto)
+        # key6: Basic 3-tuple with wildcards (FQDN)
+        key6 = (connection.KEY_RGW, dst, 0, 0)
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
@@ -627,7 +633,7 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with rest of the keys
         conn = None
-        for key in [key2, key3, key4, key5, key6]:
+        for key in [key3, key4, key5, key6]:
             if self.connectiontable.has(key):
                 self._logger.debug('Connection found for n-tuple* {}: [{}]'.format(key,self._format_5tuple(packet_fields)))
                 conn = self.connectiontable.get(key)
@@ -638,8 +644,15 @@ class PacketCallbacks(object):
             self.network.ipt_nfpacket_drop(packet)
             return
 
+        # The connection belongs to an SLA marked DNS server
+        if conn.dns_bind and conn.dns_host.contains(src):
+            self._logger.info('Connection reserved found for remote host {}: {}'.format(src, conn.dns_host))
+        elif conn.dns_bind:
+            self._logger.info('Connection not reserved for remote host {}: {}'.format(src, conn.dns_host))
+            return
+
         # DNAT to private host
-        self._logger.info('DNAT to {} @ {} via {}: [{}]'.format(conn.fqdn, conn.private_ip, dst, self._format_5tuple(packet_fields)))
+        self._logger.info('DNAT of {} to {} via {}: [{}]'.format(conn.fqdn, conn.private_ip, dst, self._format_5tuple(packet_fields)))
         self.network.ipt_nfpacket_dnat(packet, conn.private_ip)
 
         if conn.post_processing(self.connectiontable, src, sport):
