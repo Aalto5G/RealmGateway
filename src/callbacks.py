@@ -339,7 +339,7 @@ class DNSCallbacks(object):
         query.reputation_resolver = None
         query.reputation_requestor = None
 
-        self._logger.debug('WAN SOA: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.debug('WAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         # The service exists in RGW
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
@@ -393,7 +393,7 @@ class DNSCallbacks(object):
         rdtype = query.question[0].rdtype
         allocated_ipv4 = None
 
-        self._logger.warning('WAN SOA ServicePool: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.warning('WAN SOA ServicePool: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         # Sanity check
         assert(service_data['proxy_required'] is True)
@@ -429,7 +429,7 @@ class DNSCallbacks(object):
         rdtype = query.question[0].rdtype
         allocated_ipv4 = None
 
-        self._logger.warning('WAN SOA CircularPool: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.warning('WAN SOA CircularPool: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         # Sanity check
         assert(service_data['proxy_required'] is False)
