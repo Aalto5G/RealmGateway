@@ -21,9 +21,31 @@ from dns.rdataclass import *
 from dns.rdatatype import *
 
 # Control variables
-PBRA_DNS_ANTI_SPOOFING = True # Enable TCPCNAME policy
-PBRA_DNS_LOAD_POLICING = True # Use load scaling for fine policy enforcement
-PBRA_DNS_LOG_UNTRUSTED = True # Log all DNS query attempts (UDP untrusted)
+
+"""
+PBRA_DNS_POLICY_TCPCNAME establishes that allocation are only allowed for CNAMEs via TCP
+If enabled, overrides previous policies: PBRA_DNS_POLICY_TCP and PBRA_DNS_POLICY_CNAME
+"""
+PBRA_DNS_POLICY_TCPCNAME = False
+
+"""
+PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via TCP
+PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
+These policies can be enabled or disabled independently
+"""
+PBRA_DNS_POLICY_TCP   = True
+PBRA_DNS_POLICY_CNAME = False
+
+"""
+PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
+"""
+PBRA_DNS_LOG_UNTRUSTED = True
+
+"""
+PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
+"""
+PBRA_DNS_LOAD_POLICING = True
+
 
 PBRA_REPUTATION_MIDDLE = 0.45
 
@@ -56,6 +78,7 @@ KEY_DNSHOST_IPADDR  = 40
 KEY_DNS_REPUTATION  = 50
 
 
+# TODO: Create minimal unit that extends ContainerNode and implements a uReputation object with basic methods to avoid code duplication
 
 class uReputation(object):
     """
@@ -195,7 +218,7 @@ class uStateDNSHost(container3.ContainerNode):
         ## IP source / EDNS0 ClientSubnet / Extended Client Information
         self.ipaddr      = None
         self.ipaddr_mask = 32
-        ## EDNS0 Name Client Identifier -> Tuple of (tag_id, server_ipaddr)
+        ## EDNS0 Name Client Identifier -> Tuple of (tag_id, dns_group_id)
         self.ncid        = (None, None)
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
@@ -327,6 +350,9 @@ class uStateDNSGroup(container3.ContainerNode):
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
 
+        # Create DNSGroup id
+        self.group_id = id(self)
+
         # Create reputation objects
         self.reputation_current = uReputation(initial_reputation = self.initial_reputation)
         self.reputation_previous = uReputation(initial_reputation = self.initial_reputation)
@@ -338,7 +364,7 @@ class uStateDNSGroup(container3.ContainerNode):
         # Create default key to index all same-element
         keys.append((KEY_DNSGROUP, False))
         # Create unique key based on ID of object
-        keys.append(((KEY_DNSGROUP_ID, id(self)), True))
+        keys.append(((KEY_DNSGROUP_ID, self.group_id), True))
         # Create unique key based on IP address literal
         for ipaddr in self.nodes:
             keys.append(((KEY_DNSGROUP_IPADDR, ipaddr), True))
@@ -366,10 +392,6 @@ class uStateDNSGroup(container3.ContainerNode):
 
         # Create new reputation object for current period
         self.reputation_current = uReputation(initial_reputation = _reputation)
-
-    @property
-    def id(self):
-        return id(self)
 
     @property
     def reputation(self):
@@ -428,8 +450,6 @@ class PolicyBasedResourceAllocation(container3.Container):
     """
     Develop this class to be triggered from DNSCallback and PacketCallbacks
     """
-    #TODO: Create policy configuration and load it from file
-
     def __init__(self, **kwargs):
         """ Initialize as a Container """
         super().__init__('PolicyBasedResourceAllocation')
@@ -549,6 +569,8 @@ class PolicyBasedResourceAllocation(container3.Container):
             query.reputation_resolver = dnsgroup_obj
 
     def _load_metadata_requestor(self, query, addr, create=False):
+        # TODO: Bind ncid based on specific dns group id instead of resolver ipaddr (as to respect EDNS0 NCID cluster specification)
+
         # Collect metadata from DNS query related to requestor based on DNS options (EDNS0)
         dnshost_obj = None
         meta_ipaddr = None
@@ -603,6 +625,18 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Add reputation to the DNS query
         query.reputation_requestor = dnshost_obj
 
+    def _dns_preprocess_rgw_wan_soa_event_logging(self, query, alias = False):
+        """ Perform event logging based on trustworthiness of DNS query """
+        # Log only when pre-conditions are met
+        if PBRA_DNS_LOG_UNTRUSTED is False:
+            pass
+        elif alias:
+            pass
+        elif query.transport == 'udp' and query.reputation_resolver is not None:
+            # Register an untrusted event
+            query.reputation_resolver.event_untrusted()
+
+
     def dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
         """ This function implements section: Tackling real resolutions and reputation for remote server(s) and DNS clusters """
         # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver ?
@@ -617,27 +651,42 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._load_metadata_requestor(query, addr, create=False)
 
         # Log untrusted requests
-        if PBRA_DNS_LOG_UNTRUSTED is True and alias is False and query.transport == 'udp':
-            # Register an untrusted event
-            if query.reputation_resolver is not None:
-                query.reputation_resolver.event_untrusted()
+        self._dns_preprocess_rgw_wan_soa_event_logging(query, alias)
+
 
         # Evaluate pre-conditions
-        if PBRA_DNS_ANTI_SPOOFING is False:
+
+        # Anti spoofing mechanisms are not enabled, continue with query processing
+        if (PBRA_DNS_POLICY_TCPCNAME, PBRA_DNS_POLICY_TCP, PBRA_DNS_POLICY_CNAME) == (False, False, False):
             return None
 
-        # Ensure spoofed-free communications by triggering TCP requests (by default right now)
-        if alias is False and query.transport == 'udp':
-            # Create truncated response
+
+        ## Enforce PBRA_DNS_POLICY_TCPCNAME
+        if query.transport == 'udp' and PBRA_DNS_POLICY_TCPCNAME:
+            ## Create truncated response
+            response = self._policy_tcp(query)
+            self._logger.info('Create TRUNCATED response')
+            return response
+
+
+        ## Enforce PBRA_DNS_POLICY_TCP
+        ### Applies to UDP queries only
+        if query.transport == 'udp' and PBRA_DNS_POLICY_TCP and alias is False:
+            # Ensure spoofed-free communications by triggering TCP requests
+            ## Create truncated response
             response = self._policy_tcp(query)
             self._logger.info('Create TRUNCATED response')
             return response
 
         # Continue processing with *trusted* DNS query
 
-        # Gather further information from unknown DNS resolvers
-        if alias is False and query.reputation_resolver is None:
-            self._logger.info('Create CNAME response and new DNS group')
+        ## Enforce PBRA_DNS_POLICY_CNAME
+        if PBRA_DNS_POLICY_CNAME is False:
+            # PBRA_DNS_POLICY_CNAME is not enabled, continue with query processing
+            return None
+
+        if PBRA_DNS_POLICY_CNAME and alias is False:
+            self._logger.info('Create CNAME response')
             # Create CNAME response
             response, _fqdn = self._policy_cname(query)
             # Register alias service in host
@@ -647,33 +696,21 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Monkey patch delete function for timer object
             timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj, _fqdn)
             self.add(timer_obj)
-            # Create reputation metadata in query object
-            self._load_metadata_resolver(query, addr, create=True)
-            # Register a neutral event
-            query.reputation_resolver.event_neutral()
+
+            # Evaluate resolver metadata and create new if does not exist
+            if query.reputation_resolver is None:
+                # Create reputation metadata in query object
+                self._load_metadata_resolver(query, addr, create=True)
+                # Register a neutral event
+                query.reputation_resolver.event_neutral()
+            else:
+                # Register a neutral and trusted event
+                query.reputation_resolver.event_trusted()
+                query.reputation_resolver.event_neutral()
+
             # Return CNAME response
             return response
 
-        # Gather further information from known DNS resolvers
-        if alias is False and query.reputation_resolver is not None:
-            self._logger.info('Create CNAME response for existing DNS group')
-            # Create CNAME response
-            response, _fqdn = self._policy_cname(query)
-            # Register alias service in host
-            self._register_host_alias(host_obj, service_data, _fqdn)
-            ## Create uDNSQueryTimer object
-            timer_obj = uDNSQueryTimer(query, addr[0], _fqdn, service_data)
-            # Monkey patch delete function for timer object
-            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj, _fqdn)
-            self.add(timer_obj)
-            # Register a neutral and trusted event
-            query.reputation_resolver.event_trusted()
-            query.reputation_resolver.event_neutral()
-            # Return CNAME response
-            return response
-
-        # We have come this far, let's not get picky if we are using UDP or TCP
-        assert(alias is True)
 
         # Register a neutral and trusted event
         query.reputation_resolver.event_trusted()
@@ -693,10 +730,20 @@ class PolicyBasedResourceAllocation(container3.Container):
         if timer_obj.ipaddr not in query.reputation_resolver.nodes:
             # Merge DNS groups
             self._logger.warning('Discover new topology for DNS group. Initiate DNS group merger')
-            other_dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
-            query.reputation_resolver.merge(other_dnsgroup_obj)
-            self.remove(other_dnsgroup_obj)
-            self.updatekeys(query.reputation_resolver)
+            group1 = query.reputation_resolver
+            group2 = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
+            self._coalesce_dns_groups(group1, group2)
+
+
+    def _coalesce_dns_groups(self, group1, group2):
+        """ Merge two existing DNS groups and update existing DNS host NCID if needed """
+        # Merge groups, nodes and calculate new reputation values
+        group1.merge(group2)
+        self.remove(group2)
+        # Update coalesced group keys with new nodes
+        self.updatekeys(group1)
+        # TODO: Implement update of DNSHosts identified by NCID in DNSGroup
+        ## > This requires DNSHost created with NCID to be linked to DNSGroup id
 
 
     def api_data_newpacket(self, packet):
@@ -793,6 +840,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         """ The following restrictions apply
         1. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
         """
+        # TODO: Calculate _reputation with max() if dns group SLA is active, else with min()
+
         self._logger.debug('SYSTEM_LOAD_VERY_HIGH')
 
         _reputation = self._policy_get_max_reputation(query)
