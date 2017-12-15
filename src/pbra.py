@@ -105,6 +105,8 @@ class uReputation(object):
         self.total = 0
         self.trusted = 0
         self.untrusted = 0
+        # Create dummy events upon initialization
+        [self.event_neutral() for _ in range(5)]
 
     def event_ok(self):
         self.ok += 1
@@ -132,7 +134,7 @@ class uReputation(object):
     @property
     def _nok_factor(self):
         # Define a nok_factor that penalizes nok events
-        return self.total ** self.ok_factor
+        return self.total ** self.nok_factor
 
     @property
     def _neutral_factor(self):
@@ -1090,3 +1092,26 @@ class PolicyBasedResourceAllocation(container3.Container):
         host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
+
+
+def _do_ok(obj, n):
+    for _ in range(n):
+        obj.event_ok()
+        print(obj.reputation)
+
+def _do_nok(obj, n):
+    for _ in range(n):
+        obj.event_nok()
+        print(obj.reputation)
+
+def _do_neutral(obj, n):
+    for _ in range(n):
+        obj.event_neutral()
+        print(obj.reputation)
+
+if __name__ == '__main__':
+    obj1 = uReputation()
+    #_do_neutral(obj1, 5)
+    _do_ok(obj1, 100)
+    #_do_nok(obj1, 1)
+
