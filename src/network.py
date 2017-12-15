@@ -66,6 +66,8 @@ API_URL_SWITCHES    = 'stats/switches'
 API_URL_FLOW_ADD    = 'stats/flowentry/add'
 API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 
+RYU_RECONNECT = 10
+
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
@@ -554,7 +556,7 @@ class Network(object):
             except HTTPClientConnectorError as e:
                 self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
 
-            yield from asyncio.sleep(10)
+            yield from asyncio.sleep(RYU_RECONNECT)
 
         yield from self.ovs_init_flowtable()
 
