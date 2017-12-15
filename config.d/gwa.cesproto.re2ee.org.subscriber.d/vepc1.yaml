@@ -6,7 +6,7 @@ vepc1.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'vepc1.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.vepc1.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }

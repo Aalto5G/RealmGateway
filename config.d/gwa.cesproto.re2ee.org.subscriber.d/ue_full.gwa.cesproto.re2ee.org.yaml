@@ -6,7 +6,7 @@ ue001.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue001.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue001.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -29,7 +29,7 @@ ue002.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue002.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue002.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -52,7 +52,7 @@ ue003.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue003.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue003.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -75,7 +75,7 @@ ue004.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue004.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue004.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -98,7 +98,7 @@ ue005.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue005.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue005.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -121,7 +121,7 @@ ue006.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue006.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue006.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -144,7 +144,7 @@ ue007.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue007.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue007.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -167,7 +167,7 @@ ue008.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue008.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue008.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -190,7 +190,7 @@ ue009.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue009.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue009.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -213,7 +213,7 @@ ue010.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue010.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue010.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -236,7 +236,7 @@ ue011.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue011.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue011.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -259,7 +259,7 @@ ue012.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue012.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue012.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -282,7 +282,7 @@ ue013.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue013.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue013.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -305,7 +305,7 @@ ue014.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue014.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue014.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -328,7 +328,7 @@ ue015.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue015.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue015.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -351,7 +351,7 @@ ue016.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue016.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue016.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -374,7 +374,7 @@ ue017.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue017.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue017.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -397,7 +397,7 @@ ue018.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue018.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue018.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -420,7 +420,7 @@ ue019.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue019.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue019.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -443,7 +443,7 @@ ue020.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue020.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue020.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -466,7 +466,7 @@ ue021.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue021.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue021.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -489,7 +489,7 @@ ue022.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue022.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue022.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -512,7 +512,7 @@ ue023.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue023.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue023.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -535,7 +535,7 @@ ue024.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue024.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue024.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -558,7 +558,7 @@ ue025.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue025.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue025.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -581,7 +581,7 @@ ue026.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue026.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue026.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -604,7 +604,7 @@ ue027.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue027.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue027.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -627,7 +627,7 @@ ue028.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue028.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue028.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -650,7 +650,7 @@ ue029.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue029.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue029.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -673,7 +673,7 @@ ue030.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue030.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue030.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -696,7 +696,7 @@ ue031.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue031.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue031.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -719,7 +719,7 @@ ue032.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue032.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue032.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -742,7 +742,7 @@ ue033.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue033.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue033.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -765,7 +765,7 @@ ue034.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue034.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue034.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -788,7 +788,7 @@ ue035.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue035.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue035.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -811,7 +811,7 @@ ue036.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue036.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue036.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -834,7 +834,7 @@ ue037.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue037.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue037.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -857,7 +857,7 @@ ue038.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue038.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue038.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -880,7 +880,7 @@ ue039.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue039.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue039.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -903,7 +903,7 @@ ue040.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue040.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue040.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -926,7 +926,7 @@ ue041.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue041.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue041.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -949,7 +949,7 @@ ue042.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue042.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue042.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -972,7 +972,7 @@ ue043.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue043.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue043.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -995,7 +995,7 @@ ue044.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue044.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue044.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1018,7 +1018,7 @@ ue045.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue045.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue045.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1041,7 +1041,7 @@ ue046.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue046.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue046.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1064,7 +1064,7 @@ ue047.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue047.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue047.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1087,7 +1087,7 @@ ue048.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue048.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue048.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1110,7 +1110,7 @@ ue049.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue049.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue049.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1133,7 +1133,7 @@ ue050.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue050.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue050.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1156,7 +1156,7 @@ ue051.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue051.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue051.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1179,7 +1179,7 @@ ue052.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue052.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue052.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1202,7 +1202,7 @@ ue053.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue053.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue053.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1225,7 +1225,7 @@ ue054.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue054.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue054.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1248,7 +1248,7 @@ ue055.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue055.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue055.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1271,7 +1271,7 @@ ue056.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue056.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue056.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1294,7 +1294,7 @@ ue057.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue057.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue057.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1317,7 +1317,7 @@ ue058.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue058.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue058.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1340,7 +1340,7 @@ ue059.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue059.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue059.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1363,7 +1363,7 @@ ue060.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue060.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue060.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1386,7 +1386,7 @@ ue061.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue061.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue061.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1409,7 +1409,7 @@ ue062.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue062.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue062.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1432,7 +1432,7 @@ ue063.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue063.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue063.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1455,7 +1455,7 @@ ue064.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue064.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue064.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1478,7 +1478,7 @@ ue065.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue065.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue065.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1501,7 +1501,7 @@ ue066.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue066.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue066.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1524,7 +1524,7 @@ ue067.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue067.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue067.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1547,7 +1547,7 @@ ue068.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue068.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue068.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1570,7 +1570,7 @@ ue069.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue069.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue069.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1593,7 +1593,7 @@ ue070.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue070.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue070.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1616,7 +1616,7 @@ ue071.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue071.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue071.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1639,7 +1639,7 @@ ue072.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue072.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue072.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1662,7 +1662,7 @@ ue073.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue073.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue073.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1685,7 +1685,7 @@ ue074.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue074.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue074.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1708,7 +1708,7 @@ ue075.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue075.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue075.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1731,7 +1731,7 @@ ue076.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue076.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue076.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1754,7 +1754,7 @@ ue077.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue077.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue077.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1777,7 +1777,7 @@ ue078.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue078.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue078.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1800,7 +1800,7 @@ ue079.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue079.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue079.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1823,7 +1823,7 @@ ue080.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue080.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue080.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1846,7 +1846,7 @@ ue081.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue081.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue081.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1869,7 +1869,7 @@ ue082.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue082.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue082.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1892,7 +1892,7 @@ ue083.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue083.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue083.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1915,7 +1915,7 @@ ue084.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue084.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue084.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1938,7 +1938,7 @@ ue085.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue085.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue085.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1961,7 +1961,7 @@ ue086.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue086.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue086.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -1984,7 +1984,7 @@ ue087.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue087.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue087.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2007,7 +2007,7 @@ ue088.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue088.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue088.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2030,7 +2030,7 @@ ue089.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue089.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue089.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2053,7 +2053,7 @@ ue090.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue090.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue090.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2076,7 +2076,7 @@ ue091.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue091.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue091.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2099,7 +2099,7 @@ ue092.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue092.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue092.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2122,7 +2122,7 @@ ue093.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue093.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue093.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2145,7 +2145,7 @@ ue094.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue094.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue094.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2168,7 +2168,7 @@ ue095.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue095.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue095.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2191,7 +2191,7 @@ ue096.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue096.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue096.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2214,7 +2214,7 @@ ue097.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue097.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue097.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2237,7 +2237,7 @@ ue098.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue098.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue098.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2260,7 +2260,7 @@ ue099.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue099.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue099.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2283,7 +2283,7 @@ ue100.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue100.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue100.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2306,7 +2306,7 @@ ue101.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue101.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue101.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2329,7 +2329,7 @@ ue102.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue102.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue102.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2352,7 +2352,7 @@ ue103.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue103.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue103.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2375,7 +2375,7 @@ ue104.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue104.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue104.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2398,7 +2398,7 @@ ue105.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue105.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue105.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2421,7 +2421,7 @@ ue106.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue106.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue106.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2444,7 +2444,7 @@ ue107.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue107.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue107.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2467,7 +2467,7 @@ ue108.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue108.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue108.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2490,7 +2490,7 @@ ue109.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue109.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue109.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2513,7 +2513,7 @@ ue110.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue110.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue110.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2536,7 +2536,7 @@ ue111.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue111.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue111.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2559,7 +2559,7 @@ ue112.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue112.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue112.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2582,7 +2582,7 @@ ue113.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue113.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue113.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2605,7 +2605,7 @@ ue114.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue114.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue114.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2628,7 +2628,7 @@ ue115.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue115.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue115.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2651,7 +2651,7 @@ ue116.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue116.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue116.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2674,7 +2674,7 @@ ue117.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue117.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue117.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2697,7 +2697,7 @@ ue118.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue118.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue118.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2720,7 +2720,7 @@ ue119.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue119.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue119.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2743,7 +2743,7 @@ ue120.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue120.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue120.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2766,7 +2766,7 @@ ue121.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue121.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue121.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2789,7 +2789,7 @@ ue122.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue122.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue122.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2812,7 +2812,7 @@ ue123.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue123.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue123.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2835,7 +2835,7 @@ ue124.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue124.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue124.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2858,7 +2858,7 @@ ue125.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue125.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue125.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2881,7 +2881,7 @@ ue126.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue126.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue126.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2904,7 +2904,7 @@ ue127.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue127.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue127.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2927,7 +2927,7 @@ ue128.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue128.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue128.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2950,7 +2950,7 @@ ue129.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue129.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue129.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2973,7 +2973,7 @@ ue130.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue130.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue130.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -2996,7 +2996,7 @@ ue131.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue131.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue131.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3019,7 +3019,7 @@ ue132.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue132.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue132.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3042,7 +3042,7 @@ ue133.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue133.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue133.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3065,7 +3065,7 @@ ue134.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue134.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue134.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3088,7 +3088,7 @@ ue135.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue135.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue135.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3111,7 +3111,7 @@ ue136.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue136.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue136.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3134,7 +3134,7 @@ ue137.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue137.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue137.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3157,7 +3157,7 @@ ue138.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue138.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue138.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3180,7 +3180,7 @@ ue139.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue139.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue139.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3203,7 +3203,7 @@ ue140.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue140.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue140.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3226,7 +3226,7 @@ ue141.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue141.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue141.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3249,7 +3249,7 @@ ue142.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue142.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue142.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3272,7 +3272,7 @@ ue143.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue143.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue143.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3295,7 +3295,7 @@ ue144.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue144.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue144.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3318,7 +3318,7 @@ ue145.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue145.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue145.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3341,7 +3341,7 @@ ue146.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue146.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue146.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3364,7 +3364,7 @@ ue147.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue147.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue147.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3387,7 +3387,7 @@ ue148.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue148.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue148.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3410,7 +3410,7 @@ ue149.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue149.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue149.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3433,7 +3433,7 @@ ue150.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue150.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue150.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3456,7 +3456,7 @@ ue151.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue151.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue151.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3479,7 +3479,7 @@ ue152.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue152.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue152.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3502,7 +3502,7 @@ ue153.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue153.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue153.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3525,7 +3525,7 @@ ue154.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue154.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue154.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3548,7 +3548,7 @@ ue155.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue155.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue155.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3571,7 +3571,7 @@ ue156.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue156.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue156.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3594,7 +3594,7 @@ ue157.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue157.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue157.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3617,7 +3617,7 @@ ue158.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue158.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue158.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3640,7 +3640,7 @@ ue159.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue159.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue159.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3663,7 +3663,7 @@ ue160.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue160.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue160.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3686,7 +3686,7 @@ ue161.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue161.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue161.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3709,7 +3709,7 @@ ue162.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue162.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue162.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3732,7 +3732,7 @@ ue163.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue163.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue163.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3755,7 +3755,7 @@ ue164.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue164.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue164.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3778,7 +3778,7 @@ ue165.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue165.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue165.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3801,7 +3801,7 @@ ue166.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue166.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue166.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3824,7 +3824,7 @@ ue167.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue167.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue167.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3847,7 +3847,7 @@ ue168.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue168.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue168.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3870,7 +3870,7 @@ ue169.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue169.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue169.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3893,7 +3893,7 @@ ue170.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue170.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue170.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3916,7 +3916,7 @@ ue171.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue171.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue171.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3939,7 +3939,7 @@ ue172.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue172.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue172.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3962,7 +3962,7 @@ ue173.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue173.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue173.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -3985,7 +3985,7 @@ ue174.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue174.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue174.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4008,7 +4008,7 @@ ue175.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue175.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue175.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4031,7 +4031,7 @@ ue176.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue176.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue176.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4054,7 +4054,7 @@ ue177.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue177.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue177.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4077,7 +4077,7 @@ ue178.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue178.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue178.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4100,7 +4100,7 @@ ue179.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue179.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue179.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4123,7 +4123,7 @@ ue180.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue180.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue180.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4146,7 +4146,7 @@ ue181.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue181.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue181.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4169,7 +4169,7 @@ ue182.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue182.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue182.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4192,7 +4192,7 @@ ue183.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue183.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue183.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4215,7 +4215,7 @@ ue184.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue184.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue184.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4238,7 +4238,7 @@ ue185.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue185.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue185.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4261,7 +4261,7 @@ ue186.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue186.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue186.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4284,7 +4284,7 @@ ue187.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue187.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue187.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4307,7 +4307,7 @@ ue188.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue188.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue188.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4330,7 +4330,7 @@ ue189.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue189.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue189.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4353,7 +4353,7 @@ ue190.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue190.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue190.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4376,7 +4376,7 @@ ue191.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue191.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue191.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4399,7 +4399,7 @@ ue192.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue192.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue192.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4422,7 +4422,7 @@ ue193.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue193.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue193.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4445,7 +4445,7 @@ ue194.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue194.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue194.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4468,7 +4468,7 @@ ue195.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue195.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue195.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4491,7 +4491,7 @@ ue196.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue196.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue196.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4514,7 +4514,7 @@ ue197.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue197.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue197.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4537,7 +4537,7 @@ ue198.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue198.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue198.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4560,7 +4560,7 @@ ue199.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue199.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue199.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4583,7 +4583,7 @@ ue200.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue200.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue200.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4606,7 +4606,7 @@ ue201.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue201.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue201.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4629,7 +4629,7 @@ ue202.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue202.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue202.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4652,7 +4652,7 @@ ue203.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue203.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue203.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4675,7 +4675,7 @@ ue204.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue204.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue204.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4698,7 +4698,7 @@ ue205.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue205.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue205.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4721,7 +4721,7 @@ ue206.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue206.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue206.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4744,7 +4744,7 @@ ue207.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue207.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue207.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4767,7 +4767,7 @@ ue208.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue208.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue208.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4790,7 +4790,7 @@ ue209.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue209.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue209.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4813,7 +4813,7 @@ ue210.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue210.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue210.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4836,7 +4836,7 @@ ue211.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue211.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue211.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4859,7 +4859,7 @@ ue212.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue212.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue212.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4882,7 +4882,7 @@ ue213.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue213.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue213.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4905,7 +4905,7 @@ ue214.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue214.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue214.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4928,7 +4928,7 @@ ue215.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue215.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue215.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4951,7 +4951,7 @@ ue216.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue216.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue216.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4974,7 +4974,7 @@ ue217.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue217.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue217.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -4997,7 +4997,7 @@ ue218.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue218.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue218.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5020,7 +5020,7 @@ ue219.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue219.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue219.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5043,7 +5043,7 @@ ue220.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue220.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue220.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5066,7 +5066,7 @@ ue221.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue221.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue221.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5089,7 +5089,7 @@ ue222.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue222.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue222.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5112,7 +5112,7 @@ ue223.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue223.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue223.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5135,7 +5135,7 @@ ue224.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue224.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue224.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5158,7 +5158,7 @@ ue225.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue225.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue225.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5181,7 +5181,7 @@ ue226.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue226.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue226.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5204,7 +5204,7 @@ ue227.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue227.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue227.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5227,7 +5227,7 @@ ue228.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue228.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue228.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5250,7 +5250,7 @@ ue229.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue229.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue229.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5273,7 +5273,7 @@ ue230.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue230.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue230.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5296,7 +5296,7 @@ ue231.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue231.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue231.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5319,7 +5319,7 @@ ue232.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue232.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue232.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5342,7 +5342,7 @@ ue233.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue233.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue233.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5365,7 +5365,7 @@ ue234.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue234.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue234.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5388,7 +5388,7 @@ ue235.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue235.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue235.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5411,7 +5411,7 @@ ue236.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue236.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue236.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5434,7 +5434,7 @@ ue237.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue237.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue237.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5457,7 +5457,7 @@ ue238.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue238.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue238.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5480,7 +5480,7 @@ ue239.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue239.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue239.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5503,7 +5503,7 @@ ue240.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue240.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue240.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5526,7 +5526,7 @@ ue241.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue241.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue241.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5549,7 +5549,7 @@ ue242.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue242.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue242.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5572,7 +5572,7 @@ ue243.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue243.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue243.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5595,7 +5595,7 @@ ue244.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue244.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue244.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5618,7 +5618,7 @@ ue245.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue245.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue245.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5641,7 +5641,7 @@ ue246.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue246.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue246.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5664,7 +5664,7 @@ ue247.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue247.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue247.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5687,7 +5687,7 @@ ue248.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue248.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue248.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5710,7 +5710,7 @@ ue249.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue249.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue249.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5733,7 +5733,7 @@ ue250.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue250.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue250.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5756,7 +5756,7 @@ ue251.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue251.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue251.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5779,7 +5779,7 @@ ue252.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue252.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue252.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5802,7 +5802,7 @@ ue253.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue253.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue253.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
@@ -5825,7 +5825,7 @@ ue254.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'ue254.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.ue254.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
