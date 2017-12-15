@@ -225,7 +225,7 @@ class DNSCallbacks(object):
         fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
 
-        self._logger.warning('LAN SOA: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.warning('LAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # The service exists in RGW
@@ -302,7 +302,7 @@ class DNSCallbacks(object):
         fqdn = q.name
         rdtype = q.rdtype
 
-        self._logger.warning('LAN !SOA: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.warning('LAN !SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if key in self.activequeries:
             # Continue ongoing resolution
