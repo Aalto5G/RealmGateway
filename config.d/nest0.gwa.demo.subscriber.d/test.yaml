@@ -6,7 +6,7 @@ test.nest0.gwa.demo.:
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
-        - {max: 100 }
+        max: 100
     CARRIERGRADE:
         - {ipv4: 192.168.10.100}
         - {ipv4: 192.168.10.10}
