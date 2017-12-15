@@ -6,7 +6,7 @@ test103.gwa.demo.:
     GROUP:
         - IPS_GROUP_PREPAID3
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'test103.gwa.demo.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.test103.gwa.demo.',  proxy_required: true , carriergrade: false                             }

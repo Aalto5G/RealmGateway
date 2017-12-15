@@ -754,7 +754,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # TODO: Implement logic for policy and reputation checking
 
         # Get Circular Pool policy for host
-        host_policy = host_obj.get_service('CIRCULARPOOL')[0]
+        host_policy = host_obj.get_service('CIRCULARPOOL')
 
         # Update table and remove expired connections
         self.connectiontable.update_all_rgw()
@@ -763,16 +763,10 @@ class PolicyBasedResourceAllocation(container3.Container):
         rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
         host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.fqdn)) # Use host fqdn as connection id
 
-        # Evaluate most basic policy for quick exit
-        #if rgw_conns >= node_policy['max']:
-        #    self._logger.warning('RealmGateway global policy exceeded: {}'.format(node_policy['max']))
-        #    return False
-
+        # Evaluate host policy for quick exit
         if host_conns >= host_policy['max']:
             self._logger.warning('RealmGateway host policy exceeded: {}'.format(host_policy['max']))
-            return False
-
-        # No policy has been exceeded -> Continue
+            return None
 
         # Calculate system load and find executing policy function
         ## Get Circular Pool address pool stats
