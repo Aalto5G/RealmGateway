@@ -71,6 +71,8 @@ class HostEntry(container3.ContainerNode):
         self.services.setdefault(KEY_SERVICE_SFQDN, [])
         # Normalize SFQDN service definition
         self._normalize_service_sfqdn()
+        # Create hostname by splitting FQDN name
+        self.hostname = self.fqdn.split('.')[0]
 
     def lookupkeys(self):
         """ Return the lookup keys """
