@@ -34,7 +34,7 @@ PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary 
 These policies can be enabled or disabled independently
 """
 PBRA_DNS_POLICY_TCP   = True
-PBRA_DNS_POLICY_CNAME = False
+PBRA_DNS_POLICY_CNAME = True
 
 """
 PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
@@ -660,6 +660,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Anti spoofing mechanisms are not enabled, continue with query processing
         if (PBRA_DNS_POLICY_TCPCNAME, PBRA_DNS_POLICY_TCP, PBRA_DNS_POLICY_CNAME) == (False, False, False):
+            self._logger.debug('Anti spoofing mechanisms are not enabled, continue with query processing')
             return None
 
 
@@ -667,7 +668,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         if query.transport == 'udp' and PBRA_DNS_POLICY_TCPCNAME:
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response')
+            self._logger.info('Create TRUNCATED response / PBRA_DNS_POLICY_TCPCNAME')
             return response
 
 
@@ -677,20 +678,20 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Ensure spoofed-free communications by triggering TCP requests
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response')
+            self._logger.info('Create TRUNCATED response / PBRA_DNS_POLICY_TCP')
             return response
 
         # Continue processing with *trusted* DNS query
 
         ## Enforce PBRA_DNS_POLICY_CNAME
         if PBRA_DNS_POLICY_CNAME is False:
-            # PBRA_DNS_POLICY_CNAME is not enabled, continue with query processing
+            self._logger.info('PBRA_DNS_POLICY_CNAME is not enabled, continue with query processing')
             return None
 
         if PBRA_DNS_POLICY_CNAME and alias is False:
-            self._logger.info('Create CNAME response')
             # Create CNAME response
             response, _fqdn = self._policy_cname(query)
+            self._logger.info('Create CNAME response / {}'.format(_fqdn))
             # Register alias service in host
             self._register_host_alias(host_obj, service_data, _fqdn)
             ## Create uDNSQueryTimer object
