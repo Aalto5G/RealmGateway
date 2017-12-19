@@ -20,6 +20,7 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_WAN'}, 'out-interface': 'lan0', 'in-interface': 'wan0', 'target': {'MARK': {'set-xmark': '0xff112223/0xffffffff'}}}}
             - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_TUN'}, 'out-interface': 'lan0', 'in-interface': 'tun0', 'target': {'MARK': {'set-xmark': '0xff112324/0xffffffff'}}}}
             # Marks in INPUT to indicate input interface
+            - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Accept packet marked by Circular Pool'}, 'target': 'ACCEPT'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_LAN'}, 'target': {'MARK': {'set-xmark': '0xff121212/0xffffffff'}}, 'in-interface': 'lan0'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_WAN'}, 'target': {'MARK': {'set-xmark': '0xff021113/0xffffffff'}}, 'in-interface': 'wan0'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_TUN'}, 'target': {'MARK': {'set-xmark': '0xff021114/0xffffffff'}}, 'in-interface': 'tun0'}}
@@ -62,6 +63,7 @@ IPTABLES:
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
             - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': [{'mark': ['!', '0x0']}, {'mark': ['!', '0xff000000/0xff000000']}], 'multiport': {'dports': '80,443,8080,8443'}, 'protocol': 'tcp', 'comment': {'comment': 'Redirect to HTTP Reverse Proxy'}, 'target': {'DNAT': {'to-destination': '192.168.0.10'}}}}
             - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': [{'mark': ['!', '0x0']}, {'mark': ['!', '0xff000000/0xff000000']}], 'comment': {'comment': 'DNAT via CIRCULAR_POOL'}, 'target': 'CIRCULAR_POOL'}}
+            - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Accept packet marked by Circular Pool'}, 'target': 'ACCEPT'}}
             - {'table': 'nat', 'chain': 'CIRCULAR_POOL',    'rule': {'comment': {'comment': 'Do MARKDNAT'}, 'target': {'MARKDNAT': {'set-xmark': '0x0/0x0'}}}}
             # Enable SNAT for MARK_LOCAL_TO_WAN packets
             - {'table': 'nat', 'chain': 'POSTROUTING',      'rule': {'mark': {'mark': '0xFF011131/0xFFFFFFFF'}, 'comment': {'comment': 'SNAT to public IP address'}, 'target': {'SNAT': {'to-source': '192.168.0.10'}}}}
@@ -84,6 +86,7 @@ IPTABLES:
 
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Early drop blacklisted sources'}, 'target': 'DROP'}}
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Early drop blacklisted destinations'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Reject packet marked by Circular Pool'}, 'target': 'mREJECT'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklisted sources'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Drop blacklisted destinations'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_WHITELIST', 'src']}, 'comment': {'comment': 'Accept whitelisted sources'}, 'target': 'ACCEPT'}}
