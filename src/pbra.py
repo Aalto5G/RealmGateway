@@ -962,6 +962,8 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn))
             return None
 
+        # TODO: Improve dns_host representation and consider the use within connection object (contains())
+
         dns_resolver = addr[0]
         dns_host = query.reputation_requestor
         dns_bind = False
@@ -1008,7 +1010,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Connection expired
             self._logger.info('Connection expired: {} in {:.3f} msec '.format(conn, conn.age*1000))
             # Blame attribution to DNS resolver and requestor
-            self._logger.info('  >> Blame attribution!')
+            self._logger.debug('  >> Blame attribution!')
             # Register a nok event
             if conn.query.reputation_resolver is not None:
                 conn.query.reputation_resolver.event_nok()
@@ -1016,6 +1018,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                 conn.query.reputation_requestor.event_nok()
         else:
             # Connection was used
+            self._logger.info('Connection used: {} in {:.3f} msec '.format(conn, conn.age*1000))
             # Success attribution to DNS resolver and requestor
             self._logger.debug('  >> Success attribution!')
             ## Register an ok event
@@ -1086,11 +1089,13 @@ class PolicyBasedResourceAllocation(container3.Container):
         host_obj.add_service(KEY_SERVICE_SFQDN, _service_data)
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
+        # Return newly created service_data
+        return _service_data
 
     def _remove_host_alias(self, host_obj, fqdn, dnsgroup_obj):
         # Update reputation values
         ## Log OK event
-        dnsgroup_obj.event_nok()
+        dnsgroup_obj.event_ok()
         # Remove alias FQDN service from host
         service_data = host_obj.get_service_sfqdn(fqdn)
         host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
