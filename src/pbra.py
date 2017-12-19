@@ -33,8 +33,8 @@ PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via 
 PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
 These policies can be enabled or disabled independently
 """
-PBRA_DNS_POLICY_TCP   = True
-PBRA_DNS_POLICY_CNAME = True
+PBRA_DNS_POLICY_TCP   = False
+PBRA_DNS_POLICY_CNAME = False
 
 """
 PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
@@ -642,8 +642,12 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Log only when pre-conditions are met
         if PBRA_DNS_LOG_UNTRUSTED is False:
             pass
-        elif alias:
-            pass
+        elif alias and query.reputation_resolver is not None:
+            # Register a trusted event
+            query.reputation_resolver.event_trusted()
+        elif query.transport == 'tcp' and query.reputation_resolver is not None:
+            # Register a trusted event
+            query.reputation_resolver.event_trusted()
         elif query.transport == 'udp' and query.reputation_resolver is not None:
             # Register an untrusted event
             query.reputation_resolver.event_untrusted()
@@ -714,20 +718,21 @@ class PolicyBasedResourceAllocation(container3.Container):
             if query.reputation_resolver is None:
                 # Create reputation metadata in query object
                 self._load_metadata_resolver(query, addr, create=True)
+            '''
                 # Register a neutral event
                 query.reputation_resolver.event_neutral()
             else:
                 # Register a neutral and trusted event
                 query.reputation_resolver.event_trusted()
                 query.reputation_resolver.event_neutral()
-
+            '''
             # Return CNAME response
             return response
 
 
         # Register a neutral and trusted event
-        query.reputation_resolver.event_trusted()
-        query.reputation_resolver.event_neutral()
+        #query.reputation_resolver.event_trusted()
+        #query.reputation_resolver.event_neutral()
 
         # Query is trusted, load/create metadata related to requestor
         self._load_metadata_requestor(query, addr, create=True)
@@ -1011,6 +1016,8 @@ class PolicyBasedResourceAllocation(container3.Container):
                 conn.query.reputation_requestor.event_nok()
         else:
             # Connection was used
+            # Success attribution to DNS resolver and requestor
+            self._logger.debug('  >> Success attribution!')
             ## Register an ok event
             if conn.query.reputation_resolver is not None:
                 conn.query.reputation_resolver.event_ok()
