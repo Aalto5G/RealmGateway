@@ -571,8 +571,11 @@ class DNSCallbacks(object):
         return
         '''
 
-
-
+    @asyncio.coroutine
+    def dns_error_response(self, query, addr, cback, rcode=dns.rcode.REFUSED):
+        # Create error response
+        response = dnsutils.make_response_rcode(query, rcode=rcode, recursion_available=True)
+        cback(query, addr, response)
 
 
 class PacketCallbacks(object):

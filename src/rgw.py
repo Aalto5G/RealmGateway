@@ -63,6 +63,9 @@ from global_variables import RUNNING_TASKS
 import pbra
 from pbra import PolicyBasedResourceAllocation
 
+import dns
+import dns.rcode
+
 def setup_logging_yaml(default_path='logging.yaml',
                        default_level=logging.INFO,
                        env_path='LOG_CFG',
@@ -343,8 +346,8 @@ class RealmGateway(object):
         ## DNS Proxy for Local
         for ipaddr, port in self._config.dns_server_local:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-            # Disable resolutions of non SOA domains for self generated DNS queries (i.e. HTTP proxy)
-            cb_nosoa = None
+            # Disable resolutions of non SOA domains for self generated DNS queries (i.e. HTTP proxy) - Answer with REFUSED
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_error_response(x,y,z,rcode=dns.rcode.REFUSED))
             transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
