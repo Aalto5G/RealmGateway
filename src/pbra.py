@@ -33,8 +33,8 @@ PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via 
 PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
 These policies can be enabled or disabled independently
 """
-PBRA_DNS_POLICY_TCP   = False
-PBRA_DNS_POLICY_CNAME = False
+PBRA_DNS_POLICY_TCP   = True
+PBRA_DNS_POLICY_CNAME = True
 
 """
 PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
@@ -174,14 +174,14 @@ class uReputation(object):
 class uDNSQueryTimer(container3.ContainerNode):
     TIMEOUT = 8.0
 
-    def __init__(self, query, ipaddr, fqdn, service, timeout=0):
+    def __init__(self, query, ipaddr, service, alias_service, timeout=0):
         """ Initialize as a ContainerNode """
         # Initialize super
         super().__init__('uDNSQueryTimer')
         self.query = query
         self.ipaddr = ipaddr
-        self.fqdn = fqdn
         self.service = service
+        self.alias_service = alias_service
         self.timeout = timeout
         # Set default timeout if not overriden
         if not self.timeout:
@@ -197,20 +197,10 @@ class uDNSQueryTimer(container3.ContainerNode):
     def lookupkeys(self):
         """ Return the lookup keys """
         return [((KEY_TIMER), False),
-                ((KEY_TIMER_FQDN, self.fqdn), True)]
-
-    def show(self):
-        # Pretty(ier) print of the host information
-        print('### uDNSQueryTimer ##')
-        #print('> Query: {}'.format(self.query))
-        print('> Resolver: {}'.format(self.ipaddr))
-        print('> FQDN: {}'.format(self.fqdn))
-        print('> Service: {}'.format(self.service))
-        print('> Lookupkeys: {}'.format(self.lookupkeys()))
-        print('################')
+                ((KEY_TIMER_FQDN, self.alias_service['fqdn']), True)]
 
     def __repr__(self):
-        return '[{}] resolver={} fqdn={} service={} timeout={} sec'.format(self._name, self.ipaddr, self.fqdn, self.service, self.timeout)
+        return '[{}] resolver={} service={} alias_service={} timeout={} sec'.format(self._name, self.ipaddr, self.service, self.alias_service, self.timeout)
 
 
 class uStateDNSHost(container3.ContainerNode):
@@ -707,25 +697,18 @@ class PolicyBasedResourceAllocation(container3.Container):
             response, _fqdn = self._policy_cname(query)
             self._logger.info('Create CNAME response / {}'.format(_fqdn))
             # Register alias service in host
-            self._register_host_alias(host_obj, service_data, _fqdn)
+            alias_service_data = self._register_host_alias(host_obj, service_data, _fqdn)
             ## Create uDNSQueryTimer object
-            timer_obj = uDNSQueryTimer(query, addr[0], _fqdn, service_data)
+            timer_obj = uDNSQueryTimer(query, addr[0], service_data, alias_service_data)
             # Monkey patch delete function for timer object
-            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj, _fqdn)
+            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj)
             self.add(timer_obj)
 
             # Evaluate resolver metadata and create new if does not exist
             if query.reputation_resolver is None:
                 # Create reputation metadata in query object
                 self._load_metadata_resolver(query, addr, create=True)
-            '''
-                # Register a neutral event
-                query.reputation_resolver.event_neutral()
-            else:
-                # Register a neutral and trusted event
-                query.reputation_resolver.event_trusted()
-                query.reputation_resolver.event_neutral()
-            '''
+
             # Return CNAME response
             return response
 
@@ -738,7 +721,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._load_metadata_requestor(query, addr, create=True)
 
         # Remove alias service in host and update reputation (+1)
-        self._remove_host_alias(host_obj, fqdn, query.reputation_resolver)
+        if alias:
+            self._remove_host_alias(host_obj, service_data, query.reputation_resolver)
 
         # Remove timer object
         timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
@@ -1092,17 +1076,16 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Return newly created service_data
         return _service_data
 
-    def _remove_host_alias(self, host_obj, fqdn, dnsgroup_obj):
+    def _remove_host_alias(self, host_obj, service_data, dnsgroup_obj):
         # Update reputation values
         ## Log OK event
         dnsgroup_obj.event_ok()
         # Remove alias FQDN service from host
-        service_data = host_obj.get_service_sfqdn(fqdn)
         host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
 
-    def _cb_dnstimer_expired(self, timer_obj, host_obj, fqdn):
+    def _cb_dnstimer_expired(self, timer_obj, host_obj):
         # Log expiration
         if timer_obj.hasexpired():
             self._logger.info('Timer expired {}'.format(timer_obj))
@@ -1111,8 +1094,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             ## Log NOK event
             dnsgroup_obj.event_nok()
         # Remove alias FQDN service from host
-        service_data = host_obj.get_service_sfqdn(fqdn)
-        host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
+        host_obj.remove_service(KEY_SERVICE_SFQDN, timer_obj.alias_service)
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
 
