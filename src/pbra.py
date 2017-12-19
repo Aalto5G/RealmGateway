@@ -547,7 +547,13 @@ class PolicyBasedResourceAllocation(container3.Container):
     def _policy_cname(self, query):
         # Answer CNAME
         fqdn = format(query.question[0].name)
-        MAX_LENGTH_LABEL = 63
+        """
+        There seems to be a bug using LXC and string match.
+        The longest match that works is 73 chars, i.e. z1234567890123456789012345678901234567890123.test.gwa.cesproto.re2ee.org.
+        The shortest match that does not work is 74 chars, i.e. z12345678901234567890123456789012345678901234.test.gwa.cesproto.re2ee.org.
+        The ideal MAX_LENGTH_LABEL should have value of 63. For compatibility, we use 32.
+        """
+        MAX_LENGTH_LABEL = 32
         _fqdn = utils3.random_string(MAX_LENGTH_LABEL) + '.' + fqdn
         ttl = 0
         response = dns.message.make_response(query, recursion_available=False)
