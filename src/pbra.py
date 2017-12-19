@@ -605,7 +605,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         if self.has((KEY_DNSHOST_IPADDR, ipaddr_lookupkey)):
             # Get existing object
-            dnshost_obj = self.get((KEY_DNSHOST_IPADDR, ipaddr_lookup))
+            dnshost_obj = self.get((KEY_DNSHOST_IPADDR, ipaddr_lookupkey))
             self._logger.info('Retrieved existing uStateDNSHost for requestor ipaddr={}/{}'.format(meta_ipaddr, meta_mask))
 
         elif self.has((KEY_DNSHOST_IPADDR, ipaddr_lookupkey)) is False and create is True:
