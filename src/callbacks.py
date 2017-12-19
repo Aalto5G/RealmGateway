@@ -631,8 +631,8 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.info('No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
-            self.network.ipt_nfpacket_drop(packet)
+            self._logger.info('Reject / No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
+            self.network.ipt_nfpacket_reject(packet)
             return
 
         # Lookup connection in table with rest of the keys
@@ -644,15 +644,16 @@ class PacketCallbacks(object):
                 break
 
         if conn is None:
-            self._logger.warning('No connection found for packet: [{}]'.format(self._format_5tuple(packet_fields)))
-            self.network.ipt_nfpacket_drop(packet)
+            self._logger.warning('Reject / No connection found for packet: [{}]'.format(self._format_5tuple(packet_fields)))
+            self.network.ipt_nfpacket_reject(packet)
             return
 
         # The connection belongs to an SLA marked DNS server
         if conn.dns_bind and conn.dns_host.contains(src):
             self._logger.info('Connection reserved found for remote host {}: {}'.format(src, conn.dns_host))
         elif conn.dns_bind:
-            self._logger.info('Connection not reserved for remote host {}: {}'.format(src, conn.dns_host))
+            self._logger.info('Reject / Connection not reserved for remote host {}: {}'.format(src, conn.dns_host))
+            self.network.ipt_nfpacket_reject(packet)
             return
 
         # DNAT to private host

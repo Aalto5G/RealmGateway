@@ -138,7 +138,7 @@ class Network(object):
     def _do_flushing(self):
         # Flush conntrack
         if self._do_subprocess_call('conntrack -F', False, False):
-            self._logger.info('Successfully flushed connection tracking information')            
+            self._logger.info('Successfully flushed connection tracking information')
         else:
             self._logger.warning('Failed to flush connection tracking information')
 
@@ -265,6 +265,10 @@ class Network(object):
 
     def ipt_nfpacket_drop(self, packet):
         packet.drop()
+
+    def ipt_nfpacket_reject(self, packet):
+        # Use special case of packet mark 0xffffffff for reject
+        self.ipt_nfpacket_dnat(packet, '255.255.255.255')
 
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
