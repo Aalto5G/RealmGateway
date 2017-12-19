@@ -447,6 +447,10 @@ class uStateDNSGroup(container3.ContainerNode):
         ## Current reputation period
         self.reputation_current.merge(other.reputation_current)
 
+        # Update SLA values
+        if self.sla or other.sla:
+            self.sla = True
+
 
 class PolicyBasedResourceAllocation(container3.Container):
     """
