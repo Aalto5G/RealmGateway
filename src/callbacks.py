@@ -225,19 +225,20 @@ class DNSCallbacks(object):
         fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
 
-        self._logger.warning('LAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
+        self._logger.debug('LAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # The service exists in RGW
             host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
             service_data = host_obj.get_service_sfqdn(fqdn)
+            self._logger.debug('Found service: {} / {}'.format(fqdn, service_data))
         elif self.hosttable.has_carriergrade(fqdn):
             # There is a host with CarrierGrade service in RGW
-            host_obj = self.hosttable.get_carriergrade(fqdn)
-            service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+            host_obj, service_data = self.hosttable.get_carriergrade(fqdn)
+            self._logger.debug('Found CarrierGrade service: {} / {}'.format(fqdn, service_data))
         elif fqdn in self.soa_list:
             # Querying the RGW domain itself
-            self._logger.debug('Use NS address for {}'.format(fqdn))
+            self._logger.debug('Use NS address: {}'.format(fqdn))
             host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
             # Create DNS Response
             response = dnsutils.make_response_answer_rr(query, fqdn, dns.rdatatype.A, host_obj.ipv4, rdclass=1, ttl=DNSRR_TTL_DEFAULT, recursion_available=True)
@@ -341,15 +342,18 @@ class DNSCallbacks(object):
 
         self._logger.debug('WAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
-        # The service exists in RGW
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
+            # The service exists in RGW
             host_obj = self.hosttable.get((host.KEY_HOST_SERVICE, fqdn))
             service_data = host_obj.get_service_sfqdn(fqdn)
+            self._logger.debug('Found service: {} / {}'.format(fqdn, service_data))
         elif self.hosttable.has_carriergrade(fqdn):
-            host_obj = self.hosttable.get_carriergrade(fqdn)
-            service_data = host_obj.get_service_sfqdn(host_obj.fqdn)
+            # There is a host with CarrierGrade service in RGW
+            host_obj, service_data = self.hosttable.get_carriergrade(fqdn)
+            self._logger.debug('Found CarrierGrade service: {} / {}'.format(fqdn, service_data))
         elif fqdn in self.soa_list:
-            self._logger.debug('Use NS address for {}'.format(fqdn))
+            # Querying the RGW domain itself
+            self._logger.debug('Use NS address: {}'.format(fqdn))
             host_obj = self.hosttable.get((host.KEY_HOST_FQDN, fqdn))
             # Create DNS Response
             response = dnsutils.make_response_answer_rr(query, fqdn, dns.rdatatype.A, host_obj.ipv4, rdclass=1, ttl=DNSRR_TTL_DEFAULT)

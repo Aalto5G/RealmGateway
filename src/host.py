@@ -19,39 +19,47 @@ class HostTable(container3.Container):
         super().__init__(name)
 
     def has_carriergrade(self, fqdn):
-        """ Return True if a matching host is defined as carrier grade """
-        # 1. Check if the host exists for the given FQDN and supports carriergrade
-        ## TODO TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
-        host = self.lookup((KEY_HOST_FQDN, fqdn))
-        if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
-            self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
-            return True
-        # 2. Check host list and assume fqdn as a subdomain of one of our hosts
+        """ Return True if the FQDN exists for a host defined as carrier grade """
+        # 1. Check if the service exists for the given FQDN and if it supports carriergrade
+        if self.has((KEY_HOST_SERVICE, fqdn)):
+            host = self.get((KEY_HOST_SERVICE, fqdn))
+            service_data = host.get_service_sfqdn(fqdn)
+            if service_data['carriergrade']:
+                self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
+            return service_data['carriergrade']
+
+        # 2. Check host list and check if FQDN is a subdomain of one of our hosts' services
         for host in self.getall():
-            if not host.has_service(KEY_SERVICE_CARRIERGRADE):
-                continue
-            nstoken = '.{}'.format(host.fqdn)
-            if fqdn.endswith(nstoken):
-                self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
-                return True
+            for service_data in host.services[KEY_SERVICE_SFQDN]:
+                nstoken = '.{}'.format(service_data['fqdn'])
+                if not fqdn.endswith(nstoken):
+                    continue
+                # The given FQDN is nested under the current service_data
+                if service_data['carriergrade']:
+                    self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
+                return service_data['carriergrade']
         return False
 
     def get_carriergrade(self, fqdn):
-        """ Return the host object if a matching host is defined as carrier grade """
-        # 1. Check if the host exists for the given FQDN and supports carriergrade
-        ## TOCHECK: Should we check KEY_HOST_FQDN or KEY_HOST_SERVICE ?
-        host = self.lookup((KEY_HOST_FQDN, fqdn))
-        if host and host.has_service(KEY_SERVICE_CARRIERGRADE):
-            self._logger.debug('Get host KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
-            return host
-        # 2. Check host list and assume fqdn as a subdomain of one of our hosts
+        """ Return a tuple of host object an service data for which the FQDN exists as carrier grade """
+        # 1. Check if the service exists for the given FQDN and if it supports carriergrade
+        if self.has((KEY_HOST_SERVICE, fqdn)):
+            host = self.get((KEY_HOST_SERVICE, fqdn))
+            service_data = host.get_service_sfqdn(fqdn)
+            if service_data['carriergrade']:
+                self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
+            return (host,service_data)
+
+        # 2. Check host list and check if FQDN is a subdomain of one of our hosts' services
         for host in self.getall():
-            if not host.has_service(KEY_SERVICE_CARRIERGRADE):
-                continue
-            nstoken = '.{}'.format(host.fqdn)
-            if fqdn.endswith(nstoken):
-                self._logger.debug('Get host KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
-                return host
+            for service_data in host.services[KEY_SERVICE_SFQDN]:
+                nstoken = '.{}'.format(service_data['fqdn'])
+                if not fqdn.endswith(nstoken):
+                    continue
+                # The given FQDN is nested under the current service_data
+                if service_data['carriergrade']:
+                    self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
+                return (host,service_data)
         return None
 
     def show(self):
