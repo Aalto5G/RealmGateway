@@ -697,7 +697,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             response, _fqdn = self._policy_cname(query)
             self._logger.info('Create CNAME response / {}'.format(_fqdn))
             # Register alias service in host
-            alias_service_data = self._register_host_alias(host_obj, service_data, _fqdn)
+            alias_service_data = self._register_host_alias(host_obj, service_data, fqdn, _fqdn)
             ## Create uDNSQueryTimer object
             timer_obj = uDNSQueryTimer(query, addr[0], service_data, alias_service_data)
             # Monkey patch delete function for timer object
@@ -1063,11 +1063,12 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Return list of available IP addresses for overload
         return available
 
-    def _register_host_alias(self, host_obj, service_data, fqdn):
+    def _register_host_alias(self, host_obj, service_data, original_fqdn, alias_fqdn):
         # Add alias as SFQDN host service
         #service_data = {'fqdn':'foo.', 'port':0, 'protocol':0, 'proxy_required':False, 'carriergrade':False}
         _service_data = dict(service_data)
-        _service_data['fqdn'] = fqdn
+        _service_data['_fqdn'] = original_fqdn
+        _service_data['fqdn'] = alias_fqdn
         _service_data['alias'] = True
         # Add alias service to host_obj
         host_obj.add_service(KEY_SERVICE_SFQDN, _service_data)
