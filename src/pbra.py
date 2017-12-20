@@ -701,7 +701,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             ## Create uDNSQueryTimer object
             timer_obj = uDNSQueryTimer(query, addr[0], service_data, alias_service_data)
             # Monkey patch delete function for timer object
-            timer_obj.delete = partial(self._cb_dnstimer_expired, timer_obj, host_obj)
+            timer_obj.delete = partial(self._cb_dnstimer_deleted, timer_obj, host_obj)
             self.add(timer_obj)
 
             # Evaluate resolver metadata and create new if does not exist
@@ -977,7 +977,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         connection_obj = ConnectionLegacy(**conn_param)
         # Monkey patch delete function for connection object
-        connection_obj.delete = partial(self._cb_connection_expired, connection_obj)
+        connection_obj.delete = partial(self._cb_connection_deleted, connection_obj)
         # Add connection to table
         self.connectiontable.add(connection_obj)
         # Log
@@ -985,7 +985,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._logger.info('New Circular Pool connection: {}'.format(connection_obj))
         return allocated_ipv4
 
-    def _cb_connection_expired(self, conn):
+    def _cb_connection_deleted(self, conn):
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
         ipaddr = conn.outbound_ip
@@ -1085,7 +1085,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
 
-    def _cb_dnstimer_expired(self, timer_obj, host_obj):
+    def _cb_dnstimer_deleted(self, timer_obj, host_obj):
         # Log expiration
         if timer_obj.hasexpired():
             self._logger.info('Timer expired {}'.format(timer_obj))
