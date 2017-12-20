@@ -66,7 +66,7 @@ API_URL_SWITCHES    = 'stats/switches'
 API_URL_FLOW_ADD    = 'stats/flowentry/add'
 API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 
-RYU_RECONNECT = 10
+RYU_RECONNECT = 60
 
 
 class Network(object):
