@@ -25,7 +25,7 @@ class HostTable(container3.Container):
             host = self.get((KEY_HOST_SERVICE, fqdn))
             service_data = host.get_service_sfqdn(fqdn)
             if service_data['carriergrade']:
-                self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
+                self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
             return service_data['carriergrade']
 
         # 2. Check host list and check if FQDN is a subdomain of one of our hosts' services
@@ -36,7 +36,7 @@ class HostTable(container3.Container):
                     continue
                 # The given FQDN is nested under the current service_data
                 if service_data['carriergrade']:
-                    self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
+                    self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
                 return service_data['carriergrade']
         return False
 
@@ -47,7 +47,7 @@ class HostTable(container3.Container):
             host = self.get((KEY_HOST_SERVICE, fqdn))
             service_data = host.get_service_sfqdn(fqdn)
             if service_data['carriergrade']:
-                self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
+                self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for FQDN {}'.format(fqdn))
             return (host,service_data)
 
         # 2. Check host list and check if FQDN is a subdomain of one of our hosts' services
@@ -58,7 +58,7 @@ class HostTable(container3.Container):
                     continue
                 # The given FQDN is nested under the current service_data
                 if service_data['carriergrade']:
-                    self._logger.info('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
+                    self._logger.debug('Host has KEY_SERVICE_CARRIERGRADE for delegated-FQDN {}'.format(fqdn))
                 return (host,service_data)
         return None
 
