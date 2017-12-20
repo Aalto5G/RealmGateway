@@ -246,7 +246,7 @@ class DNSCallbacks(object):
         fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
 
-        self._logger.debug('LAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
+        self._logger.debug('LAN SOA: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # The service exists in RGW
@@ -314,7 +314,7 @@ class DNSCallbacks(object):
         fqdn = q.name
         rdtype = q.rdtype
 
-        self._logger.warning('LAN !SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
+        self._logger.warning('LAN !SOA: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if key in self.activequeries:
             # Continue ongoing resolution
@@ -351,7 +351,7 @@ class DNSCallbacks(object):
         query.reputation_resolver = None
         query.reputation_requestor = None
 
-        self._logger.debug('WAN SOA: {} ({}) via {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
+        self._logger.debug('WAN SOA: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
 
         if self.hosttable.has((host.KEY_HOST_SERVICE, fqdn)):
             # The service exists in RGW
@@ -651,7 +651,8 @@ class DNSCallbacks(object):
         """ Process DNS query from public network of a name not in a SOA zone """
         fqdn = format(query.question[0].name)
         rdtype = query.question[0].rdtype
-        self._logger.warning('Drop DNS query for non-SOA domain: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), query.transport))
+        self._logger.warning('Drop DNS query for non-SOA domain: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
+        # TODO: Feed this to the algorithm as untrusted events? What about misconfigured DNS servers?
         # Drop DNS Query
         return
 
