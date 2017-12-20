@@ -417,7 +417,7 @@ class uStateDNSGroup(container3.ContainerNode):
         print('  >> current:  {}'.format(self.reputation_current))
 
     def merge(self, other):
-        self._logger.warning('Merging 2 DNS groups: {} / {}'.format(self, other))
+        self._logger.info('Merging 2 DNS groups: {} / {}'.format(self, other))
         # Combine nodes
         for ipaddr in other.nodes:
             self.nodes.append(ipaddr)
@@ -578,7 +578,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         meta_flag = False
 
         for opt in query.options:
-            self._logger.warning('Found EDNS0: {}'.format(opt.to_text()))
+            self._logger.debug('Found EDNS0: {}'.format(opt.to_text()))
             if opt.otype == 0x08 and meta_ipaddr is None:
                 # ClientSubnet
                 meta_ipaddr = opt.address
@@ -729,7 +729,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Evaluate seen IP addresses for this query
         if timer_obj.ipaddr not in query.reputation_resolver.nodes:
             # Merge DNS groups
-            self._logger.warning('Discover new topology for DNS group. Initiate DNS group merger')
+            self._logger.debug('Merge DNS groups')
             group1 = query.reputation_resolver
             group2 = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
             self._coalesce_dns_groups(group1, group2)
@@ -802,12 +802,12 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         elif SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_MEDIUM[0]) and \
           sysload >= SYSTEM_LOAD_MEDIUM[0]:
-            self._logger.warning('SYSTEM_LOAD_MEDIUM ({:.2f}%%)'.format(sysload))
+            self._logger.info('SYSTEM_LOAD_MEDIUM ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_medium
 
         elif SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_LOW[0]) and \
           sysload >= SYSTEM_LOAD_LOW[0]:
-            self._logger.warning('SYSTEM_LOAD_LOW ({:.2f}%%)'.format(sysload))
+            self._logger.debug('SYSTEM_LOAD_LOW ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_low
 
     def _policy_get_max_reputation(self, query):
@@ -980,7 +980,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         self.connectiontable.add(connection_obj)
         # Log
         self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
-        self._logger.info('New Circular Pool connection: {}'.format(connection_obj))
+        self._logger.debug('New Circular Pool connection: {}'.format(connection_obj))
         return allocated_ipv4
 
     def _cb_connection_deleted(self, conn):
@@ -1000,7 +1000,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                 conn.query.reputation_requestor.event_nok()
         else:
             # Connection was used
-            self._logger.info('Connection used: {} in {:.3f} msec '.format(conn, conn.age*1000))
+            self._logger.debug('Connection used: {} in {:.3f} msec '.format(conn, conn.age*1000))
             # Success attribution to DNS resolver and requestor
             self._logger.debug('  >> Success attribution!')
             ## Register an ok event
@@ -1011,7 +1011,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
-            self._logger.info('Cannot release IP address to Circular Pool: {} @ {} still in use for {:.3f} msec'.format(conn.fqdn, ipaddr, conn.age*1000))
+            self._logger.debug('Cannot release IP address to Circular Pool: {} @ {} still in use for {:.3f} msec'.format(conn.fqdn, ipaddr, conn.age*1000))
             return
 
         ap_cpool.release(ipaddr)
