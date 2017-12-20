@@ -410,7 +410,14 @@ class DNSCallbacks(object):
         ## TODO: Check what happens with nested WWW requests and how to avoid allocation from our own CircularPool?
         _ipv4, _service_data = host_obj.ipv4, service_data
         if service_data['carriergrade'] is True:
-            _ipv4, _service_data = yield from self._dns_resolve_circularpool_carriergrade(host_obj, fqdn, addr, service_data)
+            # PROBLEM: The current service_data may correspond to the CNAMEd alias from the policy which makes this resolution fail!
+            # > We need to recover the original FQDN, maybe from the service_data passed along?
+            _carriergrade_fqdn = fqdn
+            if service_data['alias'] is True:
+                print(service_data)
+                _carriergrade_fqdn = service_data['_fqdn']
+                self._logger.warning('Using carriergrade_fqdn={} instead of alias_fqdn={}'.format(_carriergrade_fqdn, fqdn))
+            _ipv4, _service_data = yield from self._dns_resolve_circularpool_carriergrade(host_obj, _carriergrade_fqdn, addr, service_data)
         if _ipv4 is None:
             response = dnsutils.make_response_rcode(query, rcode=dns.rcode.NOERROR, recursion_available=False)
             cback(query, addr, response)
