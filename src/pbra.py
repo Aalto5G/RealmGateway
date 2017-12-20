@@ -506,9 +506,6 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def cleanup_timers(self):
         """ Perform a cleanup of expired timer objects """
-        # For debugging purposes
-        self._debug_dnsgroups()
-
         nodes = self.lookup(KEY_TIMER, update=False, check_expire=False)
         if nodes is None:
             return
@@ -516,7 +513,8 @@ class PolicyBasedResourceAllocation(container3.Container):
             if node.hasexpired():
                 self.remove(node)
 
-    def _debug_dnsgroups(self):
+    def debug_dnsgroups(self):
+        # For debugging purposes
         #nodes = self.lookup(KEY_DNSGROUP, update=False, check_expire=False)
         nodes = self.lookup(KEY_DNS_REPUTATION, update=False, check_expire=False)
         if nodes is None:

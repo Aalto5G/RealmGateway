@@ -209,6 +209,9 @@ class RealmGateway(object):
         # Create task: Timer cleanup
         _t = asyncio.ensure_future(self._init_cleanup_pbra_timers(10.0))
         RUNNING_TASKS.append((_t, 'cleanup_pbra_timers'))
+        # Create task: Show DNS groups
+        _t = asyncio.ensure_future(self._init_show_dnsgroups(60.0))
+        RUNNING_TASKS.append((_t, 'show_dnsgroups'))
         # Initialize Subscriber information
         yield from self._init_subscriberdata()
 
@@ -378,7 +381,6 @@ class RealmGateway(object):
         self._logger.info('Initiating cleanup of the Circular Pool every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
-            self._logger.debug('do cleanup circularpool')
             # Update table and remove expired elements
             self._connectiontable.update_all_rgw()
 
@@ -387,9 +389,16 @@ class RealmGateway(object):
         self._logger.info('Initiating cleanup of PBRA timers every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
-            self._logger.debug('do cleanup PBRA timers')
             # Update table and remove expired elements
             self._pbra.cleanup_timers()
+
+    @asyncio.coroutine
+    def _init_show_dnsgroups(self, delay):
+        self._logger.info('Initiating display of DNSGroup information every {} seconds'.format(delay))
+        while True:
+            yield from asyncio.sleep(delay)
+            # Update table and remove expired elements
+            self._pbra.debug_dnsgroups()
 
     @asyncio.coroutine
     def shutdown(self):
