@@ -215,16 +215,20 @@ class DNSCallbacks(object):
             return (dns.rcode.NOERROR, _target_ipaddr, _service_data)
 
         ## Record type TXT and Circular Pool resolution
-        elif rdtype == dns.rdatatype.SRV and circular_pool:
+        elif rdtype == dns.rdatatype.TXT and circular_pool:
             # Build service_data dictionary
             _service_data = {}
-            txt_metadata = rrdata_answer.replace(fqdn, '')
+            ## For some reason, TXT data (_target_txt) is enclosed in quotes '"' so we have to remove them
+            #['test103.nest0.gwa.cesproto.re2ee.org.', '0', 'IN', 'TXT', '"proxy_False.port_0.protocol_0.test103.nest0.gwa.cesproto.re2ee.org."']
+            _name, _ttl, _rdataclass, _rdatatype, _target_txt = rrdata_answer.split()
+            txt_metadata = _target_txt.replace('"', '').replace(fqdn, '')
             for label in txt_metadata.split('.'):
                 if label == '':
                     continue
-                k, v = label.split('_')[0], label.split('_')[1]
+                k, v = label.split('_')
                 if k == 'proxy':
-                    _service_data['proxy_required'] = bool(v)
+                    str2bool = lambda x: x.lower() in ("yes", "true", "t", "1")
+                    _service_data['proxy_required'] = str2bool(v)
                 elif k == 'port':
                     _service_data['port'] = int(v)
                 elif k == 'protocol':
@@ -618,7 +622,7 @@ class DNSCallbacks(object):
         """ Resolve FQDN via CarrierGrade host. Return a tuple of (IPv4 address, service_data) if successful or (None, None) """
         host_ipaddr = host_obj.ipv4
         host_cpool_ipv4 = None
-        self._logger.warning('SOA CarrierGrade: {} via {}'.format(fqdn, host_ipaddr))
+        self._logger.info('SOA CarrierGrade: {} via {}'.format(fqdn, host_ipaddr))
 
         # Initiate SRV resolution towards CarrierGrade host
         ## Add EDNS0 ECS option to query
@@ -631,9 +635,11 @@ class DNSCallbacks(object):
             try:
                 query_rdtype = dnsutils.make_query(fqdn, rdtype, options=[edns0_ecs, edns0_eci])
                 _rcode, _ipv4, _service_data =  yield from self._do_resolve_carriergrade(query_rdtype, host_ipaddr, circular_pool=True)
-                if not _ipv4:
-                    continue
-            except:
+                if _ipv4:
+                    self._logger.info('Succeeded CarrierGrade resolution: {} via {} @ {} {}'.format(fqdn, host_ipaddr, _ipv4, _service_data))
+                    break
+            except Exception as e:
+                self._logger.exception(e)
                 self._logger.warning('Exception while performing CarrierGrade resolution: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipaddr))
                 pass
 
@@ -748,7 +754,7 @@ class PacketCallbacks(object):
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
-            self._logger.info('Reject / No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
+            self._logger.debug('Reject / No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_reject(packet)
             return
 
