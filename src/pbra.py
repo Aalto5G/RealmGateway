@@ -650,6 +650,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         fqdn = format(query.question[0].name)
         alias = service_data['alias']
 
+        self._logger.info('WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
+
         # Load available reputation metadata in query object
         self._load_metadata_resolver(query, addr, create=PBRA_DNS_LOG_UNTRUSTED)
         self._load_metadata_requestor(query, addr, create=False)
@@ -691,9 +693,11 @@ class PolicyBasedResourceAllocation(container3.Container):
             return None
 
         if PBRA_DNS_POLICY_CNAME and alias is False:
+            # BUG: When using Google DNS very quickly, it is remembering the CNAME alias given in prior resolutions
+            #      However, the problem is that for some reason our local service_data does not have the alias set, so we recurrently create more and more labels!
+
             # Create CNAME response
             response, _fqdn = self._policy_cname(query)
-            self._logger.info('Create CNAME response / {}'.format(_fqdn))
             # Register alias service in host
             alias_service_data = self._register_host_alias(host_obj, service_data, fqdn, _fqdn)
             ## Create uDNSQueryTimer object
@@ -707,9 +711,9 @@ class PolicyBasedResourceAllocation(container3.Container):
                 # Create reputation metadata in query object
                 self._load_metadata_resolver(query, addr, create=True)
 
+            self._logger.info('Create CNAME response / {}'.format(alias_service_data))
             # Return CNAME response
             return response
-
 
         # Register a neutral and trusted event
         #query.reputation_resolver.event_trusted()
@@ -733,6 +737,9 @@ class PolicyBasedResourceAllocation(container3.Container):
             group1 = query.reputation_resolver
             group2 = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
             self._coalesce_dns_groups(group1, group2)
+
+        self._logger.info('/WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
+        return None
 
 
     def _coalesce_dns_groups(self, group1, group2):
@@ -778,7 +785,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         ## Get executing function
         ### Execute best-effort policy if DNS Load Policing is disabled
         if PBRA_DNS_LOAD_POLICING is False:
-            allocated_ipv4 = self._policy_circularpool_low()
+            allocated_ipv4 = self._policy_circularpool_low(query, addr, host_obj, service_data, host_ipv4)
             return allocated_ipv4
         else:
             cb_f = self._get_policy_load_function(sysload)
@@ -1045,7 +1052,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             if ipaddr in available:
                 continue
 
-            self._logger.warning('Comparing {} vs {} @{}'.format((c_port, c_proto),(s_port, s_proto), ipaddr))
+            self._logger.debug('Comparing {} vs {} @{}'.format((c_port, c_proto),(s_port, s_proto), ipaddr))
             # The following statements match when IP overloading cannot be performed
             if (c_port == 0 and c_proto == 0) or (s_port == 0 and s_proto == 0):
                 self._logger.debug('0. Port & Protocol blocked')
