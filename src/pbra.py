@@ -680,9 +680,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             return None
 
         if self.PBRA_DNS_POLICY_CNAME and alias is False:
-            # BUG: When using Google DNS very quickly, it is remembering the CNAME alias given in prior resolutions
-            #      However, the problem is that for some reason our local service_data does not have the alias set, so we recurrently create more and more labels!
-
             # Create CNAME response
             response, _fqdn = self._policy_cname(query)
             # Register alias service in host
@@ -708,6 +705,18 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._logger.info('WAN SOA detected trusted query for {} / {}'.format(fqdn, service_data))
 
         # Remove alias service in host and update reputation (+1)
+        """
+        Source of the bug:
+        The issue is attributed to downward Carrier Grade resolution on the event that this resolution fails for some reason (too long time, socket error, packet loss).
+        Upon receiving the first query that matches the alias, we are currently deleting it (burner, 1 time only). The problem is when a retransmission from the DNS Resolver for the same alias name (CNAMEd) arrives.
+        The matching service in the host, is the generic nested domain, indicating the carriergrade=True and alias=False, so once again we recurrently create more and more labels!
+
+        Potential solution:
+        1. We could associate the CNAME to a DNS Group, the problem is that we may not know the whole population of the group. BAD BAD
+        2. We could establish a flag on the service, whether it was used or not. Upon expiration we can event_ok or event_nok accordingly. -> Basic check, does not limit number of messages we forward inside but a time window.
+        3. We could establish a counter of how many times we can reuse the CNAME before we force-remove it. -> How many retransmissions are we expecting from the cluster?
+        4. Combination of upto max (#2, #3)
+        """
         if alias:
             self._remove_host_alias(host_obj, service_data, query.reputation_resolver)
 
