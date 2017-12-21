@@ -383,7 +383,7 @@ class uStateDNSGroup(container3.ContainerNode):
         print('  >> current:  {}'.format(self.reputation_current))
 
     def merge(self, other):
-        self._logger.info('Merging 2 DNS groups: {} / {}'.format(self, other))
+        self._logger.info('Merging 2 DNS groups: \n{}\n{}'.format(self, other))
         # Combine nodes
         for ipaddr in other.nodes:
             self.nodes.append(ipaddr)
@@ -637,7 +637,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         fqdn = format(query.question[0].name)
         alias = service_data['alias']
 
-        self._logger.info('WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
+        self._logger.debug('WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
 
         # Load available reputation metadata in query object
         self._load_metadata_resolver(query, addr, create=self.PBRA_DNS_LOG_UNTRUSTED)
@@ -659,7 +659,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         if query.transport == 'udp' and self.PBRA_DNS_POLICY_TCPCNAME:
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response / PBRA_DNS_POLICY_TCPCNAME')
+            self._logger.info('Create TRUNCATED response / {}'.format(service_data))
             return response
 
 
@@ -669,14 +669,14 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Ensure spoofed-free communications by triggering TCP requests
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response / PBRA_DNS_POLICY_TCP')
+            self._logger.info('Create TRUNCATED response / {}'.format(service_data))
             return response
 
         # Continue processing with *trusted* DNS query
 
         ## Enforce PBRA_DNS_POLICY_CNAME
         if self.PBRA_DNS_POLICY_CNAME is False:
-            self._logger.info('PBRA_DNS_POLICY_CNAME is not enabled, continue with query processing')
+            self._logger.debug('CNAME policy not enabled / {}'.format(service_data))
             return None
 
         if self.PBRA_DNS_POLICY_CNAME and alias is False:
@@ -705,25 +705,24 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Query is trusted, load/create metadata related to requestor
         self._load_metadata_requestor(query, addr, create=True)
 
+        self._logger.info('WAN SOA detected trusted query for {} / {}'.format(fqdn, service_data))
+
         # Remove alias service in host and update reputation (+1)
         if alias:
             self._remove_host_alias(host_obj, service_data, query.reputation_resolver)
 
-        # Remove timer object
+        # Remove timer object and associated service alias
         timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
         self.remove(timer_obj)
 
         # Evaluate seen IP addresses for this query
         if timer_obj.ipaddr not in query.reputation_resolver.nodes:
             # Merge DNS groups
-            self._logger.debug('Merge DNS groups')
             group1 = query.reputation_resolver
             group2 = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
             self._coalesce_dns_groups(group1, group2)
 
-        self._logger.info('/WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
         return None
-
 
     def _coalesce_dns_groups(self, group1, group2):
         """ Merge two existing DNS groups and update existing DNS host NCID if needed """

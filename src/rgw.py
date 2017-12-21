@@ -105,15 +105,15 @@ def parse_arguments():
                         help='DDNS serving own DHCP server')
 
     # DNS timeout parameters
-    parser.add_argument('--dns-timeout', nargs='+', type=float, default=[0.100, 0.200, 0.200],
+    parser.add_argument('--dns-timeout', nargs='+', type=float, default=[0.100, 0.250, 0.250],
                         help='Default timeouts for DNS resolution (sec)')
-    parser.add_argument('--dns-timeout-a', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-a', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS A resolution (sec)')
-    parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS AAAA resolution (sec)')
-    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS SRV resolution (sec)')
-    parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS NAPTR resolution (sec)')
 
     # Address pool parameters
