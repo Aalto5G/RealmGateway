@@ -20,43 +20,9 @@ import dns.rcode
 from dns.rdataclass import *
 from dns.rdatatype import *
 
-# Control variables
-
-"""
-PBRA_DNS_POLICY_TCPCNAME establishes that allocation are only allowed for CNAMEs via TCP
-If enabled, overrides previous policies: PBRA_DNS_POLICY_TCP and PBRA_DNS_POLICY_CNAME
-"""
-PBRA_DNS_POLICY_TCPCNAME = False
-
-"""
-PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via TCP
-PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
-These policies can be enabled or disabled independently
-"""
-PBRA_DNS_POLICY_TCP   = True
-PBRA_DNS_POLICY_CNAME = True
-
-"""
-PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
-"""
-PBRA_DNS_LOG_UNTRUSTED = True
-
-"""
-PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
-"""
-PBRA_DNS_LOAD_POLICING = True
-
-
+# Reputation and system load
 PBRA_REPUTATION_MIDDLE = 0.45
-
-# Load levels in 100% (Use -1 value to disable step)
-##SYSTEM_LOAD_POLICY    = (load_threshold, reputation_fqdn, reputation_sfqdn)
-SYSTEM_LOAD_VERY_HIGH = (-1, -1, 0.80)
-SYSTEM_LOAD_HIGH      = (-1, 0.75, 0.60)
-SYSTEM_LOAD_MEDIUM    = (-1, 0.50, 0.30)
-SYSTEM_LOAD_LOW       = ( 0, 0, 0)
 SYSTEM_LOAD_ENABLED   = lambda x: x>=0
-
 
 # Keys for uStateDNSResolver
 KEY_DNSNODE_IPADDR  = 10
@@ -444,43 +410,64 @@ class uStateDNSGroup(container3.ContainerNode):
 
 class PolicyBasedResourceAllocation(container3.Container):
     """
-    Develop this class to be triggered from DNSCallback and PacketCallbacks
+    Control variable
+
+    * PBRA_DNS_POLICY_TCPCNAME establishes that allocation are only allowed for CNAMEs via TCP
+        If enabled, overrides previous policies: PBRA_DNS_POLICY_TCP and PBRA_DNS_POLICY_CNAME
+
+    * PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via TCP
+    * PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
+        These two policies can be enabled or disabled independently
+    * PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
+    * PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
+
+    # Load levels in 100% (Use -1 value in load_threshold parameter to disable step)
+    * SYSTEM_LOAD_VERY_HIGH
+    * SYSTEM_LOAD_HIGH
+    * SYSTEM_LOAD_MEDIUM
+    * SYSTEM_LOAD_LOW
+
     """
+
+    # Define default policy control variables
+    PBRA_DNS_POLICY_TCPCNAME  = False
+    PBRA_DNS_POLICY_TCP       = False
+    PBRA_DNS_POLICY_CNAME     = False
+    PBRA_DNS_LOG_UNTRUSTED    = False
+    PBRA_DNS_LOAD_POLICING    = False
+
+    # Define default load threshold levels when PBRA_DNS_LOAD_POLICING is active
+    SYSTEM_LOAD_LOW           = {'load_threshold': 0,  'reputation_fqdn': 0,    'reputation_sfqdn': 0}
+    SYSTEM_LOAD_MEDIUM        = {'load_threshold': 20, 'reputation_fqdn': 0.5,  'reputation_sfqdn': 0.3}
+    SYSTEM_LOAD_HIGH          = {'load_threshold': 60, 'reputation_fqdn': 0.75, 'reputation_sfqdn': 0.6}
+    SYSTEM_LOAD_VERY_HIGH     = {'load_threshold': 80, 'reputation_fqdn': -1,   'reputation_sfqdn': 0.8}
+
+
     def __init__(self, **kwargs):
         """ Initialize as a Container """
         super().__init__('PolicyBasedResourceAllocation')
         # Override attributes
         utils3.set_attributes(self, override=True, **kwargs)
-        self._init_system_load_policy()
+        # Load CircularPool control variables
+        self._init_circularpool_control_variables()
+        # Load CircularPool pre configured DNS groups
         self._init_dns_group_policy()
 
-    def _init_system_load_policy(self):
+    def _init_circularpool_control_variables(self):
         # Initialize System Load Policy threshold values
         cpool_policy = self.datarepository.get_policy_ces('CIRCULARPOOL', None)
 
-        global SYSTEM_LOAD_VERY_HIGH
-        global SYSTEM_LOAD_HIGH
-        global SYSTEM_LOAD_MEDIUM
-        global SYSTEM_LOAD_LOW
+        if cpool_policy is None or 'CONTROL_VARIABLES' not in cpool_policy:
+            self._logger.warning('Using default CONTROL_VARIABLES values')
+            return
 
-        if cpool_policy is None or 'SYSTEM_LOAD_POLICY' not in cpool_policy:
-            self._logger.warning('Using default SYSTEM_LOAD_POLICY values')
-        else:
-            self._logger.warning('Loading SYSTEM_LOAD_POLICY values from policy file')
-            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['VERYHIGH']
-            SYSTEM_LOAD_VERY_HIGH = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
-            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['HIGH']
-            SYSTEM_LOAD_HIGH = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
-            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['MEDIUM']
-            SYSTEM_LOAD_MEDIUM = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
-            data_d = cpool_policy['SYSTEM_LOAD_POLICY']['LOW']
-            SYSTEM_LOAD_LOW = (data_d['load_threshold'], data_d['reputation_fqdn'], data_d['reputation_sfqdn'])
-
-        self._logger.info('SYSTEM_LOAD_POLICY    = (load_threshold, reputation_fqdn, reputation_sfqdn)')
-        self._logger.info('SYSTEM_LOAD_VERY_HIGH = {}'.format(SYSTEM_LOAD_VERY_HIGH))
-        self._logger.info('SYSTEM_LOAD_HIGH      = {}'.format(SYSTEM_LOAD_HIGH))
-        self._logger.info('SYSTEM_LOAD_MEDIUM    = {}'.format(SYSTEM_LOAD_MEDIUM))
-        self._logger.info('SYSTEM_LOAD_LOW       = {}'.format(SYSTEM_LOAD_LOW))
+        # Set all existing values of the policy
+        kwargs = cpool_policy['CONTROL_VARIABLES']
+        utils3.set_attributes(self, override=True, **kwargs)
+        # Show running control variables
+        control_variables = ['PBRA_DNS_POLICY_TCPCNAME', 'PBRA_DNS_POLICY_TCP', 'PBRA_DNS_POLICY_CNAME', 'PBRA_DNS_LOG_UNTRUSTED', 'PBRA_DNS_LOAD_POLICING', 'SYSTEM_LOAD_VERY_HIGH', 'SYSTEM_LOAD_HIGH', 'SYSTEM_LOAD_MEDIUM', 'SYSTEM_LOAD_LOW']
+        for _name in control_variables:
+            self._logger.info('Control variable: {}={}'.format(_name, getattr(self, _name)))
 
     def _init_dns_group_policy(self):
         # Initialize DNS Group Policy with bootstrapping values
@@ -628,7 +615,7 @@ class PolicyBasedResourceAllocation(container3.Container):
     def _dns_preprocess_rgw_wan_soa_event_logging(self, query, alias = False):
         """ Perform event logging based on trustworthiness of DNS query """
         # Log only when pre-conditions are met
-        if PBRA_DNS_LOG_UNTRUSTED is False:
+        if self.PBRA_DNS_LOG_UNTRUSTED is False:
             pass
         elif alias and query.reputation_resolver is not None:
             # Register a trusted event
@@ -653,7 +640,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._logger.info('WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
 
         # Load available reputation metadata in query object
-        self._load_metadata_resolver(query, addr, create=PBRA_DNS_LOG_UNTRUSTED)
+        self._load_metadata_resolver(query, addr, create=self.PBRA_DNS_LOG_UNTRUSTED)
         self._load_metadata_requestor(query, addr, create=False)
 
         # Log untrusted requests
@@ -663,13 +650,13 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Evaluate pre-conditions
 
         # Anti spoofing mechanisms are not enabled, continue with query processing
-        if (PBRA_DNS_POLICY_TCPCNAME, PBRA_DNS_POLICY_TCP, PBRA_DNS_POLICY_CNAME) == (False, False, False):
+        if (self.PBRA_DNS_POLICY_TCPCNAME, self.PBRA_DNS_POLICY_TCP, self.PBRA_DNS_POLICY_CNAME) == (False, False, False):
             self._logger.debug('Anti spoofing mechanisms are not enabled, continue with query processing')
             return None
 
 
         ## Enforce PBRA_DNS_POLICY_TCPCNAME
-        if query.transport == 'udp' and PBRA_DNS_POLICY_TCPCNAME:
+        if query.transport == 'udp' and self.PBRA_DNS_POLICY_TCPCNAME:
             ## Create truncated response
             response = self._policy_tcp(query)
             self._logger.info('Create TRUNCATED response / PBRA_DNS_POLICY_TCPCNAME')
@@ -678,7 +665,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         ## Enforce PBRA_DNS_POLICY_TCP
         ### Applies to UDP queries only
-        if query.transport == 'udp' and PBRA_DNS_POLICY_TCP and alias is False:
+        if query.transport == 'udp' and self.PBRA_DNS_POLICY_TCP and alias is False:
             # Ensure spoofed-free communications by triggering TCP requests
             ## Create truncated response
             response = self._policy_tcp(query)
@@ -688,11 +675,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Continue processing with *trusted* DNS query
 
         ## Enforce PBRA_DNS_POLICY_CNAME
-        if PBRA_DNS_POLICY_CNAME is False:
+        if self.PBRA_DNS_POLICY_CNAME is False:
             self._logger.info('PBRA_DNS_POLICY_CNAME is not enabled, continue with query processing')
             return None
 
-        if PBRA_DNS_POLICY_CNAME and alias is False:
+        if self.PBRA_DNS_POLICY_CNAME and alias is False:
             # BUG: When using Google DNS very quickly, it is remembering the CNAME alias given in prior resolutions
             #      However, the problem is that for some reason our local service_data does not have the alias set, so we recurrently create more and more labels!
 
@@ -714,10 +701,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.info('Create CNAME response / {}'.format(alias_service_data))
             # Return CNAME response
             return response
-
-        # Register a neutral and trusted event
-        #query.reputation_resolver.event_trusted()
-        #query.reputation_resolver.event_neutral()
 
         # Query is trusted, load/create metadata related to requestor
         self._load_metadata_requestor(query, addr, create=True)
@@ -784,7 +767,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         ## Get executing function
         ### Execute best-effort policy if DNS Load Policing is disabled
-        if PBRA_DNS_LOAD_POLICING is False:
+        if self.PBRA_DNS_LOAD_POLICING is False:
             allocated_ipv4 = self._policy_circularpool_low(query, addr, host_obj, service_data, host_ipv4)
             return allocated_ipv4
         else:
@@ -797,23 +780,23 @@ class PolicyBasedResourceAllocation(container3.Container):
         """ Based on current load, return callback function for policy processing """
         # We define up to 4 different levels of system load
 
-        if SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_VERY_HIGH[0]) and \
-          sysload >= SYSTEM_LOAD_VERY_HIGH[0]:
+        if SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_VERY_HIGH['load_threshold']) and \
+          sysload >= self.SYSTEM_LOAD_VERY_HIGH['load_threshold']:
             self._logger.warning('SYSTEM_LOAD_VERY_HIGH ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_veryhigh
 
-        elif SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_HIGH[0]) and \
-          sysload >= SYSTEM_LOAD_HIGH[0]:
+        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_HIGH['load_threshold']) and \
+          sysload >= self.SYSTEM_LOAD_HIGH['load_threshold']:
             self._logger.warning('SYSTEM_LOAD_HIGH ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_high
 
-        elif SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_MEDIUM[0]) and \
-          sysload >= SYSTEM_LOAD_MEDIUM[0]:
+        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_MEDIUM['load_threshold']) and \
+          sysload >= self.SYSTEM_LOAD_MEDIUM['load_threshold']:
             self._logger.info('SYSTEM_LOAD_MEDIUM ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_medium
 
-        elif SYSTEM_LOAD_ENABLED(SYSTEM_LOAD_LOW[0]) and \
-          sysload >= SYSTEM_LOAD_LOW[0]:
+        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_LOW['load_threshold']) and \
+          sysload >= self.SYSTEM_LOAD_LOW['load_threshold']:
             self._logger.debug('SYSTEM_LOAD_LOW ({:.2f}%%)'.format(sysload))
             return self._policy_circularpool_low
 
@@ -849,13 +832,13 @@ class PolicyBasedResourceAllocation(container3.Container):
         _overload   = self._service_is_overloadable(service_data, partial_overload=False)
 
         # 1. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        if _reputation >= SYSTEM_LOAD_VERY_HIGH[2] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_VERY_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, SYSTEM_LOAD_VERY_HIGH[2], _overload, True))
+        if _reputation >= self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'] and _overload is True:
+            self._logger.info('Policy match @ SYSTEM_LOAD_VERY_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'], _overload, True))
             return self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
 
         # Log error violation
         self._logger.info('Policy violation @ SYSTEM_LOAD_VERY_HIGH')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(SYSTEM_LOAD_VERY_HIGH[2], True))
+        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'], True))
         self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
         return None
 
@@ -872,19 +855,19 @@ class PolicyBasedResourceAllocation(container3.Container):
         _overload   = self._service_is_overloadable(service_data, partial_overload=False)
 
         # 1. Minimum reputation is required for allocating new IP address regardless of the service
-        if _reputation >= SYSTEM_LOAD_HIGH[1]:
-            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f}'.format(_reputation, SYSTEM_LOAD_HIGH[1]))
+        if _reputation >= self.SYSTEM_LOAD_HIGH['reputation_fqdn']:
+            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f}'.format(_reputation, self.SYSTEM_LOAD_HIGH['reputation_fqdn']))
             return self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
 
         # 2. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        if _reputation >= SYSTEM_LOAD_HIGH[2] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, SYSTEM_LOAD_HIGH[2], _overload, True))
+        if _reputation >= self.SYSTEM_LOAD_HIGH['reputation_sfqdn'] and _overload is True:
+            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_HIGH['reputation_sfqdn'], _overload, True))
             return self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
 
         # Log error violation
         self._logger.info('Policy violation @ SYSTEM_LOAD_HIGH')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(SYSTEM_LOAD_HIGH[1], False))
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(SYSTEM_LOAD_HIGH[2], True))
+        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_HIGH['reputation_fqdn'], False))
+        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_HIGH['reputation_sfqdn'], True))
         self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
         return None
 
@@ -901,19 +884,19 @@ class PolicyBasedResourceAllocation(container3.Container):
         _overload   = self._service_is_overloadable(service_data, partial_overload=True)
 
         # 1. Minimum reputation is required for allocating new IP address regardless of the service
-        if _reputation >= SYSTEM_LOAD_MEDIUM[1]:
-            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f}'.format(_reputation, SYSTEM_LOAD_MEDIUM[1]))
+        if _reputation >= self.SYSTEM_LOAD_MEDIUM['reputation_fqdn']:
+            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f}'.format(_reputation, self.SYSTEM_LOAD_MEDIUM['reputation_fqdn']))
             return self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
 
         # 2. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port or protocol are not zero
-        if _reputation >= SYSTEM_LOAD_MEDIUM[2] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, SYSTEM_LOAD_MEDIUM[2], _overload, True))
+        if _reputation >= self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'] and _overload is True:
+            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'], _overload, True))
             return self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
 
         # Log error violation
         self._logger.info('Policy violation @ SYSTEM_LOAD_MEDIUM')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(SYSTEM_LOAD_MEDIUM[1], False))
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(SYSTEM_LOAD_MEDIUM[2], True))
+        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_MEDIUM['reputation_fqdn'], False))
+        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'], True))
         self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
         return None
 
@@ -957,7 +940,9 @@ class PolicyBasedResourceAllocation(container3.Container):
         dns_host = query.reputation_requestor
         dns_bind = False
         # Create DNS bound connection if all parameters are available
-        if query.reputation_resolver.sla and dns_host and dns_host.ipaddr:
+        if query.reputation_resolver is None or dns_host is None:
+            dns_bind = False
+        elif query.reputation_resolver.sla and dns_host.ipaddr:
             dns_bind = True
 
         # Continue to creating the connection
