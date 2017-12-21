@@ -986,7 +986,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Add connection to table
         self.connectiontable.add(connection_obj)
         # Log
-        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
+        self._logger.warning('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
         self._logger.debug('New Circular Pool connection: {}'.format(connection_obj))
         return allocated_ipv4
 
@@ -1022,7 +1022,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             return
 
         ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
+        self._logger.warning('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
 
     def _service_is_overloadable(self, service_data, partial_overload=True):
         """ Return True if service is overloadable """
