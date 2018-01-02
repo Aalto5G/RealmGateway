@@ -155,6 +155,10 @@ class uDNSQueryTimer(container3.ContainerNode):
         # Take creation timestamp
         self.timestamp_zero = time.time()
         self.timestamp_eol = self.timestamp_zero + self.timeout
+        # Create DNS cache dictionary (k,v) -> (rdtype, rdata)
+        self.cache = {}
+        # Use a flag
+        self.active = False
 
     def hasexpired(self):
         """ Return True if the timeout has expired """
@@ -591,7 +595,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         if self.has((KEY_DNSHOST_IPADDR, ipaddr_lookupkey)):
             # Get existing object
             dnshost_obj = self.get((KEY_DNSHOST_IPADDR, ipaddr_lookupkey))
-            self._logger.info('Retrieved existing uStateDNSHost for requestor ipaddr={}/{}'.format(meta_ipaddr, meta_mask))
+            self._logger.debug('Retrieved existing uStateDNSHost for requestor ipaddr={}/{}'.format(meta_ipaddr, meta_mask))
 
         elif self.has((KEY_DNSHOST_IPADDR, ipaddr_lookupkey)) is False and create is True:
             self._logger.info('Create uStateDNSHost for requestor ipaddr={}/{}'.format(meta_ipaddr, meta_mask))
@@ -602,7 +606,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         elif self.has((KEY_DNSHOST_NCID, ncid_lookupkey)):
             # Get existing object
             dnshost_obj = self.get((KEY_DNSHOST_NCID, ncid_lookupkey))
-            self._logger.info('Retrieved existing uStateDNSHost for requestor ncid={}@{}'.format(meta_ncid, addr[0]))
+            self._logger.debug('Retrieved existing uStateDNSHost for requestor ncid={}@{}'.format(meta_ncid, addr[0]))
 
         elif self.has((KEY_DNSHOST_NCID, ncid_lookupkey)) is False and create is True:
             self._logger.info('Create uStateDNSHost for requestor ncid={}@{}'.format(meta_ncid, addr[0]))
@@ -628,7 +632,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             query.reputation_resolver.event_untrusted()
 
 
-    def dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
+    def pbra_dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
         """ This function implements section: Tackling real resolutions and reputation for remote server(s) and DNS clusters """
         # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver ?
         # TODO: Implement TCPCNAME or CNAME based on reputation of the sender?
@@ -654,14 +658,12 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.debug('Anti spoofing mechanisms are not enabled, continue with query processing')
             return None
 
-
         ## Enforce PBRA_DNS_POLICY_TCPCNAME
         if query.transport == 'udp' and self.PBRA_DNS_POLICY_TCPCNAME:
             ## Create truncated response
             response = self._policy_tcp(query)
             self._logger.info('Create TRUNCATED response / {}'.format(service_data))
             return response
-
 
         ## Enforce PBRA_DNS_POLICY_TCP
         ### Applies to UDP queries only
@@ -704,27 +706,8 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         self._logger.info('WAN SOA detected trusted query for {} / {}'.format(fqdn, service_data))
 
-        # Remove alias service in host and update reputation (+1)
-        """
-        Source of the bug:
-        The issue is attributed to downward Carrier Grade resolution on the event that this resolution fails for some reason (too long time, socket error, packet loss).
-        Upon receiving the first query that matches the alias, we are currently deleting it (burner, 1 time only). The problem is when a retransmission from the DNS Resolver for the same alias name (CNAMEd) arrives.
-        The matching service in the host, is the generic nested domain, indicating the carriergrade=True and alias=False, so once again we recurrently create more and more labels!
-
-        Potential solution:
-        1. We could associate the CNAME to a DNS Group, the problem is that we may not know the whole population of the group. BAD BAD
-        2. We could establish a flag on the service, whether it was used or not. Upon expiration we can event_ok or event_nok accordingly. -> Basic check, does not limit number of messages we forward inside but a time window.
-        3. We could establish a counter of how many times we can reuse the CNAME before we force-remove it. -> How many retransmissions are we expecting from the cluster?
-        4. Combination of upto max (#2, #3)
-        """
-        if alias:
-            self._remove_host_alias(host_obj, service_data, query.reputation_resolver)
-
-        # Remove timer object and associated service alias
+        # Evaluate seen IP addresses for current FQDN
         timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
-        self.remove(timer_obj)
-
-        # Evaluate seen IP addresses for this query
         if timer_obj.ipaddr not in query.reputation_resolver.nodes:
             # Merge DNS groups
             group1 = query.reputation_resolver
@@ -744,11 +727,70 @@ class PolicyBasedResourceAllocation(container3.Container):
         ## > This requires DNSHost created with NCID to be linked to DNSGroup id
 
 
-    def api_data_newpacket(self, packet):
-        pass
+    def pbra_dns_process_rgw_wan_soa(self, query, addr, host_obj, service_data, host_ipv4):
+        fqdn = format(query.question[0].name)
+        rdtype = query.question[0].rdtype
 
-    def api_dns_circularpool(self, query, addr, host_obj, service_data, host_ipv4):
-        """ Takes in a DNS query for CircularPool... """
+        # Get cached record
+        allocated_ipv4 = self._rgw_cache_get(fqdn, rdtype)
+        if allocated_ipv4 is not None:
+            self._logger.critical('Using cached result {} ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), allocated_ipv4))
+            return allocated_ipv4
+
+        # Evaluate host data service and use appropriate address pool
+        if service_data['proxy_required'] is True:
+            # Resolve via Service Pool
+            self._logger.info('Process {} with ServicePool ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), service_data))
+            allocated_ipv4 =  self._rgw_allocate_servicepool()
+        else:
+            # Resolve via Circular Pool
+            self._logger.info('Process {} with CircularPool ({}) for {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipv4, service_data))
+            # Decision making based on load level(s) and reputation
+            allocated_ipv4 = self._rgw_allocate_circularpool(query, addr, host_obj, service_data, host_ipv4)
+
+        # Create cached record
+        self._rgw_cache_set(fqdn, rdtype, allocated_ipv4)
+        return allocated_ipv4
+
+    def _rgw_cache_get(self, fqdn, rdtype):
+        """ Return an existing cached rdata for an fqdn/rdtype """
+        timer_obj = self.lookup((KEY_TIMER_FQDN, fqdn))
+        if timer_obj is None:
+            # PBRA_DNS_POLICY_CNAME must not be enabled...
+            return None
+        if rdtype not in timer_obj.cache:
+            # A record has not been allocated
+            return None
+
+        # Return cached record
+        allocated_ipv4 = timer_obj.cache[rdtype]
+        return allocated_ipv4
+
+    def _rgw_cache_set(self, fqdn, rdtype, rdata):
+        """ Create a cached rdata for an fqdn/rdtype """
+        timer_obj = self.lookup((KEY_TIMER_FQDN, fqdn))
+        if timer_obj is None:
+            # PBRA_DNS_POLICY_CNAME must not be enabled...
+            return None
+
+        # Set active flag to True to indicate use
+        timer_obj.active = True
+
+        if rdata is None:
+            # A record has not been allocated
+            return
+
+        self._logger.debug('Create cached result {} ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), rdata))
+        timer_obj.cache[rdtype] = rdata
+
+    def _rgw_allocate_servicepool(self):
+        """ Takes in a DNS query for ServicePool """
+        ap_spool = self.pooltable.get('servicepool')
+        allocated_ipv4 = ap_spool.release(ap_spool.allocate())
+        return allocated_ipv4
+
+    def _rgw_allocate_circularpool(self, query, addr, host_obj, service_data, host_ipv4):
+        """ Takes in a DNS query for CircularPool """
         # TODO: Implement logic for policy and reputation checking
 
         # Get Circular Pool policy for host
@@ -1075,23 +1117,20 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Return newly created service_data
         return _service_data
 
-    def _remove_host_alias(self, host_obj, service_data, dnsgroup_obj):
-        # Update reputation values
-        ## Log OK event
-        dnsgroup_obj.event_ok()
-        # Remove alias FQDN service from host
-        host_obj.remove_service(KEY_SERVICE_SFQDN, service_data)
-        # Update lookup keys in host table
-        self.hosttable.updatekeys(host_obj)
-
     def _cb_dnstimer_deleted(self, timer_obj, host_obj):
-        # Log expiration
-        if timer_obj.hasexpired():
-            self._logger.info('Timer expired {}'.format(timer_obj))
-            # Update reputation values. DNS group must exists
-            dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
-            ## Log NOK event
+        # Update reputation values based on timer_obj utilization. DNS group must exists
+        dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
+        if not timer_obj.active:
+            # Timer could not be used. Do not blame any party
+            self._logger.info('[--] Timer expired {}'.format(timer_obj))
+            pass
+        elif len(timer_obj.cache):
+            self._logger.debug('[OK] Timer expired {}'.format(timer_obj))
+            dnsgroup_obj.event_ok()
+        else:
+            self._logger.warning('[KO] Timer expired {}'.format(timer_obj))
             dnsgroup_obj.event_nok()
+
         # Remove alias FQDN service from host
         host_obj.remove_service(KEY_SERVICE_SFQDN, timer_obj.alias_service)
         # Update lookup keys in host table

@@ -179,7 +179,7 @@ class uDNSResolver():
                 self.sock.close()
                 return dns.message.from_wire(dataresponse)
             except asyncio.TimeoutError:
-                logger.info('#{} timeout expired: {:.4f} sec ({})'.format(i, tout, fqdn))
+                logger.debug('#{} timeout expired: {:.4f} sec ({})'.format(i, tout, fqdn))
                 continue
         return None
 
