@@ -315,11 +315,11 @@ class SYNProxyDataplane():
             return rules
         elif ipaddr != '0.0.0.0' and port == '0':
             # Match on IP only
-            rules = [_ for _ in rules if ipaddr == _['dst'] and 'dport' not in _['tcp']]
+            rules = [_ for _ in rules if (dst in _ and ipaddr == _['dst'] and 'dport' not in _['tcp'])]
             return rules
         elif ipaddr != '0.0.0.0' and port != '0':
             # Match on IP and TCP port only
-            rules = [_ for _ in rules if (ipaddr == _['dst'] and 'dport' in _['tcp'] and port == _['tcp']['dport'])]
+            rules = [_ for _ in rules if (dst in _ and ipaddr == _['dst'] and 'dport' in _['tcp'] and port == _['tcp']['dport'])]
             return rules
         else:
             self._logger.error('_fetch_ipt_synproxy_rules{}'.format((ipaddr, proto, port)))
