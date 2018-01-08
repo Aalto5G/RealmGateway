@@ -10,8 +10,8 @@ class DNSProxy(asyncio.DatagramProtocol):
     def __init__(self, soa_list = [], cb_soa = None, cb_nosoa = None):
         self._logger = logging.getLogger('DNSProxy')
         self.soa_list = soa_list
-        self.cb_soa = cb_soa
-        self.cb_nosoa = cb_nosoa
+        self.cb_soa   = cb_soa   if cb_soa   is not None else lambda x,y,z: self.callback_send(x,y,None)
+        self.cb_nosoa = cb_nosoa if cb_nosoa is not None else lambda x,y,z: self.callback_send(x,y,None)
 
     def connection_made(self, transport):
         self._transport = transport
