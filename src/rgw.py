@@ -173,6 +173,10 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
+    ## SYNPROXY information
+    parser.add_argument('--synproxy', nargs=2, default=('127.0.0.1', 12345),
+                        metavar=('IPADDR', 'PORT'),
+                        help='SYNPROXY control endpoint')
     # Operation mode
     parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
@@ -197,10 +201,12 @@ class RealmGateway(object):
         yield from self._init_hosttable()
         # Initialize Connection table
         yield from self._init_connectiontable()
-        # Initialize Policy Based Resource Allocation
-        yield from self._init_pbra()
         # Initialize Network
         yield from self._init_network()
+        # Initialize Policy Based Resource Allocation
+        yield from self._init_pbra()
+        # Initialize PacketCallbacks
+        yield from self._init_packet_callbacks()
         # Initialize DNS
         yield from self._init_dns()
         # Create task: CircularPool cleanup
@@ -268,14 +274,6 @@ class RealmGateway(object):
         self._connectiontable = ConnectionTable()
 
     @asyncio.coroutine
-    def _init_pbra(self):
-        # Create container of Reputation objects
-        self._pbra = PolicyBasedResourceAllocation(pooltable       = self._pooltable,
-                                                   hosttable       = self._hosttable,
-                                                   connectiontable = self._connectiontable,
-                                                   datarepository  = self._datarepository)
-
-    @asyncio.coroutine
     def _init_network(self):
         self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
                                         ipt_cpool_chain  = self._config.ipt_cpool_chain,
@@ -286,7 +284,20 @@ class RealmGateway(object):
                                         ipt_flush        = self._config.ipt_flush,
                                         ips_hosts        = self._config.ips_hosts,
                                         api_url          = self._config.network_api_url,
-                                        datarepository   = self._datarepository)
+                                        datarepository   = self._datarepository,
+                                        synproxy         = self._config.synproxy)
+
+    @asyncio.coroutine
+    def _init_pbra(self):
+        # Create container of Reputation objects
+        self._pbra = PolicyBasedResourceAllocation(pooltable       = self._pooltable,
+                                                   hosttable       = self._hosttable,
+                                                   connectiontable = self._connectiontable,
+                                                   datarepository  = self._datarepository,
+                                                   network         = self._network)
+
+    @asyncio.coroutine
+    def _init_packet_callbacks(self):
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network         = self._network,
                                         connectiontable = self._connectiontable,

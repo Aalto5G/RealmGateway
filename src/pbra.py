@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from functools import partial
@@ -1017,12 +1018,23 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         connection_obj = ConnectionLegacy(**conn_param)
         # Monkey patch delete function for connection object
+        ## TODO: Execute this as a coroutine to yield from synproxy_del_connection ?
         connection_obj.delete = partial(self._cb_connection_deleted, connection_obj)
         # Add connection to table
         self.connectiontable.add(connection_obj)
         # Log
         self._logger.warning('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
         self._logger.debug('New Circular Pool connection: {}'.format(connection_obj))
+
+        # Synchronize connection with SYNPROXY module
+        ## TODO: Get TCP options policy from host
+        tcpmss = 1360
+        tcpsack = 1
+        tcpwscale = 1
+        # Do this in parallel ?
+        asyncio.async(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
+
+        # Return the allocated address
         return allocated_ipv4
 
     def _cb_connection_deleted(self, conn):

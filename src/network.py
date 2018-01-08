@@ -73,6 +73,8 @@ class Network(object):
     def __init__(self, name='Network', **kwargs):
         self._logger = logging.getLogger(name)
         utils3.set_attributes(self, **kwargs)
+        # Get event loop
+        self.loop = asyncio.get_event_loop()
         # Initialize nfqueues list
         self._nfqueues = []
         # Configure MARKDNAT
@@ -87,6 +89,8 @@ class Network(object):
         self.rest_api_init()
         # Create OpenvSwitch
         self.ovs_create()
+        # Create SYNPROXY instance
+        self.synproxy_create()
 
     def ips_init(self):
         data_d = self.datarepository.get_policy_ces('IPSET', {})
@@ -407,21 +411,6 @@ class Network(object):
         # Use new batch functions
         iptc_helper3.batch_delete_rules('filter', rules_batch, ipv6=False)
 
-    '''
-        ### Not in use since the addition of batch processing ###
-
-    def _ipt_create_chain(self, table, chain, flush = False):
-        # Create and flush to ensure an empty table
-        iptc_helper3.add_chain(table, chain, ipv6=False)
-        if flush:
-            iptc_helper3.flush_chain(table, chain, ipv6=False, silent=True)
-
-    def _ipt_remove_chain(self, table, chain):
-        # Flush and delete to ensure the table is removed
-        iptc_helper3.flush_chain(table, chain, silent=True, ipv6=False)
-        iptc_helper3.delete_chain(table, chain, silent=True, ipv6=False)
-    '''
-
     def _ipt_xlat_rule(self, chain, rule):
         ret = dict(rule)
         # Translate direction value into packet mark
@@ -705,6 +694,114 @@ class Network(object):
             data['match']['ip_dscp'] = OVS_DIFFSERV_MARK
         yield from self.rest_api.do_post(url_delete, json.dumps(data))
 
+
+    def synproxy_create(self):
+        self._logger.info('Create SYNPROXY connection')
+        # Create connection to SYNPROXY
+        asyncio.async(self._synproxy_create())
+
+    @asyncio.coroutine
+    def _synproxy_create(self):
+        # Initialize object
+        self.synproxy_sock = None
+        # Create TCP socket
+        sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setblocking(False)
+
+        while True:
+            try:
+                # Connect TCP socket
+                self._logger.debug('Initiating connection to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
+                #yield from asyncio.wait_for(loop.sock_connect(sock, (self.synproxy[0], self.synproxy[1])), timeout=5)
+                yield from self.loop.sock_connect(sock, (self.synproxy[0], self.synproxy[1]))
+                self._logger.info('Connected to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
+                break
+            except Exception as e:
+                self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
+                yield from asyncio.sleep(5)
+
+        # Set socket object
+        self.synproxy_sock = sock
+
+
+    @asyncio.coroutine
+    def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        success = yield from self._synproxy_sendrecv('mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        if success:
+            self._logger.info('Successfully added connection to SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+        else:
+            self._logger.warning('Failed to add connection to SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+
+    @asyncio.coroutine
+    def synproxy_del_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        if success:
+            self._logger.info('Successfully deleted connection from SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+        else:
+            self._logger.warning('Failed to delete connection from SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+
+    @asyncio.coroutine
+    def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        if self.synproxy_sock is None:
+            return False
+
+        try:
+            msg = self._synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+            self._logger.debug('Sending control message <{}>'.format(msg))
+            yield from self.loop.sock_sendall(self.synproxy_sock, msg)
+            self._logger.debug('Waiting for response...')
+            data = yield from asyncio.wait_for(self.loop.sock_recv(self.synproxy_sock, 2), timeout=1)
+            # Evaluate response
+            if data == b'1\n':
+                return True
+            elif data == b'0\n':
+                return False
+        except:
+            # TODO: Currently, we do not handle re-connection to socket
+            self._logger.info('SYNPROXY connection failed, initiate reconnection... ?')
+            #self.synproxy_sock.close()
+            self.synproxy_sock = None
+            #asyncio.async(self._synproxy_create())
+            return False
+
+
+    def _synproxy_build_message(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        """
+        Build and return synchronization message
+
+        Message structure:
+          - 32 bits: IPv4 address
+          - 16 bits: Port number
+          - 8  bits: Protocol
+          - 8  bits: Flags
+          - 16 bits: TCP MSS value
+          - 8  bits: TCP SACK value [0,1]
+          - 8  bits: TCP window scaling value [0-14]
+        """
+        # Build flags
+        flags = 0
+        if mode == 'flush':
+            flags |= 0b0000001
+            tcpmss = 0
+            tcpsack = 0
+            tcpwscale = 0
+            port = 0
+            proto = 0
+        elif mode == 'add':
+            flags |= 0b0000010
+        elif mode == 'mod':
+            flags |= 0b0000100
+        elif mode == 'del':
+            flags |= 0b0001000
+            tcpmss = 0
+            tcpsack = 0
+            tcpwscale = 0
+        # Pack message
+        msg = socket.inet_pton(socket.AF_INET, ipaddr) + struct.pack('!HBBHBB', port, proto, flags, tcpmss, tcpsack, tcpwscale)
+        # Return built message
+        return msg
 
 '''
 # Create OpenvSwitch for CES data tunnelling
