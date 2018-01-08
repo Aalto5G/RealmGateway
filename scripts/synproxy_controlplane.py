@@ -62,6 +62,7 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, co
     # Create TCP socket
     sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     sock.setblocking(False)
     # Connect TCP socket
     logger.info('Initiating connection to <{}:{}>'.format(ipaddr, port))
