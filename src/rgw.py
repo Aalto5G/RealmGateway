@@ -168,6 +168,11 @@ def parse_arguments():
                         metavar=('FOLDERNAME'),
                         help='Configuration folder with local policy information')
 
+    ## SYNPROXY information
+    parser.add_argument('--synproxy', nargs=2, default=('127.0.0.1', 12345),
+                        metavar=('IPADDR', 'PORT'),
+                        help='SYNPROXY control endpoint')
+
     # Operation mode
     parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
@@ -265,7 +270,8 @@ class RealmGateway(object):
                                         ipt_flush        = self._config.ipt_flush,
                                         ips_hosts        = self._config.ips_hosts,
                                         api_url          = self._config.network_api_url,
-                                        datarepository   = self._datarepository)
+                                        datarepository   = self._datarepository,
+                                        synproxy         = self._config.synproxy)
         # Create object for storing all PacketIn-related information
         self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
         # Register NFQUEUE(s) callback

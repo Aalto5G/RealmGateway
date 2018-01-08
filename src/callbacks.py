@@ -413,7 +413,7 @@ class DNSCallbacks(object):
             _service_data = service_data
 
         # Get service data based on host FQDN
-        conn = self._create_connectionentryrgw(host_obj, _rdata, addr[0], None, fqdn, _service_data)
+        conn = yield from self._create_connectionentryrgw(host_obj, _rdata, addr[0], None, fqdn, _service_data)
 
         if not conn:
             # Failed to allocate an address - Drop DNS Query
@@ -490,7 +490,7 @@ class DNSCallbacks(object):
             ap_spool.release(allocated_ipv4)
         elif self._check_policyrgw(host_obj, addr[0], None):
             self._logger.debug('Use CircularPool address pool for {}'.format(fqdn))
-            conn = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
+            conn = yield from self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
             if conn:
                 allocated_ipv4 = conn.outbound_ip
 
@@ -517,7 +517,7 @@ class DNSCallbacks(object):
             ap_spool.release(allocated_ipv4)
         elif self._check_policyrgw(host_obj, addr[0], None):
             self._logger.debug('Use CircularPool address pool for {}'.format(fqdn))
-            conn = self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
+            conn = yield from self._create_connectionentryrgw(host_obj, host_obj.ipv4, addr[0], None, fqdn, service_data)
             if conn:
                 allocated_ipv4 = conn.outbound_ip
 
@@ -593,6 +593,7 @@ class DNSCallbacks(object):
         # No policy has been exceeded
         return True
 
+    @asyncio.coroutine
     def _create_connectionentryrgw(self, host_obj, host_ipaddr, dns_server_ip, dns_client_ip, fqdn, service_data):
         """ Return the created connection or None """
         allocated_ipv4 = None
@@ -619,12 +620,22 @@ class DNSCallbacks(object):
                       'timeout': service_data.setdefault('timeout', 0)}
         new_conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function
+        ## TODO: Execute this as a coroutine to yield from synproxy_del_connection ?
         new_conn.delete = partial(self._delete_connectionentryrgw, new_conn)
         # Add connection to table
         self.connectiontable.add(new_conn)
         # Log
         self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, new_conn.timeout*1000))
         self._logger.info('New Circular Pool connection: {}'.format(new_conn))
+
+        # Synchronize connection with SYNPROXY module
+        ## TODO: Get TCP options policy from host
+        tcpmss = 1360
+        tcpsack = 1
+        tcpwscale = 1
+        yield from self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale)
+
+        # Return new connection object
         return new_conn
 
     def _overload_connectionentryrgw(self, port, protocol):
