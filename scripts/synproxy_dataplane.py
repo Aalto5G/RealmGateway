@@ -176,7 +176,7 @@ class SYNProxyDataplane():
                    'sysctl -w net.ipv4.tcp_timestamps=1',
                    'sysctl -w net.netfilter.nf_conntrack_tcp_loose=0']
         for _ in to_exec:
-            self._do_subprocess_call(_, raise_exc = True, silent = True)
+            self._do_subprocess_call(_, raise_exc = False, silent = True)
 
 
         ## Restart OpenvSwitch service
@@ -188,7 +188,7 @@ class SYNProxyDataplane():
         to_exec = ['ovs-vsctl --if-exists del-br br-synproxy',
                    'ovs-vsctl             add-br br-synproxy']
         for _ in to_exec:
-            self._do_subprocess_call(_, raise_exc = False, silent = False)
+            self._do_subprocess_call(_, raise_exc = True, silent = False)
 
         ## Add ports
         to_exec = ['ovs-vsctl add-port br-synproxy {0}  -- set interface {0}  ofport_request=1'.format(self.nic_wan),
