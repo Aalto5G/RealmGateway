@@ -12,7 +12,7 @@ from helpers_n_wrappers import utils3
 from helpers_n_wrappers import iptc_helper3
 from helpers_n_wrappers import iproute2_helper3
 from helpers_n_wrappers import aiohttp_client
-from nfqueue3 import NFQueue3
+from helpers_n_wrappers import nfqueue3
 
 from global_variables import RUNNING_TASKS
 
@@ -252,7 +252,7 @@ class Network(object):
 
     def ipt_register_nfqueues(self, cb, *cb_args, **cb_kwargs):
         for queue in self.ipt_cpool_queue:
-            self._nfqueues.append(NFQueue3(queue, cb, *cb_args, **cb_kwargs))
+            self._nfqueues.append(nfqueue3.NFQueue3(queue, cb, *cb_args, **cb_kwargs))
 
     def ipt_deregister_nfqueues(self):
         for nfqueueObj in self._nfqueues:
