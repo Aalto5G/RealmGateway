@@ -20,8 +20,9 @@ import socket
 import struct
 import subprocess
 import sys
+from contextlib import suppress
 
-from helpers_n_wrappers import iptc_helper3, iproute2_helper3
+from helpers_n_wrappers import iptc_helper3, container3
 
 
 def synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
@@ -63,7 +64,7 @@ def synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale
 
 def synproxy_parse_message(data):
     """ Return tuple (mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale) """
-    if len(data)!= 12:
+    if len(data) != 12:
         raise Exception('wrong message')
 
     # Unpack IP address
@@ -92,27 +93,56 @@ def synproxy_parse_message(data):
     return (mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
 
 
+class SYNProxyConnectionTCP(container3.ContainerNode):
+    def __init__(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, ipt_rule):
+        self.ipaddr = ipaddr
+        self.port = port
+        self.proto = proto
+        self.tcpmss = tcpmss
+        self.tcpsack = tcpsack
+        self.tcpwscale = tcpwscale
+        # Add rule object to minimize Netlink load
+        self.ipt_rule = ipt_rule
+
+    def lookupkeys(self):
+        """ Return the lookup keys of the node. """
+        # Create 3-tuple and 1-tuple (IP-based) matches
+        return (((self.ipaddr, self.port, self.proto), True), (self.ipaddr, False))
+
+    def dump(self):
+        """ Return a string representation of the node. """
+        return '[{}] {}:{} / mss={} sack={} wscale={}'.format(self.proto, self.ipaddr, self.port, self.tcpmss, self.tcpsack, self.tcpwscale)
+
+    def __repr__(self):
+        return self.dump()
+
+
 class SYNProxyDataplane():
     def __init__(self, **kwargs):
         self._logger = logging.getLogger('SYNProxyDataplane')
-
+        # Store local parameters
         self.nic_wan  = kwargs['nic_wan']
         self.nic_wanp = kwargs['nic_wanp']
         self.default_gw = kwargs['default_gw']
-
+        # Create a connection table to store the rules
+        self.connectiontable = container3.Container(name='ConnectionTable')
+        # Continue with bootstrapping actions
         self.ovs_create()
         self.ovs_init_flows()
         self.ipt_init_flows()
 
+        # Start monitor task
+        self.tasks = []
+        _t = asyncio.ensure_future(self.monitor(10))
+        self.tasks.append(_t)
+
         # Run in standalone mode with default flow
         if kwargs['standalone']:
-            # Build full rule
-            rule_d = self._build_ipt_synproxy_rule('0.0.0.0', 6, 0, kwargs['tcpmss'], kwargs['tcpsack'], kwargs['tcpwscale'])
-            iptc_helper3.add_rule('filter', 'synproxy_chain', rule_d, position=1, ipv6=False)
-            self._logger.info('Insert default SYNPROXY rule {}'.format(rule_d))
+            self._logger.info('Standalone more active, insert default rule')
+            self._do_mod('0.0.0.0', 0, 6, kwargs['tcpmss'], kwargs['tcpsack'], kwargs['tcpwscale'])
 
-
-    def close(self):
+    @asyncio.coroutine
+    def shutdown(self):
         self._logger.warning('Removing OpenvSwitch instance')
 
         ## Delete OVS bridge
@@ -124,6 +154,12 @@ class SYNProxyDataplane():
         to_exec = ['systemctl restart openvswitch-switch']
         for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = True, silent = False)
+
+        ## Cancel running tasks
+        for _task in self.tasks:
+            with suppress(asyncio.CancelledError):
+                del _task
+                yield from asyncio.sleep(1)
 
 
     def ovs_create(self):
@@ -182,7 +218,7 @@ class SYNProxyDataplane():
 
 
     def ovs_init_flows(self):
-        self._logger.info('Install OpenvSwitch flows for transparent SYNProxy data forwarding')
+        self._logger.info('Initialize OpenvSwitch flows')
 
         ## Create basic table architecture
         to_exec = ['ovs-ofctl del-flows -O OpenFlow13 br-synproxy',
@@ -221,19 +257,11 @@ class SYNProxyDataplane():
 
     def ipt_init_flows(self):
         # Specific TCP flows are inserted/appended to filter.synproxy_chain """
-        self._logger.info('Install iptables flows for transparent SYNProxy data forwarding')
+        self._logger.info('Initialize iptables chains and rules')
 
         # Add custom chains
         iptc_helper3.add_chain('raw', 'synproxy_chain', ipv6=False, silent=True)
         iptc_helper3.add_chain('filter', 'synproxy_chain', ipv6=False, silent=True)
-
-        # Sanitize ipset creation
-        if iproute2_helper3.ipset_exists('circularpool'):
-            iproute2_helper3.ipset_destroy('circularpool')
-        iproute2_helper3.ipset_create('circularpool', stype='hash:ip')
-
-        # Populate ipsets
-        #iproute2_helper3.ipset_add('circularpool',ipaddr, etype='ip')
 
         # Flush chains
         iptc_helper3.flush_chain('raw', 'PREROUTING', ipv6=False, silent=False)
@@ -260,6 +288,37 @@ class SYNProxyDataplane():
         iptc_helper3.add_rule('filter', 'synproxy_chain', rule_d, position=0, ipv6=False)
 
 
+    def process_message(self, data, addr):
+        # Parse received message
+        mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale = synproxy_parse_message(data)
+        self._logger.debug('Data received from {}: {}'.format(addr, (mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+        # Evaluate mode
+        if mode == 'flush':
+            ret = self._do_flush(ipaddr)
+        elif mode == 'add':
+            ret = self._do_add(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        elif mode == 'mod':
+            ret = self._do_mod(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        elif mode == 'del':
+            ret = self._do_del(ipaddr, port, proto)
+        # Return result
+        if ret:
+            return b'1\n'
+        else:
+            return b'0\n'
+
+    @asyncio.coroutine
+    def monitor(self, interval):
+        """ Monitoring service to display periodic information """
+        self._logger.info('Monitoring connection table state every {} sec'.format(interval))
+        while True:
+            connections = self.connectiontable.getall()
+            nof_connections = len(connections)
+            self._logger.info('There are currently {} connection(s)'.format(nof_connections))
+            if nof_connections:
+                self._logger.info('\n'.join('\t#{}. {}'.format(_i+1, _c) for _i, _c in enumerate(connections)))
+            yield from asyncio.sleep(interval)
+
     def _do_subprocess_call(self, command, raise_exc = True, silent = False):
         try:
             self._logger.debug('System call: {}'.format(command))
@@ -277,7 +336,7 @@ class SYNProxyDataplane():
             return False
 
 
-    def _build_ipt_synproxy_rule(self, ipaddr, proto, port, tcpmss, tcpsack, tcpwscale):
+    def _build_ipt_synproxy_rule(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
         # Adjust parameters
         if ipaddr == '0.0.0.0':
             ipaddr = '0.0.0.0/0'
@@ -296,103 +355,124 @@ class SYNProxyDataplane():
         rule_d['target']['SYNPROXY']['wscale'] = str(tcpwscale)
         if tcpsack:
             rule_d['target']['SYNPROXY']['sack-perm'] = ''
-
+        # Return rule
         return rule_d
 
 
-    def _fetch_ipt_synproxy_rules(self, ipaddr, proto, port):
-        # Normalize to string due to library requirements
-        proto, port = str(proto), str(port)
-
-        # Get all SYNPROXY rules
-        _unfiltered = iptc_helper3.dump_chain('filter', 'synproxy_chain', ipv6=False)
-        rules = [_ for _ in _unfiltered if 'SYNPROXY' in _['target']]
-        #self._logger.debug('_fetch_ipt_synproxy_rules{}\n\t{}'.format((ipaddr, proto, port), rules))
-
-        # Use a 3 tuple match to define the flow
+    def _do_flush(self, ipaddr):
+        # Flush connections based on IP address
         if ipaddr == '0.0.0.0':
-            # Do not match proto or port
-            return rules
-        elif ipaddr != '0.0.0.0' and port == '0':
-            # Match on IP only
-            rules = [_ for _ in rules if (dst in _ and ipaddr == _['dst'] and 'dport' not in _['tcp'])]
-            return rules
-        elif ipaddr != '0.0.0.0' and port != '0':
-            # Match on IP and TCP port only
-            rules = [_ for _ in rules if (dst in _ and ipaddr == _['dst'] and 'dport' in _['tcp'] and port == _['tcp']['dport'])]
-            return rules
+            connections = self.connectiontable.getall()
+        elif self.connectiontable.has(ipaddr):
+            connections = self.connectiontable.get(ipaddr)
         else:
-            self._logger.error('_fetch_ipt_synproxy_rules{}'.format((ipaddr, proto, port)))
+            # Nothing to do here
+            self._logger.debug('[flush] No connection(s) found for ipaddr={}'.format(ipaddr))
+            return False
 
-        return rules
+        # We need a new iterable not to modify on the fly the set/list of connections
+        _connections = list(connections)
 
+        # Optimize for batch mode?
+        BATCH = True
+        if BATCH:
+            for connection in _connections:
+                self._logger.info('Flush connection: {}'.format(connection))
+                self.connectiontable.remove(connection, callback=False)
 
-    def process_message(self, data, addr):
-        #self._logger.debug('Data received from {}: {}'.format(data, addr))
-        mode, ipaddr, proto, port, tcpmss, tcpsack, tcpwscale = synproxy_parse_message(data)
-        self._logger.info('Data received from {}: {}'.format(addr, (mode, ipaddr, proto, port, tcpmss, tcpsack, tcpwscale)))
-        # Build rule lookup key
-        lookup_key = (ipaddr, proto, port)
-        rule_matches = self._fetch_ipt_synproxy_rules(*lookup_key)
+            batch_rules = [('synproxy_chain', _c.ipt_rule) for _c in _connections]
+            iptc_helper3.batch_begin(table='filter', ipv6=False)
+            iptc_helper3.batch_delete_rules('filter', batch_rules, ipv6=False, silent=True)
+            iptc_helper3.batch_end(table='filter', ipv6=False)
 
-        if mode == 'flush':
-            for rule_d in rule_matches:
-                self._logger.info('Deleting rule: {}'.format(rule_d))
-                iptc_helper3.delete_rule('filter', 'synproxy_chain', rule_d, ipv6=False, silent=False)
-            return b'1\n'
+        else:
+            for connection in _connections:
+                self._logger.info('Flush connection: {}'.format(connection))
+                self.connectiontable.remove(connection, callback=False)
+                iptc_helper3.delete_rule('filter', 'synproxy_chain', connection.ipt_rule, ipv6=False, silent=True)
 
-        elif mode == 'add':
-            if len(rule_matches) > 0:
-                self._logger.info('Failed to add rule, already exists: {} / {}'.format(lookup_key, rule_matches))
-                return b'0\n'
+        return True
 
-            # Define inserting position based on n-tuple match
-            if ipaddr != '0.0.0.0' and port != 0:
-                position = 1
-            elif ipaddr != '0.0.0.0':
-                position = -2
-            else:
-                position = -3
-            # Build full rule
-            rule_d = self._build_ipt_synproxy_rule(ipaddr, proto, port, tcpmss, tcpsack, tcpwscale)
-            iptc_helper3.add_rule('filter', 'synproxy_chain', rule_d, position=position, ipv6=False)
-            return b'1\n'
+    def _do_add(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        # Add a connection based on given parameters
+        # Define inserting position based on n-tuple match
+        if ipaddr != '0.0.0.0' and port != 0:
+            # 3-tuple connection, higher priority
+            pos = 1
+        elif ipaddr != '0.0.0.0' and port == 0:
+            # 3-tuple connection with wildcard port, higher priority than default
+            pos = -3
+        elif ipaddr == '0.0.0.0':
+            # Default connection, lowest priority
+            pos = -2
+        else:
+            raise Exception('Unsupported! {}'.format(ipaddr, proto, port, tcpmss, tcpsack, tcpwscale))
 
-        elif mode == 'mod':
-            if len(rule_matches) == 0:
-                # Continue as add
-                # Define inserting position based on n-tuple match
-                if ipaddr != '0.0.0.0' and port != 0:
-                    position = 1
-                elif ipaddr != '0.0.0.0':
-                    position = -2
-                else:
-                    position = -3
+        if self.connectiontable.has((ipaddr, port, proto)):
+            connection = self.connectiontable.get((ipaddr, port, proto))
+            self._logger.debug('[add] Conflict exists for {} / {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale), connection))
+            return False
 
-                # Build full rule
-                rule_d = self._build_ipt_synproxy_rule(ipaddr, proto, port, tcpmss, tcpsack, tcpwscale)
-                iptc_helper3.add_rule('filter', 'synproxy_chain', rule_d, position=position, ipv6=False)
-                return b'1\n'
+        # Create iptables rule and connection object
+        ipt_rule = self._build_ipt_synproxy_rule(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        connection = SYNProxyConnectionTCP(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, ipt_rule)
+        self.connectiontable.add(connection)
+        # Insert rule at precise position
+        self._logger.info('Add connection: {}'.format(connection))
+        iptc_helper3.add_rule('filter', 'synproxy_chain', ipt_rule, position=pos, ipv6=False)
+        return True
 
-            elif len(rule_matches) == 1:
-                # Build full rule
-                rule_d = self._build_ipt_synproxy_rule(ipaddr, proto, port, tcpmss, tcpsack, tcpwscale)
-                old_rule_d = rule_matches[0]
-                iptc_helper3.replace_rule('filter', 'synproxy_chain', old_rule_d, rule_d, ipv6=False)
-                return b'1\n'
+    def _do_mod(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        # Modify a connection based on given parameters
+        # Define inserting position based on n-tuple match
+        if ipaddr != '0.0.0.0' and port != 0:
+            # 3-tuple connection, higher priority
+            pos = 1
+        elif ipaddr != '0.0.0.0' and port == 0:
+            # 3-tuple connection with wildcard port, higher priority than default
+            pos = -3
+        elif ipaddr == '0.0.0.0':
+            # Default connection, lowest priority
+            pos = -2
+        else:
+            raise Exception('Unsupported! {}'.format(ipaddr, proto, port, tcpmss, tcpsack, tcpwscale))
 
-            else:
-                self._logger.info('Failed to mod rule, conflict exists: {} / {}'.format(lookup_key, rule_matches))
-                return b'0\n'
+        if self.connectiontable.has((ipaddr, port, proto)):
+            connection = self.connectiontable.get((ipaddr, port, proto))
+            # Check if the existing parameters are the same
+            if connection.tcpmss == tcpmss and connection.tcpsack == tcpsack and connection.tcpwscale == tcpwscale:
+                self._logger.debug('[mod] Modify not required : {} / {}'.format(connection, (tcpmss, tcpsack, tcpwscale)))
+                return True
+            # Create iptables rule and update connection object
+            old_ipt_rule = connection.ipt_rule
+            new_ipt_rule = self._build_ipt_synproxy_rule(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+            self._logger.info('Modify connection: {} / {}'.format(connection, (tcpmss, tcpsack, tcpwscale)))
+            connection.ipt_rule = new_ipt_rule
+            # Replace rule
+            iptc_helper3.replace_rule('filter', 'synproxy_chain', old_ipt_rule, new_ipt_rule, ipv6=False)
+        else:
+            # Create iptables rule and connection object
+            ipt_rule = self._build_ipt_synproxy_rule(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+            connection = SYNProxyConnectionTCP(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, ipt_rule)
+            self.connectiontable.add(connection)
+            # Insert rule at precise position
+            self._logger.info('Add connection: {}'.format(connection))
+            iptc_helper3.add_rule('filter', 'synproxy_chain', ipt_rule, position=pos, ipv6=False)
 
-        elif mode == 'del':
-            if len(rule_matches) != 1:
-                self._logger.info('Failed to mod rule, conflict exists: {} / {}'.format(lookup_key, rule_matches))
-                return b'0\n'
+        return True
 
-            old_rule_d = rule_matches[0]
-            iptc_helper3.delete_rule('filter', 'synproxy_chain', old_rule_d, ipv6=False, silent=False)
-            return b'1\n'
+    def _do_del(self, ipaddr, port, proto):
+        # Delete a connection based on given parameters
+        if not self.connectiontable.has((ipaddr, port, proto)):
+            # Nothing to do here
+            self._logger.debug('[del] No connection found for key={}'.format((ipaddr, port, proto)))
+            return False
+
+        connection = self.connectiontable.get((ipaddr, port, proto))
+        self._logger.info('Delete connection: {}'.format(connection))
+        self.connectiontable.remove(connection, callback=False)
+        iptc_helper3.delete_rule('filter', 'synproxy_chain', connection.ipt_rule, ipv6=False, silent=True)
+        return True
 
 
 class SYNProxyDataplaneEndpoint(asyncio.Protocol):
@@ -430,11 +510,13 @@ class SYNProxyDataplaneEndpoint(asyncio.Protocol):
             return ''
 
     def data_received(self, data):
-        data = self._read_from_buffer(data)
-        if not data:
-            return
-        response = self.cb(data, self.raddr)
-        self._transport.write(response)
+        # Add data to buffer and extract up to one message
+        _data = self._read_from_buffer(data)
+        # Process messages in a loop while there is data in the buffer
+        while _data:
+            response = self.cb(_data, self.raddr)
+            self._transport.write(response)
+            _data = self._read_from_buffer(b'')
 
 
 def validate_arguments(args):
@@ -491,7 +573,6 @@ def parse_arguments():
     parser.add_argument('--default-gw', action='store_true',
                         help='Add default gateway route')
 
-
     args = parser.parse_args()
     validate_arguments(args)
     return args
@@ -515,40 +596,81 @@ if __name__ == '__main__':
                                      tcpwscale = args.default_tcpwscale,
                                      default_gw = args.default_gw
                                      )
-    coro = loop.create_server(lambda: SYNProxyDataplaneEndpoint(cb = synproxy_obj.process_message),
-                              host=args.ipaddr, port=args.port, reuse_address=True)
+    cb = synproxy_obj.process_message
+    coro = loop.create_server(lambda: SYNProxyDataplaneEndpoint(cb = cb),
+                              host=args.ipaddr,
+                              port=args.port,
+                              reuse_address=True)
 
     try:
         server = loop.run_until_complete(coro)
         loop.run_forever()
     except KeyboardInterrupt:
-        pass
+        loop.run_until_complete(synproxy_obj.shutdown())
 
     server.close()
-    synproxy_obj.close()
-    logger.warning('Bye!')
     loop.close()
+    logger.warning('Bye!')
     sys.exit(0)
 
 
 '''
-
 How to create test flows from sibling synproxy_controlplane.py script
 
-# Flush
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 1.1.1.1 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
+TESTS
 
-# Add
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add --conn-dstaddr 1.1.1.1 --conn-dstport 0 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add --conn-dstaddr 1.1.1.1 --conn-dstport 0 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
+#1 - Flush all - OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
 
+#2 - Flush all twice - OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
 
-# Mod
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode mod --conn-dstaddr 1.1.1.1 --conn-dstport 0 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add --conn-dstaddr 1.1.1.1 --conn-dstport 22 --conn-tcpmss 536 --conn-tcpsack 0 --conn-tcpwscale 1
+#3 - Flush all then flush IP address - OK/NOK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 1.1.1.1
 
-# Del
-./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode del --conn-dstaddr 1.1.1.1 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
+#4 - Flush all then add default connection - OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 0.0.0.0 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#5 - Flush all then add default connection twice - OK/OK/NOK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 0.0.0.0 --conn-proto 6 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 0.0.0.0 --conn-proto 6 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#6 - Flush all then add default connection then modify - OK/OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 0.0.0.0 --conn-proto 6 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode mod   --conn-dstaddr 0.0.0.0 --conn-proto 6 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#7 - Flush all then add default connection then modify - OK/OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode mod   --conn-dstaddr 0.0.0.0 --conn-proto 6 --conn-dstport 0  --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#8 - Flush all then add default connection then delete - OK/OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode del   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#9 - Flush all then add default connection then delete NOK - OK/OK/NOK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode del   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 0  --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+
+#10 - Flush all then add default connection then delete NOK - OK/OK/OK/OK/OK
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 23 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 24 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 7
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 1.1.1.1
+
+# 11 - Add in benchmark mode
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 1 --conn-tcpmss  536 --conn-tcpsack 1 --conn-tcpwscale 1 --benchmark --benchmark-seq 1 --benchmark-iter 5000 #4000 ops
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 1 --conn-tcpmss  536 --conn-tcpsack 1 --conn-tcpwscale 1 --benchmark --benchmark-seq 1 --benchmark-iter 500  #330  ops
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add   --conn-dstaddr 1.1.1.1 --conn-proto 6 --conn-dstport 1 --conn-tcpmss  536 --conn-tcpsack 1 --conn-tcpwscale 1 --benchmark --benchmark-seq 1 --benchmark-iter 5000 #115  ops
+./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0                                                                                        --benchmark --benchmark-seq 1 --benchmark-iter 1
 
 '''
+
