@@ -6,7 +6,7 @@ test.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
-        - {max: 100 }
+        max: 100
     CARRIERGRADE:
         - {ipv4: 192.168.0.100}
         - {ipv4: 192.168.0.10}

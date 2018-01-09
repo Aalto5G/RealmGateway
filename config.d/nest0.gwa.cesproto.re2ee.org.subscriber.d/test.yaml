@@ -1,6 +1,6 @@
-test.nest0.gwa.demo.:
+test.nest0.gwa.cesproto.re2ee.org.:
     ID:
-        fqdn:   ['test.nest0.gwa.demo.']
+        fqdn:   ['test.nest0.gwa.cesproto.re2ee.org.']
         ipv4:   ['192.168.10.100']
         msisdn: ['0000010100']
     GROUP:
@@ -13,18 +13,18 @@ test.nest0.gwa.demo.:
         - {ipv4: 192.168.10.11}
         - {ipv4: 192.168.10.12}
     SFQDN:
-        - {fqdn:          'test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false                             }
-        - {fqdn:      'www.test.nest0.gwa.demo.',  proxy_required: true , carriergrade: false                             }
-        - {fqdn:      'sip.test.nest0.gwa.demo.',  proxy_required: true , carriergrade: false                             }
-        - {fqdn:     'icmp.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
-        - {fqdn:     'ping.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
-        - {fqdn:      'tcp.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 0    }
-        - {fqdn:      'udp.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 0    }
-        - {fqdn:     'sctp.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 0    }
-        - {fqdn:      'ssh.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
-        - {fqdn:  'tcp1234.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 1234 }
-        - {fqdn:  'udp1234.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234, loose_packet: 3 }
-        - {fqdn: 'sctp1234.test.nest0.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
+        - {fqdn:          'test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:      'sip.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:     'icmp.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
+        - {fqdn:     'ping.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
+        - {fqdn:      'tcp.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 0    }
+        - {fqdn:      'udp.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 0    }
+        - {fqdn:     'sctp.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 0    }
+        - {fqdn:      'ssh.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
+        - {fqdn:  'tcp1234.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 1234 }
+        - {fqdn:  'udp1234.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234, loose_packet: 3 }
+        - {fqdn: 'sctp1234.test.nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
     FIREWALL:
         FIREWALL_ADMIN:
             - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}

@@ -222,6 +222,7 @@ class _AddressPoolUnit_set(object):
     def release(self, addr):
         self._allocated.remove(addr)
         self._available.add(addr)
+        return addr
 
 class _AddressPoolUnit_list(object):
     def __init__(self, name='_AddressPoolUnit'):
@@ -296,6 +297,7 @@ class _AddressPoolUnit_list(object):
         if self._sortflag:
            self._allocated.sort()
            self._available.sort()
+        return addr
 
 # Define AddressPoolUnit in use
 _AddressPoolUnit = _AddressPoolUnit_list #Extracts a controlled element

@@ -1,6 +1,6 @@
-nest0.gwa.demo.:
+nest0.gwa.cesproto.re2ee.org.:
     ID:
-        fqdn:   ['nest0.gwa.demo.']
+        fqdn:   ['nest0.gwa.cesproto.re2ee.org.']
         ipv4:   ['192.168.0.10']
         msisdn: ['0000000010']
     GROUP:
@@ -14,9 +14,9 @@ nest0.gwa.demo.:
         - {ipv4: 192.168.0.13}
         - {ipv4: 192.168.0.14}
     SFQDN:
-        - {fqdn:          'nest0.gwa.demo.',  proxy_required: false, carriergrade: true                              }
-        - {fqdn:      'www.nest0.gwa.demo.',  proxy_required: true , carriergrade: false                             }
-        - {fqdn:      'sip.nest0.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:          'nest0.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: true                              }
+        - {fqdn:      'www.nest0.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:      'sip.nest0.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
     FIREWALL:
         FIREWALL_ADMIN:
             - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}

@@ -6,7 +6,7 @@ test102.gwa.cesproto.re2ee.org.:
     GROUP:
         - IPS_GROUP_PREPAID2
     CIRCULARPOOL:
-        - {max: 3 }
+        max: 3
     SFQDN:
         - {fqdn:          'test102.gwa.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.test102.gwa.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }

@@ -20,6 +20,7 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_WAN'}, 'out-interface': 'lan0', 'in-interface': 'wan0', 'target': {'MARK': {'set-xmark': '0xff112223/0xffffffff'}}}}
             - {'table': 'mangle', 'chain': 'FORWARD',    'rule': {'comment': {'comment': 'MARK_LAN_FROM_TUN'}, 'out-interface': 'lan0', 'in-interface': 'tun0', 'target': {'MARK': {'set-xmark': '0xff112324/0xffffffff'}}}}
             # Marks in INPUT to indicate input interface
+            - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Accept packet marked by Circular Pool'}, 'target': 'ACCEPT'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_LAN'}, 'target': {'MARK': {'set-xmark': '0xff121212/0xffffffff'}}, 'in-interface': 'lan0'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_WAN'}, 'target': {'MARK': {'set-xmark': '0xff021113/0xffffffff'}}, 'in-interface': 'wan0'}}
             - {'table': 'mangle', 'chain': 'INPUT',      'rule': {'comment': {'comment': 'MARK_LOCAL_FROM_TUN'}, 'target': {'MARK': {'set-xmark': '0xff021114/0xffffffff'}}, 'in-interface': 'tun0'}}
@@ -61,6 +62,7 @@ IPTABLES:
             - {'table': 'mangle', 'chain': 'PREROUTING',    'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'set': {'match-set': ['IPS_CIRCULAR_POOL', 'dst']}, 'comment': {'comment': 'New connections via CircularPool'}, 'conntrack': {'ctstate': 'NEW'}, 'target': 'CIRCULAR_POOL'}}
             # Check proper matching before doing the MARKDNAT - Packet mark is different than gratuitous
             - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': [{'mark': ['!', '0x0']}, {'mark': ['!', '0xff000000/0xff000000']}], 'comment': {'comment': 'DNAT via CIRCULAR_POOL'}, 'target': 'CIRCULAR_POOL'}}
+            - {'table': 'nat', 'chain': 'PREROUTING',       'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Accept packet marked by Circular Pool'}, 'target': 'ACCEPT'}}
             - {'table': 'nat', 'chain': 'CIRCULAR_POOL',    'rule': {'comment': {'comment': 'Do MARKDNAT'}, 'target': {'MARKDNAT': {'set-xmark': '0x0/0x0'}}}}
             # Enable SNAT for MARK_LOCAL_TO_WAN packets
             - {'table': 'nat', 'chain': 'POSTROUTING',      'rule': {'mark': {'mark': '0xFF011131/0xFFFFFFFF'}, 'comment': {'comment': 'SNAT to public IP address'}, 'target': {'SNAT': {'to-source': '195.148.125.201'}}}}
@@ -83,6 +85,7 @@ IPTABLES:
 
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Early drop blacklisted sources'}, 'target': 'DROP'}}
             - {'table': 'raw',    'chain': 'PREROUTING',       'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Early drop blacklisted destinations'}, 'target': 'DROP'}}
+            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xffffffff/0xffffffff'}, 'comment': {'comment': 'Reject packet marked by Circular Pool'}, 'target': 'mREJECT'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklisted sources'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_BLACKLIST', 'dst']}, 'comment': {'comment': 'Drop blacklisted destinations'}, 'target': 'DROP', 'comment': {'comment': 'Should not match here!'}}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'set': {'match-set': ['IPS_FILTER_WHITELIST', 'src']}, 'comment': {'comment': 'Accept whitelisted sources'}, 'target': 'ACCEPT'}}
@@ -220,9 +223,9 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'set': {'match-set': ['IPS_DNS_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklist DNS source'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'comment': {'comment': 'DNS unexpected response'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}, 'u32': {'u32': '0x1c&0xf800=0x8000'}}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|07|in-addr|04|arpa|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|03|gwa|08|cesproto|05|re2ee|03|org|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Drop !SOA allowed records'}, 'target': 'DROP'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|07|in-addr|04|arpa|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|03|gwa|08|cesproto|05|re2ee|03|org|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Drop !SOA allowed records'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept Non-SLA traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Drop excess'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Best effort Greylist'}, 'hashlimit': {'hashlimit-upto': '25/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '50'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}

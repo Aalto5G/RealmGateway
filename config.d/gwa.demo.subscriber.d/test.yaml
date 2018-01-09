@@ -6,7 +6,7 @@ test.gwa.demo.:
     GROUP:
         - IPS_GROUP_POSTPAID
     CIRCULARPOOL:
-        - {max: 100 }
+        max: 100
     SFQDN:
         - {fqdn:          'test.gwa.demo.',  proxy_required: false, carriergrade: false                             }
         - {fqdn:      'www.test.gwa.demo.',  proxy_required: true , carriergrade: false                             }

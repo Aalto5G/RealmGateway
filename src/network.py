@@ -66,6 +66,8 @@ API_URL_SWITCHES    = 'stats/switches'
 API_URL_FLOW_ADD    = 'stats/flowentry/add'
 API_URL_FLOW_DELETE = 'stats/flowentry/delete'
 
+RYU_RECONNECT = 60
+
 
 class Network(object):
     def __init__(self, name='Network', **kwargs):
@@ -268,6 +270,10 @@ class Network(object):
     def ipt_nfpacket_drop(self, packet):
         packet.drop()
 
+    def ipt_nfpacket_reject(self, packet):
+        # Use special case of packet mark 0xffffffff for reject
+        self.ipt_nfpacket_dnat(packet, '255.255.255.255')
+
     def ipt_nfpacket_payload(self, packet):
         return packet.get_payload()
 
@@ -404,21 +410,6 @@ class Network(object):
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
         # Use new batch functions
         iptc_helper3.batch_delete_rules('filter', rules_batch, ipv6=False)
-
-    '''
-        ### Not in use since the addition of batch processing ###
-
-    def _ipt_create_chain(self, table, chain, flush = False):
-        # Create and flush to ensure an empty table
-        iptc_helper3.add_chain(table, chain, ipv6=False)
-        if flush:
-            iptc_helper3.flush_chain(table, chain, ipv6=False, silent=True)
-
-    def _ipt_remove_chain(self, table, chain):
-        # Flush and delete to ensure the table is removed
-        iptc_helper3.flush_chain(table, chain, silent=True, ipv6=False)
-        iptc_helper3.delete_chain(table, chain, silent=True, ipv6=False)
-    '''
 
     def _ipt_xlat_rule(self, chain, rule):
         ret = dict(rule)
@@ -558,7 +549,7 @@ class Network(object):
             except HTTPClientConnectorError as e:
                 self._logger.warning('Failed to connect to SDN Controller: {}'.format(e))
 
-            yield from asyncio.sleep(10)
+            yield from asyncio.sleep(RYU_RECONNECT)
 
         yield from self.ovs_init_flowtable()
 
@@ -716,9 +707,8 @@ class Network(object):
         # Create TCP socket
         sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setblocking(False)
-        # Set TCP_NODELAY
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setblocking(False)
 
         while True:
             try:
@@ -812,7 +802,6 @@ class Network(object):
         msg = socket.inet_pton(socket.AF_INET, ipaddr) + struct.pack('!HBBHBB', port, proto, flags, tcpmss, tcpsack, tcpwscale)
         # Return built message
         return msg
-
 
 '''
 # Create OpenvSwitch for CES data tunnelling

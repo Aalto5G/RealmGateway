@@ -55,25 +55,30 @@ from callbacks import DNSCallbacks, PacketCallbacks
 
 import customdns
 from customdns.ddns import DDNSServer
-from customdns.dnsproxy import DNSProxy
+from customdns.dnsproxy import DNSProxy, DNSTCPProxy
 
 from aalto_helpers import utils3
 from global_variables import RUNNING_TASKS
 
+import pbra
+from pbra import PolicyBasedResourceAllocation
+
+import dns
+import dns.rcode
+
 def setup_logging_yaml(default_path='logging.yaml',
                        default_level=logging.INFO,
-                       env_key='LOG_CFG'):
+                       env_path='LOG_CFG',
+                       env_level='LOG_LEVEL'):
     """Setup logging configuration"""
-    path = default_path
-    value = os.getenv(env_key, None)
-    if value:
-        path = value
+    path = os.getenv(env_path, default_path)
+    level = os.getenv(env_level, default_level)
     if os.path.exists(path):
         with open(path, 'rt') as f:
             config = yaml.safe_load(f.read())
         logging.config.dictConfig(config)
     else:
-        logging.basicConfig(level=default_level)
+        logging.basicConfig(level=level)
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Realm Gateway')
@@ -100,15 +105,15 @@ def parse_arguments():
                         help='DDNS serving own DHCP server')
 
     # DNS timeout parameters
-    parser.add_argument('--dns-timeout', nargs='+', type=float, default=[0.100, 0.200, 0.200],
+    parser.add_argument('--dns-timeout', nargs='+', type=float, default=[0.100, 0.250, 0.250],
                         help='Default timeouts for DNS resolution (sec)')
-    parser.add_argument('--dns-timeout-a', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-a', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS A resolution (sec)')
-    parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-aaaa', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS AAAA resolution (sec)')
-    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-srv', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS SRV resolution (sec)')
-    parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, default=[0.010, 0.200, 0.200],
+    parser.add_argument('--dns-timeout-naptr', nargs='+', type=float, #default=[0.010, 0.200, 0.200],
                         help='Default timeouts for DNS NAPTR resolution (sec)')
 
     # Address pool parameters
@@ -172,7 +177,6 @@ def parse_arguments():
     parser.add_argument('--synproxy', nargs=2, default=('127.0.0.1', 12345),
                         metavar=('IPADDR', 'PORT'),
                         help='SYNPROXY control endpoint')
-
     # Operation mode
     parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
@@ -199,11 +203,21 @@ class RealmGateway(object):
         yield from self._init_connectiontable()
         # Initialize Network
         yield from self._init_network()
+        # Initialize Policy Based Resource Allocation
+        yield from self._init_pbra()
+        # Initialize PacketCallbacks
+        yield from self._init_packet_callbacks()
         # Initialize DNS
         yield from self._init_dns()
         # Create task: CircularPool cleanup
         _t = asyncio.ensure_future(self._init_cleanup_cpool(0.1))
-        RUNNING_TASKS.append((_t, '_init_cleanup_cpool'))
+        RUNNING_TASKS.append((_t, 'cleanup_cpool'))
+        # Create task: Timer cleanup
+        _t = asyncio.ensure_future(self._init_cleanup_pbra_timers(10.0))
+        RUNNING_TASKS.append((_t, 'cleanup_pbra_timers'))
+        # Create task: Show DNS groups
+        _t = asyncio.ensure_future(self._init_show_dnsgroups(60.0))
+        RUNNING_TASKS.append((_t, 'show_dnsgroups'))
         # Initialize Subscriber information
         yield from self._init_subscriberdata()
 
@@ -272,8 +286,22 @@ class RealmGateway(object):
                                         api_url          = self._config.network_api_url,
                                         datarepository   = self._datarepository,
                                         synproxy         = self._config.synproxy)
+
+    @asyncio.coroutine
+    def _init_pbra(self):
+        # Create container of Reputation objects
+        self._pbra = PolicyBasedResourceAllocation(pooltable       = self._pooltable,
+                                                   hosttable       = self._hosttable,
+                                                   connectiontable = self._connectiontable,
+                                                   datarepository  = self._datarepository,
+                                                   network         = self._network)
+
+    @asyncio.coroutine
+    def _init_packet_callbacks(self):
         # Create object for storing all PacketIn-related information
-        self.packetcb = PacketCallbacks(network=self._network, connectiontable=self._connectiontable)
+        self.packetcb = PacketCallbacks(network         = self._network,
+                                        connectiontable = self._connectiontable,
+                                        pbra            = self._pbra)
         # Register NFQUEUE(s) callback
         self._network.ipt_register_nfqueues(self.packetcb.packet_in_circularpool)
 
@@ -285,7 +313,8 @@ class RealmGateway(object):
                                   network         = self._network,
                                   hosttable       = self._hosttable,
                                   pooltable       = self._pooltable,
-                                  connectiontable = self._connectiontable)
+                                  connectiontable = self._connectiontable,
+                                  pbra            = self._pbra)
 
         # Register defined DNS timeouts
         self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
@@ -308,17 +337,15 @@ class RealmGateway(object):
         # Dynamic DNS Server for DNS update messages
         for ipaddr, port in self._config.ddns_server:
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
-            transport, protocol = yield from asyncio.ensure_future(listen_obj)
+            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
-        # DNS Server for WAN
+        # DNS Server for WAN via UDP
         for ipaddr, port in self._config.dns_server_wan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = yield from asyncio.ensure_future(listen_obj)
+            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
@@ -326,20 +353,28 @@ class RealmGateway(object):
         for ipaddr, port in self._config.dns_server_lan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = yield from asyncio.ensure_future(listen_obj)
-            self._logger.info('Creating DNS LAN Proxy endpoint @{}:{}'.format(ipaddr, port))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
+            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
         ## DNS Proxy for Local
         for ipaddr, port in self._config.dns_server_local:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-            #cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-            cb_nosoa = None
-            listen_obj = self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
-            transport, protocol = yield from asyncio.ensure_future(listen_obj)
-            self._logger.info('Creating DNS LOCAL Proxy endpoint @{}:{}'.format(ipaddr, port))
+            # Disable resolutions of non SOA domains for self generated DNS queries (i.e. HTTP proxy) - Answer with REFUSED
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_error_response(x,y,z,rcode=dns.rcode.REFUSED))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
+            self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
+
+        # BUG: If we move this part upwards, there is misrouting of messages to dns_process_rgw_lan_soa/dns_process_rgw_lan_nosoa
+        # DNS Server for WAN via TCP
+        for ipaddr, port in self._config.dns_server_wan:
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+            server = yield from self._loop.create_server(lambda: DNSTCPProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), host=ipaddr, port=port, reuse_address=True)
+            server.connection_lost = lambda x: server.close()
+            self._logger.info('Creating DNS TCP Server endpoint @{}:{}'.format(ipaddr, port))
+            self.dnscb.register_object('DNSTCPServer@{}:{}'.format(ipaddr, port), server)
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
@@ -357,9 +392,24 @@ class RealmGateway(object):
         self._logger.info('Initiating cleanup of the Circular Pool every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
-            self._logger.debug('do cleanup circularpool')
-            # Update table and remove for expired connections
+            # Update table and remove expired elements
             self._connectiontable.update_all_rgw()
+
+    @asyncio.coroutine
+    def _init_cleanup_pbra_timers(self, delay):
+        self._logger.info('Initiating cleanup of PBRA timers every {} seconds'.format(delay))
+        while True:
+            yield from asyncio.sleep(delay)
+            # Update table and remove expired elements
+            self._pbra.cleanup_timers()
+
+    @asyncio.coroutine
+    def _init_show_dnsgroups(self, delay):
+        self._logger.info('Initiating display of DNSGroup information every {} seconds'.format(delay))
+        while True:
+            yield from asyncio.sleep(delay)
+            # Update table and remove expired elements
+            self._pbra.debug_dnsgroups()
 
     @asyncio.coroutine
     def shutdown(self):
@@ -392,7 +442,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     # Get event loop
     loop = asyncio.get_event_loop()
-    loop.set_debug(True)
+    loop.set_debug(False)
     try:
         # Create object instance
         obj = RealmGateway(args)
