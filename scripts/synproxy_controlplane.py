@@ -10,7 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-# Run as: ./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add --conn-dstaddr 1.2.3.4 --conn-dstport 22 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
+# Run as: ./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode add --conn-dstaddr 1.2.3.4 --conn-dstport 22 --conn-proto 6 --conn-tcpmss 1460 --conn-tcpsack 1 --conn-tcpwscale 14
 
 import asyncio
 import argparse
@@ -77,7 +77,7 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, co
         logger.debug('Sending control message <{}>'.format(msg))
         yield from loop.sock_sendall(sock, msg)
         logger.debug('Waiting for response...')
-        data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=2)
+        data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=10)
         logger.debug('Received response <{}>'.format(data))
     t_elapsed = loop.time() - t_zero
     if seq > 1:
@@ -119,6 +119,11 @@ def validate_arguments(args):
         logger.error('Port number not valid <{}>'.format(args.conn_dstport))
         sys.exit(1)
 
+    # Validate port number
+    if args.conn_proto < 0 or args.conn_proto > 255:
+        logger.error('Protocol number not valid <{}> (0-255)'.format(args.conn_proto))
+        sys.exit(1)
+
     # Validate TCP MSS value
     ## Set MAX MTU size at 9000
     if args.conn_tcpmss <= 0 or args.conn_tcpmss > 8960:
@@ -149,6 +154,9 @@ def parse_arguments():
     parser.add_argument('--conn-dstport', type=int, default=0,
                         metavar=('PORT'),
                         help='Destination IP address')
+    parser.add_argument('--conn-proto', type=int, default=0,
+                        metavar=('PROTOCOL'),
+                        help='IP protocol')
     parser.add_argument('--conn-tcpmss', type=int, default=1460,
                         metavar=('TCPMSS'),
                         help='TCP MSS value')
@@ -187,13 +195,13 @@ if __name__ == '__main__':
     if args.benchmark:
         # Prepare coroutine with parameters for execution
         coro = synproxy_sendrecv_loop(args.ipaddr, args.port, args.mode,
-                                      args.conn_dstaddr, args.conn_dstport, 6,
+                                      args.conn_dstaddr, args.conn_dstport, args.conn_proto,
                                       args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale,
                                       args.benchmark_seq, args.benchmark_iter)
     else:
         # Prepare coroutine with parameters for execution
         coro = synproxy_sendrecv(args.ipaddr, args.port, args.mode,
-                                 args.conn_dstaddr, args.conn_dstport, 6,
+                                 args.conn_dstaddr, args.conn_dstport, args.conn_proto,
                                  args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale)
     try:
         loop.run_until_complete(coro)
