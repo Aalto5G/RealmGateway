@@ -58,7 +58,7 @@ def synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale
 
 
 @asyncio.coroutine
-def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale):
+def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale, seq=1):
     # Create TCP socket
     sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -68,14 +68,30 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, co
     logger.info('Initiating connection to <{}:{}>'.format(ipaddr, port))
     yield from loop.sock_connect(sock, (ipaddr, port))
     logger.debug('Connected to <{}:{}>'.format(ipaddr, port))
-    # Build control message
-    msg = synproxy_build_message(mode, conn_ipaddr, conn_proto, conn_port, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
-    logger.debug('Sending control message <{}>'.format(msg))
-    yield from loop.sock_sendall(sock, msg)
-    logger.debug('Waiting for response...')
-    data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=5)
+    # Perform loop if benchmark mode is enabled (seq>1)
+    t_zero = loop.time()
+    for i in range(seq):
+        # Build new control message per iteration and crop to 16 bits
+        _conn_port = (conn_port + i) & 0xFFFF
+        msg = synproxy_build_message(mode, conn_ipaddr, _conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
+        logger.debug('Sending control message <{}>'.format(msg))
+        yield from loop.sock_sendall(sock, msg)
+        logger.debug('Waiting for response...')
+        data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=2)
+        logger.debug('Received response <{}>'.format(data))
+    t_elapsed = loop.time() - t_zero
+    if seq > 1:
+        logger.info('{} send&recv iterations @ {} iter/sec'.format(seq, seq/t_elapsed))
     sock.close()
-    logger.info('Received response <{}>'.format(data))
+
+
+@asyncio.coroutine
+def synproxy_sendrecv_loop(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale, seq=1, iter=1):
+    t_zero = loop.time()
+    for i in range(seq):
+        yield from synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale, iter)
+    t_elapsed = loop.time() - t_zero
+    logger.info('Completed {} sequence(s) of {} iteration(s) in {:.3f} (msec)'.format(seq, iter, t_elapsed*1000))
 
 
 def validate_arguments(args):
@@ -144,6 +160,13 @@ def parse_arguments():
                         choices=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
                         metavar=('TCPWSCALE'),
                         help='TCP window scaling value [0-14]')
+    # Add benchmark control parameters
+    parser.add_argument('--benchmark', action='store_true',
+                        help='Perform benchmark test')
+    parser.add_argument('--benchmark-seq', type=int, default=1,
+                        help='Number of sequential open->send&recv->close operations')
+    parser.add_argument('--benchmark-iter', type=int, default=100,
+                        help='Number of iterative send&recv operations per sequence')
 
     args = parser.parse_args()
     validate_arguments(args)
@@ -161,10 +184,17 @@ if __name__ == '__main__':
     args = parse_arguments()
     logger.info('Creating connection to @{}:{}'.format(args.ipaddr, args.port))
 
-    # Prepare coroutine with parameters for execution
-    coro = synproxy_sendrecv(args.ipaddr, args.port, args.mode,
-                             args.conn_dstaddr, args.conn_dstport, 6,
-                             args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale)
+    if args.benchmark:
+        # Prepare coroutine with parameters for execution
+        coro = synproxy_sendrecv_loop(args.ipaddr, args.port, args.mode,
+                                      args.conn_dstaddr, args.conn_dstport, 6,
+                                      args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale,
+                                      args.benchmark_seq, args.benchmark_iter)
+    else:
+        # Prepare coroutine with parameters for execution
+        coro = synproxy_sendrecv(args.ipaddr, args.port, args.mode,
+                                 args.conn_dstaddr, args.conn_dstport, 6,
+                                 args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale)
     try:
         loop.run_until_complete(coro)
     except KeyboardInterrupt:
