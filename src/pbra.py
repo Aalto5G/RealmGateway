@@ -5,8 +5,8 @@ from functools import partial
 
 import ipaddress
 
-from aalto_helpers import container3
-from aalto_helpers import utils3
+from helpers_n_wrappers import container3
+from helpers_n_wrappers import utils3
 
 import host
 from host import KEY_SERVICE_SFQDN

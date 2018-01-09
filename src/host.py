@@ -1,7 +1,7 @@
 import logging
 
-from aalto_helpers import container3
-from aalto_helpers import utils3
+from helpers_n_wrappers import container3
+from helpers_n_wrappers import utils3
 from customdns.dnsutils import from_address as ptr_from_address
 
 KEY_HOST = 0

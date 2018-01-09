@@ -5,8 +5,8 @@ import pprint
 from functools import partial
 from operator import getitem
 
-from aalto_helpers import utils3
-from aalto_helpers import network_helper3
+from helpers_n_wrappers import utils3
+from helpers_n_wrappers import network_helper3
 
 import customdns
 from customdns import dnsutils
