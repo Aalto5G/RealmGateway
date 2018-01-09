@@ -7,8 +7,7 @@ import urllib.parse
 from contextlib import suppress
 
 from helpers_n_wrappers import utils3
-from aiohttp_client import HTTPRestClient
-from aiohttp_client import HTTPClientConnectorError
+from helpers_n_wrappers import aiohttp_client
 
 
 class DataRepository(object):
@@ -29,7 +28,7 @@ class DataRepository(object):
 
     def rest_api_init(self, n=5):
         """ Create long lived HTTP session """
-        self.rest_api = HTTPRestClient(n)
+        self.rest_api = aiohttp_client.HTTPRestClient(n)
 
     def rest_api_close(self):
         self.rest_api.close()
