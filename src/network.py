@@ -697,7 +697,7 @@ class Network(object):
     def synproxy_create(self):
         self._logger.info('Create SYNPROXY connection')
         # Create connection to SYNPROXY
-        asyncio.async(self._synproxy_create())
+        asyncio.ensure_future(self._synproxy_create())
 
     @asyncio.coroutine
     def _synproxy_create(self):
@@ -713,13 +713,14 @@ class Network(object):
             try:
                 # Connect TCP socket
                 self._logger.debug('Initiating connection to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
-                #yield from asyncio.wait_for(loop.sock_connect(sock, (self.synproxy[0], self.synproxy[1])), timeout=5)
                 yield from self.loop.sock_connect(sock, (self.synproxy[0], self.synproxy[1]))
                 self._logger.info('Connected to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
                 break
             except Exception as e:
                 self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
                 yield from asyncio.sleep(5)
+
+        # TODO: Flush and initialization for each IP address in the pool with default TCP options?
 
         # Set socket object
         self.synproxy_sock = sock
@@ -766,7 +767,7 @@ class Network(object):
             self._logger.info('SYNPROXY connection failed, initiate reconnection... ?')
             #self.synproxy_sock.close()
             self.synproxy_sock = None
-            #asyncio.async(self._synproxy_create())
+            #asyncio.ensure_future(self._synproxy_create())
             return False
 
 

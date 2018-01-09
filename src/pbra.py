@@ -1032,7 +1032,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         tcpsack = 1
         tcpwscale = 1
         # Do this in parallel ?
-        asyncio.async(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
+        asyncio.ensure_future(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
 
         # Return the allocated address
         return allocated_ipv4
