@@ -37,7 +37,7 @@ import argparse
 import asyncio
 import pool
 import configparser
-import network
+
 
 import logging
 import logging.config
@@ -51,6 +51,7 @@ from datarepository import DataRepository
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
 from host import HostTable, HostEntry
 from connection import ConnectionTable
+from network import Network
 from callbacks import DNSCallbacks, PacketCallbacks
 
 import customdns
@@ -275,17 +276,18 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_network(self):
-        self._network = network.Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
-                                        ipt_cpool_chain  = self._config.ipt_cpool_chain,
-                                        ipt_host_chain   = self._config.ipt_host_chain ,
-                                        ipt_host_unknown = self._config.ipt_host_unknown,
-                                        ipt_policy_order = self._config.ipt_policy_order,
-                                        ipt_markdnat     = self._config.ipt_markdnat,
-                                        ipt_flush        = self._config.ipt_flush,
-                                        ips_hosts        = self._config.ips_hosts,
-                                        api_url          = self._config.network_api_url,
-                                        datarepository   = self._datarepository,
-                                        synproxy         = self._config.synproxy)
+        self._network = Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
+                                ipt_cpool_chain  = self._config.ipt_cpool_chain,
+                                ipt_host_chain   = self._config.ipt_host_chain ,
+                                ipt_host_unknown = self._config.ipt_host_unknown,
+                                ipt_policy_order = self._config.ipt_policy_order,
+                                ipt_markdnat     = self._config.ipt_markdnat,
+                                ipt_flush        = self._config.ipt_flush,
+                                ips_hosts        = self._config.ips_hosts,
+                                api_url          = self._config.network_api_url,
+                                datarepository   = self._datarepository,
+                                synproxy         = self._config.synproxy,
+                                pooltable        = self._pooltable)
 
     @asyncio.coroutine
     def _init_pbra(self):

@@ -720,11 +720,19 @@ class Network(object):
                 self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
                 yield from asyncio.sleep(5)
 
-        # TODO: Flush and initialization for each IP address in the pool with default TCP options?
-
         # Set socket object
         self.synproxy_sock = sock
 
+        # Flush all connections from SYNPROXY
+        yield from self._synproxy_sendrecv('flush', '0.0.0.0', 0, 0, 0, 0, 0)
+        # Set default connection
+        yield from self._synproxy_sendrecv('mod', '0.0.0.0', 0, 0, 536, 0, 1)
+        # Initialize IP address of the CircularPool and ServicePool pool with default TCP options
+        ap_cpool = self.pooltable.get('circularpool')
+        ap_spool = self.pooltable.get('servicepool')
+        ap_pool  = ap_cpool.get_pool() + ap_spool.get_pool()
+        for ipaddr in ap_pool:
+            yield from self.synproxy_add_connection(ipaddr, 0, 0, 1460, 1, 7)
 
     @asyncio.coroutine
     def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
@@ -734,17 +742,17 @@ class Network(object):
         if success:
             self._logger.info('Successfully added connection to SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
         else:
-            self._logger.warning('Failed to add connection to SYNPROXY ({:.3} ms): {}'.format((_tdelay, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.warning('Failed to add connection to SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
 
     @asyncio.coroutine
-    def synproxy_del_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+    def synproxy_del_connection(self, ipaddr, port, proto):
         _t = self.loop.time()
-        success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto)
         _tdelay = (self.loop.time() - _t) * 1000
         if success:
-            self._logger.info('Successfully deleted connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.info('Successfully deleted connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto)))
         else:
-            self._logger.warning('Failed to delete connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.warning('Failed to delete connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto)))
 
     @asyncio.coroutine
     def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
@@ -756,7 +764,7 @@ class Network(object):
             self._logger.debug('Sending control message <{}>'.format(msg))
             yield from self.loop.sock_sendall(self.synproxy_sock, msg)
             self._logger.debug('Waiting for response...')
-            data = yield from asyncio.wait_for(self.loop.sock_recv(self.synproxy_sock, 2), timeout=1)
+            data = yield from asyncio.wait_for(self.loop.sock_recv(self.synproxy_sock, 2), timeout=5)
             # Evaluate response
             if data == b'1\n':
                 return True
