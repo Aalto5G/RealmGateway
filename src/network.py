@@ -727,19 +727,23 @@ class Network(object):
 
     @asyncio.coroutine
     def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        _t = self.loop.time()
         success = yield from self._synproxy_sendrecv('mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        _tdelay = (self.loop.time() - _t) * 1000
         if success:
-            self._logger.info('Successfully added connection to SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.info('Successfully added connection to SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
         else:
-            self._logger.warning('Failed to add connection to SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.warning('Failed to add connection to SYNPROXY ({:.3} ms): {}'.format((_tdelay, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
 
     @asyncio.coroutine
     def synproxy_del_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        _t = self.loop.time()
         success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        _tdelay = (self.loop.time() - _t) * 1000
         if success:
-            self._logger.info('Successfully deleted connection from SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.info('Successfully deleted connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
         else:
-            self._logger.warning('Failed to delete connection from SYNPROXY: {}'.format((ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.warning('Failed to delete connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
 
     @asyncio.coroutine
     def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
