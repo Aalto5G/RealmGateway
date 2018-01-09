@@ -1,8 +1,6 @@
 - Fix bug with tunnel src/dst matches in Ryu rest API - low priority
 - Use pylint to enhance python style
 - Add Rest API to datarepository - Use update_policy / update_subscriber to contact remote Policy Database, maintaining current API of datarepository
-- Add eDNS0 extensions to carrier grade resolution
 - Use message.find_rrset() functions in dnspython for obtaining records from message section
 - Add mode selector for RGW or CES (DNS functions needs to be changed)
-- Commit d34ff7d8a5ffbf944e0c4770c3f8faf3eba70e4b introduces DNAT redirection for all incoming HTTP(S) + alt ports to Reverse Proxy - for the case of nested environments
-  + Enhance SRV query to indicate proxyrequired = True/False? Then we can enhance address allocation by using Service Pool instead of Circular Pool!
+- Add packet policy history to PBRA

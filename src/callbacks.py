@@ -421,19 +421,7 @@ class DNSCallbacks(object):
             cback(query, addr, response)
             return
 
-        '''
-        # Evaluate host data service and use appropriate address pool
-        if _service_data['proxy_required'] is True:
-            # Resolve via Service Pool
-            self._logger.info('Process {} with ServicePool ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), _service_data))
-            ap_spool = self.pooltable.get('servicepool')
-            allocated_ipv4 = ap_spool.release(ap_spool.allocate())
-        else:
-            # Resolve via Circular Pool
-            self._logger.info('Process {} with CircularPool ({}) for {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), _ipv4, _service_data))
-            # Decision making based on load level(s) and reputation
-            allocated_ipv4 = self.pbra.api_dns_circularpool(query, addr, host_obj, _service_data, _ipv4)
-        '''
+        # Use PBRA to allocate an address according to policy
         allocated_ipv4 = self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
 
         # Evaluate allocated address
