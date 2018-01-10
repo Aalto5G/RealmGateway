@@ -548,10 +548,11 @@ class PacketCallbacks(object):
 
     def _format_5tuple(self, packet_fields):
         if packet_fields['proto'] == 6:
-            return '{}:{} {}:{} [{}] (TTL {}) flags/{:08b}'.format(packet_fields['src'], packet_fields['sport'],
-                                                                  packet_fields['dst'], packet_fields['dport'],
-                                                                  packet_fields['proto'], packet_fields['ttl'],
-                                                                  packet_fields['tcp_flags'])
+            return '{}:{} {}:{} [{}] (TTL {}) flags/{:08b} seq/{} ack{}'.format(packet_fields['src'], packet_fields['sport'],
+                                                                                packet_fields['dst'], packet_fields['dport'],
+                                                                                packet_fields['proto'], packet_fields['ttl'],
+                                                                                packet_fields['tcp_flags'],packet_fields['tcp_seq'],
+                                                                                packet_fields['tcp_ack'])
         elif packet_fields['proto'] == 132:
             return '{}:{} {}:{} [{}] (TTL {}) tag/{:x}'.format(packet_fields['src'], packet_fields['sport'],
                                                                 packet_fields['dst'], packet_fields['dport'],
@@ -581,6 +582,14 @@ class PacketCallbacks(object):
         sender = '{}:{}'.format(src, sport)
         self._logger.debug('Received PacketIn: {}'.format(packet_fields))
 
+        # Pre-emptive check with PBRA if the packet is blacklister
+        response = self.pbra.pbra_data_preaccept_circularpool(data, packet_fields)
+        if response is False:
+            self._logger.info('Reject / CircularPool pre-emptive check failed: [{}]'.format(dst,self._format_5tuple(packet_fields)))
+            self.network.ipt_nfpacket_reject(packet)
+            self.pbra.pbra_data_track_circularpool(data, packet_fields)
+            return
+
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
         key1 = (connection.KEY_RGW, dst)
@@ -599,6 +608,7 @@ class PacketCallbacks(object):
         if not self.connectiontable.has(key1):
             self._logger.debug('Reject / No connection reserved for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_reject(packet)
+            self.pbra.pbra_data_track_circularpool(data, packet_fields)
             return
 
         # Lookup connection in table with rest of the keys
@@ -612,6 +622,7 @@ class PacketCallbacks(object):
         if conn is None:
             self._logger.warning('Reject / No connection found for packet: [{}]'.format(self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_reject(packet)
+            self.pbra.pbra_data_track_circularpool(data, packet_fields)
             return
 
         # The connection belongs to an SLA marked DNS server
@@ -620,6 +631,7 @@ class PacketCallbacks(object):
         elif conn.dns_bind:
             self._logger.info('Reject / Connection not reserved for remote host {}: {}'.format(src, conn.dns_host))
             self.network.ipt_nfpacket_reject(packet)
+            self.pbra.pbra_data_track_circularpool(data, packet_fields)
             return
 
         # DNAT to private host

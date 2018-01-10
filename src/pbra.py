@@ -44,6 +44,8 @@ KEY_DNSHOST_IPADDR  = 40
 # Common keys for reputation objects
 KEY_DNS_REPUTATION  = 50
 
+# Keys for uStateDataPacket
+KEY_DATA_PACKET     = 60
 
 # TODO: Create minimal unit that extends ContainerNode and implements a uReputation object with basic methods to avoid code duplication
 
@@ -411,6 +413,78 @@ class uStateDNSGroup(container3.ContainerNode):
         # Update SLA values
         if self.sla or other.sla:
             self.sla = True
+
+class uStateDataPacket(container3.ContainerNode):
+    """ This class stores the packet information available for any data source """
+    def __init__(self, src, dst):
+        # Receive an exploded dict of packet_fields
+        super().__init__('uStateDataPacket')
+        self.src = src
+        self.dst = dst
+        # Use dictionary to record seen packets
+        self.state = {}
+
+    def lookupkeys(self):
+        """ Return the lookup keys """
+        # Return an iterable (key, isunique)
+        keys = []
+        # Create unique key based on IP src and dst
+        keys.append(((KEY_DATA_PACKET, (self.src, self.dst)), True))
+        return keys
+
+    def hasexpired(self):
+        """ Return True if the timeout has expired """
+        ts_now = time.time()
+        delete_keys = []
+        for key, (_n, _t) in self.state.items():
+            if ts_now < _t:
+                continue
+            delete_keys.append(key)
+        for key in delete_keys:
+            del self.state[key]
+
+    def _generate_packet_key(self, **kwargs):
+        _proto = kwargs['proto']
+        if _proto == 1:
+            _type, _code = kwargs['icmp-type'], kwargs['icmp-code']
+            key = (_type, _code)
+        elif _proto == 6:
+            _sport, _dport = kwargs['sport'], kwargs['dport']
+            _seq, _ack, _flags = kwargs['tcp_seq'], kwargs['tcp_ack'], kwargs['tcp_flags']
+            key = (_sport, _dport, _seq, _ack)
+        elif _proto == 17:
+            _sport, _dport = kwargs['sport'], kwargs['dport']
+            key = (_sport, _dport)
+        elif _proto == 132:
+            _sport, _dport = kwargs['sport'], kwargs['dport']
+            _tag = kwargs['sctp_tag']
+            key = (_sport, _dport)
+        else:
+            return _proto
+        return key
+
+    def has_record(self, **kwargs):
+        key = self._generate_packet_key(**kwargs)
+        return (key in self.state)
+
+    def add_record(self, **kwargs):
+        key = self._generate_packet_key(**kwargs)
+        # Use a TTL of 20 seconds per record
+        ttl = 20
+        ts_eol = time.time() + ttl
+        if key in self.state:
+            _n, _t = self.state[key]
+            self.state[key] = (_n+1, ts_eol)
+        else:
+            self.state[key] = (1, ts_eol)
+
+    def get_record(self, **kwargs):
+        key = self._generate_packet_key(**kwargs)
+        assert(key in self.state)
+        return self.state[key]
+
+    def __repr__(self):
+        return '[{}] src={} dst={}\n{}'.format(self._name, self.src, self.dst, self.state)
 
 
 class PolicyBasedResourceAllocation(container3.Container):
@@ -1023,14 +1097,12 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Add connection to table
         self.connectiontable.add(connection_obj)
         # Log
-        self._logger.warning('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
         self._logger.debug('New Circular Pool connection: {}'.format(connection_obj))
 
         # Synchronize connection with SYNPROXY module
         ## TODO: Get TCP options policy from host
-        tcpmss = 1360
-        tcpsack = 1
-        tcpwscale = 1
+        tcpmss, tcpsack, tcpwscale = 1460, 1, 7
         # Do this in parallel ?
         asyncio.ensure_future(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
 
@@ -1069,7 +1141,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             return
 
         ap_cpool.release(ipaddr)
-        self._logger.warning('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
+        self._logger.info('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
 
     def _service_is_overloadable(self, service_data, partial_overload=True):
         """ Return True if service is overloadable """
@@ -1147,6 +1219,35 @@ class PolicyBasedResourceAllocation(container3.Container):
         host_obj.remove_service(KEY_SERVICE_SFQDN, timer_obj.alias_service)
         # Update lookup keys in host table
         self.hosttable.updatekeys(host_obj)
+
+
+    def pbra_data_preaccept_circularpool(self, data, packet_fields):
+        # Check if the endpoints are known
+        key = (KEY_DATA_PACKET, (packet_fields['src'], packet_fields['dst']))
+        if not self.has(key):
+            # We have not seent this packet before
+            return True
+
+        node = self.get(key)
+        if not node.has_record(**packet_fields):
+            # We have not seent this packet before
+            return True
+
+        record = node.get_record(**packet_fields)
+        self._logger.debug('Found prior state: {} / {}'.format(packet_fields, record))
+        return False
+
+    def pbra_data_track_circularpool(self, data, packet_fields):
+        # Create a record for a seen packet
+        key = (KEY_DATA_PACKET, (packet_fields['src'], packet_fields['dst']))
+        if not self.has(key):
+            node = uStateDataPacket(packet_fields['src'], packet_fields['dst'])
+            self.add(node)
+        else:
+            node = self.get(key)
+
+        node.add_record(**packet_fields)
+        self._logger.debug('Tracking packet: {}'.format(packet_fields))
 
 
 def _do_ok(obj, n):
