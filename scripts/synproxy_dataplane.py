@@ -370,6 +370,7 @@ class SYNProxyDataplane():
             rule_d['tcp']['dport'] = str(port)
         rule_d['target']['SYNPROXY']['mss'] = str(tcpmss)
         rule_d['target']['SYNPROXY']['wscale'] = str(tcpwscale)
+        rule_d['target']['SYNPROXY']['timestamp'] = ''
         if tcpsack:
             rule_d['target']['SYNPROXY']['sack-perm'] = ''
         # Return rule
