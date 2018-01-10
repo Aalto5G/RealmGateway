@@ -14,6 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 import asyncio
 import argparse
+import ipaddress
 import logging
 import os
 import socket
@@ -124,6 +125,7 @@ class SYNProxyDataplane():
         self.nic_wan  = kwargs['nic_wan']
         self.nic_wanp = kwargs['nic_wanp']
         self.default_gw = kwargs['default_gw']
+        self.secure_net = kwargs['secure_net']
         # Create a connection table to store the rules
         self.connectiontable = container3.Container(name='ConnectionTable')
         # Continue with bootstrapping actions
@@ -213,7 +215,12 @@ class SYNProxyDataplane():
 
         ## Configure default gateway
         if self.default_gw:
-            _ = 'ip route add default dev mitm0'
+            _ = 'ip route add default dev mitm0 metric 100'
+            self._do_subprocess_call(_, raise_exc = False, silent = True)
+
+        ## Configure secure networks
+        to_exec = ['ip route add {} dev mitm1'.format(net) for net in self.secure_net]
+        for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = False, silent = True)
 
 
@@ -277,6 +284,8 @@ class SYNProxyDataplane():
         iptc_helper3.add_rule('raw', 'PREROUTING', rule_d, position=0, ipv6=False)
         ## raw.synproxy_chain
         rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'target': {'CT': {'notrack': ''}}, }
+        iptc_helper3.add_rule('raw', 'synproxy_chain', rule_d, position=0, ipv6=False)
+        rule_d = {'target': 'ACCEPT'}
         iptc_helper3.add_rule('raw', 'synproxy_chain', rule_d, position=0, ipv6=False)
         ## filter.FORWARD
         rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'target': 'synproxy_chain'}
@@ -543,6 +552,15 @@ def validate_arguments(args):
         logger.error('TCP window scale value not valid <{}> (0-14)'.format(args.default_tcpwscale))
         sys.exit(1)
 
+    # Validate secure networks value
+    for net in args.secure_net:
+        try:
+            ipaddress.IPv4Network(net)
+        except:
+            logger.error('Network not valid <{}>'.format(net))
+            sys.exit(1)
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='TCP SYN Proxy ControlPlane v0.1')
     # Socket address
@@ -570,11 +588,14 @@ def parse_arguments():
                         metavar=('TCPWSCALE'),
                         help='Default TCP window scaling value [0-14]')
 
+    parser.add_argument('--secure-net', nargs='*', type=str,
+                        help='Networks behind SYNPROXY in CIDR format e.g. 195.148.124.0/24 195.148.125.0/24')
     parser.add_argument('--default-gw', action='store_true',
                         help='Add default gateway route')
 
     args = parser.parse_args()
     validate_arguments(args)
+    print(args)
     return args
 
 
@@ -594,6 +615,7 @@ if __name__ == '__main__':
                                      tcpmss = args.default_tcpmss,
                                      tcpsack = args.default_tcpsack,
                                      tcpwscale = args.default_tcpwscale,
+                                     secure_net = args.secure_net,
                                      default_gw = args.default_gw
                                      )
     cb = synproxy_obj.process_message
