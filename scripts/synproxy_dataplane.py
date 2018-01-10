@@ -10,7 +10,13 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-# Run as: ./synproxy_dataplane.py --nic-wan test_wan0 --nic-wanp test_wan0p --ipaddr 127.0.0.1 --port 12345
+# Run as:
+# ./synproxy_dataplane.py --nic-wan test_wan0 --nic-wanp test_wan0p --ipaddr 127.0.0.1 --port 12345
+# Run standalone with supporting network configured
+# ./synproxy_dataplane.py --nic-wan test_wan0 --nic-wanp test_wan0p --ipaddr 127.0.0.1 --port 12345 --default-tcpmss 1460 --default-tcpsack 1 --default-tcpwscale 7 --standalone
+# Run standalone modifying networking from the process
+# ./synproxy_dataplane.py --nic-wan test_wan0 --nic-wanp test_wan0p --ipaddr 127.0.0.1 --port 12345 --default-tcpmss 1460 --default-tcpsack 1 --default-tcpwscale 7 --standalone --secure-net 195.148.124.0/24 195.148.125.201/32 --default-gw
+
 
 import asyncio
 import argparse
@@ -215,12 +221,14 @@ class SYNProxyDataplane():
 
         ## Configure default gateway
         if self.default_gw:
+            self._logger.info('Adding route to default gateway via mimt0')
             _ = 'ip route add default dev mitm0 metric 100'
             self._do_subprocess_call(_, raise_exc = False, silent = True)
 
         ## Configure secure networks
-        to_exec = ['ip route add {} dev mitm1'.format(net) for net in self.secure_net]
-        for _ in to_exec:
+        for net in self.secure_net:
+            self._logger.info('Adding route to secure network {} via mitm1'.format(net))
+            _ = 'ip route add {} dev mitm1'.format(net)
             self._do_subprocess_call(_, raise_exc = False, silent = True)
 
 
@@ -595,7 +603,6 @@ def parse_arguments():
 
     args = parser.parse_args()
     validate_arguments(args)
-    print(args)
     return args
 
 
