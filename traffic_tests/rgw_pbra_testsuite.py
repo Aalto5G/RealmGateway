@@ -104,26 +104,61 @@ Modelling spoofed destinations for data:
 # Modelling configuration file
     config_d = {
      'duration': 1,
-     # Globals for traffic tests ?
-     #'service_dns': [('tcp2000.host.demo', 2000, 6), ('udp2001.host.demo', 2001, 17)],
-     #'service_data': [('195.148.125.202', 2000, 6), ('195.148.125.203', 2001, 17)],
+     # Globals for traffic tests
+     'global_traffic': {
+        'dnsdata': {
+            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
+            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
+            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
+            'data_raddr': [('example.com', 2000, 17), ('google.es', 2000, 6)],
+        },
+        'dns': {
+            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
+            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
+            'data_raddr': [('dnsonly.example.com', 2000, 17), ('dnsonly.google.es', 2000, 6)],
+        },
+        'data': {
+            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
+            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
+        },
+        'dnsspoof': {
+            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
+            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
+            'data_raddr': [('dnsspoof.example.com', 2000, 17), ('dnsspoof.google.es', 2000, 6)],
+        },
+        'dataspoof': {
+            'data_laddr': [('1.1.1.1', 2000, 17), ('2.2.2.2', 2000, 6)],
+            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
+        },
+     },
      # This models all the test traffic
      'traffic': [
                 # dnsdata: TCP based data & UDP based resolution
                  {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('google.es', 2000, 6)]},
                 # dnsdata: UDP based data & UDP based resolution
-                 {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2001.host.demo', 2001, 17)]},
+                # {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2001.host.demo', 2001, 17)]},
 
                 # dns: UDP based resolution
-                 {'type': 'dns',      'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2002.host.demo', 2002, 17)]},
+                # {'type': 'dns',      'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_raddr': [('udp2002.host.demo', 2002, 17)]},
 
                 # data: TCP based data
-                 {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
+                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
                 # data: UDP based data
-                 {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
+                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
 
-                # dnsspoof: UDP based resolution
-                 {'type': 'dnsspoof', 'load': 1, 'dns_laddr':[('198.18.0.1', 0, 17)], 'dns_raddr':[('195.148.125.201', 53, 17)]},
+                # dnsspoof: UDP based resolution only
+                # {'type': 'dnsspoof', 'load': 1, 'dns_laddr':[('198.18.0.1', 0, 17)], 'dns_raddr':[('195.148.125.201', 53, 17)], 'data_raddr': [('udp5002.host.demo', 5002, 17)]},
+
+                # dataspoof: UDP based data
+                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('1.1.1.1', 65535, 6)],  'data_raddr': [('9.9.9.9', 65535, 6)]},
+                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('2.2.2.2', 65535, 17)], 'data_raddr': [('9.9.9.9', 65535, 17)]},
+
+                ## Test for global_traffic
+                # {'type': 'dnsdata',   'load': 1},
+                # {'type': 'dns',       'load': 1},
+                # {'type': 'data',      'load': 1},
+                # {'type': 'dataspoof', 'load': 1},
+                # {'type': 'dnsspoof',  'load': 1},
                  ]
      }
 
@@ -134,19 +169,15 @@ Run as: ./async_echoclient_v4.py --duration 3 --load 300 --distribution const --
 Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 127.0.0.1:2007 127.0.0.1:2008 127.0.0.1:2009
 """
 
-"""
-TODOS
-
-define information model for result information
-"""
-
 
 import asyncio
 import argparse
 import functools
 import json
 import logging
+import math
 import os
+import pprint
 import random
 import socket
 import statistics
@@ -155,26 +186,27 @@ import sys
 import time
 import uuid
 
-
-import math
-import struct
-
 import dns
 import dns.message
 import dns.edns
 import dns.rdatatype
 
-# For Scapy packet parsing
+# For Scapy
+logging.getLogger('scapy.runtime').setLevel(logging.ERROR)
 from scapy.all import *
 from scapy.layers.inet import *
 from scapy.layers.inet6 import *
 
 
-from helpers_n_wrappers import utils3
-
 WATCHDOG = 1.0 #Sleep 1 second before displaying loop stats
 RESULTS = []   #List to store TestResult objects
 
+def set_attributes(obj, override=False, **kwargs):
+    """Set attributes in object from a dictionary"""
+    for k,v in kwargs.items():
+        if hasattr(obj, k) and not override:
+            continue
+        setattr(obj, k, v)
 
 loop = asyncio.get_event_loop()
 def _now(ref = 0):
@@ -202,7 +234,6 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
         return sock
     except:
         return None
-
 
 @asyncio.coroutine
 def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
@@ -276,7 +307,6 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
     sock.close()
     return (ipaddr, query.id, attempt)
 
-
 @asyncio.coroutine
 def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
     """
@@ -334,38 +364,16 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     return eth_pkt
 
 def _scapy_send_packet(packet, iface):
-    sendp(packet, iface=iface)
+    sendp(packet, iface=iface, verbose=False)
 
 
 def add_result(name, success, metadata, ts_start, ts_end):
-    """
-    name: Name of the test as defined in configuration
-    success: True or False
-    metadata: Dictionaty with metadata for the current type
-    ts_start: Time of start
-    ts_end: Time of end
-    """
-    # Create result object
+    # Add a result dictionary entry
     global RESULTS
-    RESULTS.append(TestResult(name, success, metadata, ts_start, ts_end))
-
-class TestResult(object):
-    __slots__ = [ 'name', 'success', 'metadata', 'ts_start', 'ts_end']
-    def __init__(self, name, success, metadata, ts_start, ts_end):
-        self.name = name
-        self.success = success
-        self.metadata = metadata
-        self.ts_start = ts_start
-        self.ts_end = ts_end
-
-    def __repr__(self):
-        return 'name={} success={} metadata={}'.format(self.name, self.success, self.metadata)
+    RESULTS.append({'name':name, 'success':success, 'metadata': metadata, 'ts_start': ts_start, 'ts_end': ts_end})
 
 
 class RealDNSDataTraffic(object):
-    # TCP based data
-    # {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('tcp2000.host.demo', 2000, 6)]},
-
     def __init__(self, **kwargs):
         '''
         # Common parameters
@@ -373,7 +381,7 @@ class RealDNSDataTraffic(object):
         ts_start: (float) absolute starting time to schedule events
         results: (list) results list
         '''
-        utils3.set_attributes(self, override=True, **kwargs)
+        set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSDataTraffic')
 
         # Adjust next taskdelay time
@@ -474,9 +482,6 @@ class RealDNSDataTraffic(object):
 
 
 class RealDNSTraffic(object):
-    # dns: UDP based resolution
-    # {'type': 'dns',      'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2002.host.demo', 2002, 17)]},
-
     def __init__(self, **kwargs):
         '''
         # Common parameters
@@ -484,7 +489,7 @@ class RealDNSTraffic(object):
         ts_start: (float) absolute starting time to schedule events
         results: (list) results list
         '''
-        utils3.set_attributes(self, override=True, **kwargs)
+        set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSTraffic')
 
         # Adjust next taskdelay time
@@ -542,6 +547,7 @@ class RealDNSTraffic(object):
         metadata_d['dns_raddr'] = dns_raddr
         metadata_d['dns_fqdn'] = data_fqdn
         metadata_d['duration'] = ts_end - ts_start
+        metadata_d['data_raddr'] = (data_ripaddr, data_rport, data_rproto)
 
         # Evaluate DNS resolution
         if data_ripaddr is None:
@@ -557,11 +563,6 @@ class RealDNSTraffic(object):
 
 
 class RealDataTraffic(object):
-    # data: TCP based data
-    # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
-    # data: UDP based data
-    # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
-
     def __init__(self, **kwargs):
         '''
         # Common parameters
@@ -569,7 +570,7 @@ class RealDataTraffic(object):
         ts_start: (float) absolute starting time to schedule events
         results: (list) results list
         '''
-        utils3.set_attributes(self, override=True, **kwargs)
+        set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDataTraffic')
 
         # Adjust next taskdelay time
@@ -640,7 +641,7 @@ class SpoofDNSTraffic(object):
         results: (list) results list
         '''
         self.interface = None
-        utils3.set_attributes(self, override=True, **kwargs)
+        set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('SpoofDNSTraffic')
 
         # Adjust next taskdelay time
@@ -702,11 +703,6 @@ class SpoofDNSTraffic(object):
 
 
 class SpoofDataTraffic(object):
-    # dataspoof: TCP based data
-    # {'type': 'dataspoof', 'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
-    # data: UDP based data
-    # {'type': 'dataspoof', 'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
-
     def __init__(self, **kwargs):
         '''
         # Common parameters
@@ -715,7 +711,7 @@ class SpoofDataTraffic(object):
         results: (list) results list
         '''
         self.interface = None
-        utils3.set_attributes(self, override=True, **kwargs)
+        set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('SpoofDataTraffic')
 
         # Adjust next taskdelay time
@@ -764,6 +760,7 @@ class SpoofDataTraffic(object):
         add_result(self.type, True, metadata_d, ts_start, ts_end)
 
 
+
 class MainTestClient(object):
     def __init__(self, config_d):
         self.logger = logging.getLogger('MainTestClient')
@@ -774,10 +771,10 @@ class MainTestClient(object):
         ts_start = _now() + ts_backoff
 
         type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr']),
-                       'dns':       (RealDNSTraffic, ['dns_laddr', 'dns_raddr', 'data_raddr']),
-                       'data':      (RealDataTraffic, ['data_laddr', 'data_raddr']),
-                       'dnsspoof':  (SpoofDNSTraffic, ['dns_laddr', 'dns_raddr', 'data_raddr']),
-                       'dataspoof': (SpoofDataTraffic, ['data_laddr', 'data_raddr']),
+                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr']),
+                       'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr']),
+                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr']),
+                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr']),
                        }
 
         def _get_global_traffic_param(config_d, traffic_type, parameter):
@@ -786,10 +783,7 @@ class MainTestClient(object):
             except KeyError:
                 return []
 
-
         for item_d in config_d['traffic']:
-            print(item_d)
-
             # Get class and config parameters
             cls, parameters = type2config[item_d['type']]
 
@@ -806,7 +800,6 @@ class MainTestClient(object):
             obj = cls(**item_d)
 
 
-
     @asyncio.coroutine
     def monitor_pending_tasks(self, watchdog = WATCHDOG):
         # Monitor number of remaining tasks and exit when done
@@ -820,22 +813,19 @@ class MainTestClient(object):
         return loop.time()
 
     def process_results(self):
-        '''
-        The information model for the results dictionary consists of type2class indexing keys and a list with the individual results as the data type
-        '''
         # Process results and show brief statistics
         global RESULTS
         results_d = {}
         for result_obj in RESULTS:
-            data_l = results_d.setdefault(result_obj.name, [])
+            data_l = results_d.setdefault(result_obj['name'], [])
             data_l.append(result_obj)
 
         for data_key, data_l in results_d.items():
-            nof_ok  = len([1 for _ in data_l if _.success is True])
-            nof_nok = len([0 for _ in data_l if _.success is False])
+            nof_ok  = len([1 for _ in data_l if _['success'] is True])
+            nof_nok = len([0 for _ in data_l if _['success'] is False])
             self.logger.info('{} ok={} nok={}'.format(data_key, nof_ok, nof_nok))
 
-        [print(_) for _ in RESULTS]
+        pprint.pprint(RESULTS)
 
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -875,7 +865,7 @@ if __name__ == '__main__':
         'dns': {
             'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
             'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsonly.example.com', 2000, 17), ('dnsonly.google.es', 2000, 6)],
+            'data_raddr': [('dnsonly.example.com', 0, 0), ('dnsonly.google.es', 0, 0)],
         },
         'data': {
             'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
@@ -884,7 +874,7 @@ if __name__ == '__main__':
         'dnsspoof': {
             'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
             'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsspoof.example.com', 2000, 17), ('dnsspoof.google.es', 2000, 6)],
+            'data_raddr': [('dnsspoof.example.com', 0, 0), ('dnsspoof.google.es', 0, 0)],
         },
         'dataspoof': {
             'data_laddr': [('1.1.1.1', 2000, 17), ('2.2.2.2', 2000, 6)],
@@ -913,12 +903,12 @@ if __name__ == '__main__':
                 # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('1.1.1.1', 65535, 6)],  'data_raddr': [('9.9.9.9', 65535, 6)]},
                 # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('2.2.2.2', 65535, 17)], 'data_raddr': [('9.9.9.9', 65535, 17)]},
 
-                ## Test for global_traffic
-                # {'type': 'dnsdata',   'load': 1},
-                # {'type': 'dns',       'load': 1},
-                # {'type': 'data',      'load': 1},
-                # {'type': 'dataspoof', 'load': 1},
-                # {'type': 'dnsspoof',  'load': 1},
+                # Test for global_traffic
+                 {'type': 'dnsdata',   'load': 1},
+                 {'type': 'dns',       'load': 1},
+                 {'type': 'data',      'load': 1},
+                 {'type': 'dataspoof', 'load': 1},
+                 {'type': 'dnsspoof',  'load': 1},
                  ]
      }
 
