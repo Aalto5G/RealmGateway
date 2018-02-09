@@ -34,10 +34,11 @@ b. Data transfer: Begin an echo client instance (TCP/UDP) to the given IP addres
 #4. Spoofed DNS clients
 c. Spoofed DNS resolution: Resolve an FQDN issuing an A query request to a DNS server impersonating another host/server.
 This is a special case because impersonating a DNS resolver we could try to fake DNS options to also affect reputation of a host.
+We use Scapy for packet manipulation.
 
 #5. Spoofed data clients
 d. Spoofed data transfer: Send TCP SYN or UDP messages as an echo client instance to the given IP address and port.
-
+We use Scapy for packet manipulation.
 
 
 How do we mix all of this in the same program?
@@ -77,6 +78,7 @@ We define the requirements for actions {a,b,c,d} separately.
     + UDP: Measure success/failure based on any response
 
 
+NB: A configuration file example is added at the end of the file, after the Python code
 
 Requires: ./async_echoserver_v3.py -b 127.0.0.1:12345
 Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 127.0.0.1:2007 127.0.0.1:2008 127.0.0.1:2009
@@ -792,3 +794,72 @@ if __name__ == '__main__':
     logger.warning('Processing results...')
     main.process_results()
     sys.exit(0)
+
+
+
+"""
+File: example_traffic.yaml
+
+# YAML configuration file for Realm Gateway Traffic Test Suite v0.1
+## Modify and test via yaml.load(open('config_test.yaml', 'r'))
+
+# Total duration of the test (sec)
+duration: 1
+
+# Backoff time before scheduling tests (sec)
+backoff: 3
+
+# Global definitions for traffic tests, used if no test specific parameter is defined
+global_traffic:
+    dnsdata:
+        dns_laddr: [["0.0.0.0", 0, 6], ["0.0.0.0", 0, 17]]
+        dns_raddr: [["8.8.8.8", 53, 17], ["8.8.8.8", 53, 6], ["8.8.4.4", 53, 17], ["8.8.4.4", 53, 6]]
+        data_laddr: [["0.0.0.0", 0, 6], ["0.0.0.0", 0, 17]]
+        data_raddr: [["example.com", 80, 6], ["google-public-dns-a.google.com", 53, 17]]
+    dns:
+        dns_laddr: [["0.0.0.0", 0, 6], ["0.0.0.0", 0, 17]]
+        dns_raddr: [["8.8.8.8", 53, 17], ["8.8.8.8", 53, 6], ["8.8.4.4", 53, 17], ["8.8.4.4", 53, 6]]
+        data_raddr: [["example.com", 0, 0], ["google-public-dns-a.google.com", 0, 0]]
+    data:
+        data_laddr: [["0.0.0.0", 0, 6], ["0.0.0.0", 0, 17]]
+        data_raddr: [["93.184.216.34", 80, 6], ["8.8.8.8", 53, 17]]
+    dnsspoof:
+        dns_laddr: [["1.1.1.1", 2000, 17], ["2.2.2.2", 2000, 17]]
+        dns_raddr: [["8.8.8.8", 53, 17], ["8.8.4.4", 53, 17], ["195.148.125.201", 53, 17], ["100.64.1.130", 53, 17]]
+        data_raddr: [["dnsspoof.example.com", 0, 0], ["dnsspoof.google.es", 0, 0]]
+        interface: "ens18"
+    dataspoof:
+        data_laddr: [["1.1.1.1", 3000, 17], ["1.1.1.1", 0, 6]]
+        data_raddr: [["8.8.8.8", 0, 17], ["8.8.8.8", 0, 6], ["195.148.125.201", 0, 17], ["195.148.125.201", 0, 6], ["100.64.1.130", 0, 17], ["100.64.1.130", 0, 6]]
+        interface: "ens18"
+
+# This models all the test traffic
+traffic:
+    # Example of tests with global_traffic parameters
+    - {"type": "dnsdata",   "load": 2}
+    - {"type": "dns",       "load": 2}
+    - {"type": "data",      "load": 2}
+    - {"type": "dataspoof", "load": 2, interface: "wan0"}
+    - {"type": "dnsspoof",  "load": 2, interface: "wan0"}
+
+    ## Example of tests with specific values
+    ## dnsdata: TCP based data & UDP based resolution
+    #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 17]], dns_raddr:[["8.8.8.8", 53, 17]], data_laddr: [["0.0.0.0", 0, 6]],  data_raddr: [["google.es", 2000, 6]]}
+    ## dnsdata: UDP based data & UDP based resolution
+    #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 17]], dns_raddr:[["8.8.8.8", 53, 17]], data_laddr: [["0.0.0.0", 0, 17]], data_raddr: [["udp2001.host.demo", 2001, 17]]}
+    #
+    ## dns: UDP based resolution
+    #- {"type": "dns",      "load": 1, dns_laddr:[["0.0.0.0", 0, 17]], dns_raddr:[["8.8.8.8", 53, 17]], data_raddr: [["udp2002.host.demo", 2002, 17]]}
+    #
+    ## data: TCP & UDP based data
+    #- {"type": "data",     "load": 1,                                                                      data_laddr: [["0.0.0.0", 0, 6]],  data_raddr: [["195.148.125.202", 3000, 6]]}
+    #- {"type": "data",     "load": 1,                                                                      data_laddr: [["0.0.0.0", 0, 17]], data_raddr: [["195.148.125.202", 3001, 17]]}
+    #
+    ## dnsspoof: UDP based resolution only
+    #- {"type": "dnsspoof", "load": 1, dns_laddr:[["198.18.0.1", 0, 17]], dns_raddr:[["195.148.125.201", 53, 17]], data_raddr: [["udp5002.host.demo", 5002, 17]]}
+    #
+    ## dataspoof: UDP based data
+    #- {"type": "dataspoof", "load": 1,                                                                     data_laddr: [["1.1.1.1", 65535, 6]],  data_raddr: [["9.9.9.9", 65535, 6]]}
+    #- {"type": "dataspoof", "load": 1,                                                                     data_laddr: [["2.2.2.2", 65535, 17]], data_raddr: [["9.9.9.9", 65535, 17]]}
+
+"""
