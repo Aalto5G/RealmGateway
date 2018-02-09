@@ -279,7 +279,10 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     return eth_pkt
 
 def _scapy_send_packet(packet, iface):
-    sendp(packet, iface=iface, verbose=False)
+    try:
+        sendp(packet, iface=iface, verbose=False)
+    except OSError as e:
+        logger.error('Failed to send / {} via {}  <{}>'.format(packet.command(), iface, e))
 
 
 def add_result(name, success, metadata, ts_start, ts_end):
@@ -583,7 +586,7 @@ class SpoofDNSTraffic(object):
 
     @asyncio.coroutine
     def run(self, dns_raddr, dns_laddr, data_laddr, data_raddr):
-        self.logger.info('[{}] Running task / {}'.format(_now(), (data_laddr, data_raddr)))
+        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_raddr, dns_laddr, data_laddr, data_raddr)))
         ts_start = _now()
         metadata_d = {}
 
@@ -725,7 +728,7 @@ class MainTestClient(object):
         t0 = loop.time()
         while len(loop._scheduled):
             i += 1 # Counter of iterations
-            self.logger.warning('({:.3f}) [{}] Pending tasks: {}'.format(_now(t0), i, len(loop._scheduled)))
+            self.logger.info('({:.3f}) [{}] Pending tasks: {}'.format(_now(t0), i, len(loop._scheduled)))
             yield from asyncio.sleep(watchdog)
         self.logger.warning('({:.3f}) [{}] All tasks completed!'.format(_now(t0), i))
         return loop.time()
@@ -741,7 +744,7 @@ class MainTestClient(object):
         for data_key, data_l in results_d.items():
             nof_ok  = len([1 for _ in data_l if _['success'] is True])
             nof_nok = len([0 for _ in data_l if _['success'] is False])
-            self.logger.info('{} ok={} nok={}'.format(data_key, nof_ok, nof_nok))
+            self.logger.info('{}\t\t\tok={}\tnok={}'.format(data_key, nof_ok, nof_nok))
 
         # Save results to file in json
         if self.args.results:
