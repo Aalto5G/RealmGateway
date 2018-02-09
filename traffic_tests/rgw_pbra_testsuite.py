@@ -62,7 +62,7 @@ We define the requirements for actions {a,b,c,d} separately.
  - EDNS0 options?
  - Source socket address
  - Remote socket address
- - Retransmission scheme
+ - Retransmission scheme ?
  - Implementation details:
     + Use the same code as "a. DNS resolution" from a *fake* IP source
     + Measure success/failure based on A record type found in response
@@ -78,95 +78,9 @@ We define the requirements for actions {a,b,c,d} separately.
 
 
 
-There seems to be a rather common amount of data required for all phases.
-
-Modelling FQDN:
- - A tuple consisting on ((s)fqdn, port, protocol)
- - Read from a file and build pool?
-
-Modelling DNS resolvers for #1 and #2:
- - A tuple consisting on (ip, port, protocol)
- - Read from a file and build pool?
-
-Modelling spoofed sources for DNS/data:
- - A tuple consisting on (ip, port, protocol)
- - Read from a file and build pool?
-
-Modelling spoofed destinations for DNS:
- - A tuple consisting on (ip, port, protocol)
- - Read from a file and build pool?
-
-Modelling spoofed destinations for data:
- - A tuple consisting on (ip, port, protocol)
- - Read from a file and build pool?
-
-
-# Modelling configuration file
-    config_d = {
-     'duration': 1,
-     # Globals for traffic tests
-     'global_traffic': {
-        'dnsdata': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'data_raddr': [('example.com', 2000, 17), ('google.es', 2000, 6)],
-        },
-        'dns': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsonly.example.com', 2000, 17), ('dnsonly.google.es', 2000, 6)],
-        },
-        'data': {
-            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
-        },
-        'dnsspoof': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsspoof.example.com', 2000, 17), ('dnsspoof.google.es', 2000, 6)],
-        },
-        'dataspoof': {
-            'data_laddr': [('1.1.1.1', 2000, 17), ('2.2.2.2', 2000, 6)],
-            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
-        },
-     },
-     # This models all the test traffic
-     'traffic': [
-                # dnsdata: TCP based data & UDP based resolution
-                 {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('google.es', 2000, 6)]},
-                # dnsdata: UDP based data & UDP based resolution
-                # {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2001.host.demo', 2001, 17)]},
-
-                # dns: UDP based resolution
-                # {'type': 'dns',      'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_raddr': [('udp2002.host.demo', 2002, 17)]},
-
-                # data: TCP based data
-                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
-                # data: UDP based data
-                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
-
-                # dnsspoof: UDP based resolution only
-                # {'type': 'dnsspoof', 'load': 1, 'dns_laddr':[('198.18.0.1', 0, 17)], 'dns_raddr':[('195.148.125.201', 53, 17)], 'data_raddr': [('udp5002.host.demo', 5002, 17)]},
-
-                # dataspoof: UDP based data
-                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('1.1.1.1', 65535, 6)],  'data_raddr': [('9.9.9.9', 65535, 6)]},
-                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('2.2.2.2', 65535, 17)], 'data_raddr': [('9.9.9.9', 65535, 17)]},
-
-                ## Test for global_traffic
-                # {'type': 'dnsdata',   'load': 1},
-                # {'type': 'dns',       'load': 1},
-                # {'type': 'data',      'load': 1},
-                # {'type': 'dataspoof', 'load': 1},
-                # {'type': 'dnsspoof',  'load': 1},
-                 ]
-     }
-
-Run as:   ./async_echoclient_v4.py --duration 3 --load 300 --distribution const --dnstimeout 1 1 1 --datatimeout 1 --fqdn localhost.demo:12345 --dnsaddr 127.0.0.1 --dnsport 54
 Requires: ./async_echoserver_v3.py -b 127.0.0.1:12345
-
-Run as: ./async_echoclient_v4.py --duration 3 --load 300 --distribution const --dnstimeout 1 1 1 --datatimeout 1 --dnsaddr 127.0.0.1 --dnsport 54 --fqdn localhost.demo:2000 --sfqdn udp2000.localhost.demo:2000 udp2001.localhost.demo:2001 udp2002.localhost.demo:2002 udp2003.localhost.demo:2003 udp2004.localhost.demo:2004 udp2005.localhost.demo:2005 udp2006.localhost.demo:2006 udp2007.localhost.demo:2007 udp2008.localhost.demo:2008 udp2009.localhost.demo:2009 --trafficshape 0
 Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 127.0.0.1:2007 127.0.0.1:2008 127.0.0.1:2009
+
 """
 
 
@@ -177,14 +91,13 @@ import json
 import logging
 import math
 import os
-import pprint
 import random
 import socket
 import statistics
 import struct
 import sys
 import time
-import uuid
+import yaml
 
 import dns
 import dns.message
@@ -447,10 +360,10 @@ class RealDNSDataTraffic(object):
 
         # Evaluate DNS resolution
         if data_ripaddr is None:
-            metadata_d['sucess'] = False
+            sucess = False
             metadata_d['dns_sucess'] = False
             metadata_d['duration'] = ts_end - ts_start
-            add_result(self.type, False, metadata_d, ts_start, ts_end)
+            add_result(self.type, sucess, metadata_d, ts_start, ts_end)
             return
         else:
             metadata_d['dns_sucess'] = True
@@ -458,8 +371,9 @@ class RealDNSDataTraffic(object):
         ## Run data transfer
         ts_start_data = _now()
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
-        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport), (data_lipaddr, data_lport),
-                                                           timeouts=data_timeouts, socktype=data_sockettype)
+        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+                                                      (data_lipaddr, data_lport),
+                                                       timeouts=data_timeouts, socktype=data_sockettype)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempt
@@ -470,15 +384,13 @@ class RealDNSDataTraffic(object):
 
         # Evaluate data transfer
         if data_recv is None:
-            metadata_d['sucess'] = False
+            sucess = False
             metadata_d['data_sucess'] = False
-            add_result(self.type, False, metadata_d, ts_start, ts_end)
-            return
         else:
-            metadata_d['sucess'] = True
+            sucess = True
             metadata_d['data_sucess'] = True
 
-        add_result(self.type, False, metadata_d, ts_start, ts_end)
+        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
 
 class RealDNSTraffic(object):
@@ -537,7 +449,7 @@ class RealDNSTraffic(object):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempt = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                            timeouts=dns_timeouts, socktype=dns_sockettype)
+                                                                        timeouts=dns_timeouts, socktype=dns_sockettype)
 
         # Populate partial results
         ts_end = _now()
@@ -551,15 +463,13 @@ class RealDNSTraffic(object):
 
         # Evaluate DNS resolution
         if data_ripaddr is None:
-            metadata_d['sucess'] = False
+            sucess = False
             metadata_d['dns_sucess'] = False
-            add_result(self.type, False, metadata_d, ts_start, ts_end)
-            return
         else:
-            metadata_d['sucess'] = True
+            sucess = True
             metadata_d['dns_sucess'] = True
 
-        add_result(self.type, False, metadata_d, ts_start, ts_end)
+        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
 
 class RealDataTraffic(object):
@@ -609,8 +519,9 @@ class RealDataTraffic(object):
 
         ## Run data transfer
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
-        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport), (data_lipaddr, data_lport),
-                                                           timeouts=data_timeouts, socktype=data_sockettype)
+        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+                                                      (data_lipaddr, data_lport),
+                                                       timeouts=data_timeouts, socktype=data_sockettype)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempt
@@ -621,15 +532,13 @@ class RealDataTraffic(object):
 
         # Evaluate data transfer
         if data_recv is None:
-            metadata_d['sucess'] = False
+            sucess = False
             metadata_d['data_sucess'] = False
-            add_result(self.type, False, metadata_d, ts_start, ts_end)
-            return
         else:
-            metadata_d['sucess'] = True
+            sucess = True
             metadata_d['data_sucess'] = True
 
-        add_result(self.type, False, metadata_d, ts_start, ts_end)
+        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
 
 class SpoofDNSTraffic(object):
@@ -762,12 +671,20 @@ class SpoofDataTraffic(object):
 
 
 class MainTestClient(object):
-    def __init__(self, config_d):
+    def __init__(self, args):
         self.logger = logging.getLogger('MainTestClient')
+        self.args = args
 
-        # Main dictionary to store results
+        # Read configuration file
+        with open(self.args.config, 'r') as infile:
+            config_d = yaml.load(infile)
+
+        # Schedule test intances
+        self._spawn_traffic_tests(config_d)
+
+    def _spawn_traffic_tests(self, config_d):
         duration = config_d['duration']
-        ts_backoff = 3
+        ts_backoff = config_d['backoff']
         ts_start = _now() + ts_backoff
 
         type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr']),
@@ -799,7 +716,6 @@ class MainTestClient(object):
             # Create object
             obj = cls(**item_d)
 
-
     @asyncio.coroutine
     def monitor_pending_tasks(self, watchdog = WATCHDOG):
         # Monitor number of remaining tasks and exit when done
@@ -825,7 +741,11 @@ class MainTestClient(object):
             nof_nok = len([0 for _ in data_l if _['success'] is False])
             self.logger.info('{} ok={} nok={}'.format(data_key, nof_ok, nof_nok))
 
-        pprint.pprint(RESULTS)
+        # Save results to file in json
+        if self.args.results:
+            self.logger.info('Writing results to file <{}>'.format(self.args.results))
+            with open(self.args.results, 'w') as outfile:
+                json.dump(RESULTS, outfile)
 
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -842,78 +762,27 @@ def setup_logging_yaml(default_path='logging.yaml',
     else:
         logging.basicConfig(level=level)
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Realm Gateway Traffic Test Suite v0.1')
+    parser.add_argument('--config', type=str, required=True,
+                        help='Input configuration file (yaml)')
+    parser.add_argument('--results', type=str, required=False,
+                        help='Output results file (json)')
+    return parser.parse_args()
 
 if __name__ == '__main__':
     # Use function to configure logging from file
     setup_logging_yaml()
+    logger = logging.getLogger('')
+
+    # Parse arguments
+    args = parse_arguments()
 
     loop = asyncio.get_event_loop()
     #loop.set_debug(True)
 
-    logger = logging.getLogger('')
-
-    config_d = {
-     'duration': 1,
-     # Globals for traffic tests
-     'global_traffic': {
-        'dnsdata': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'data_raddr': [('example.com', 2000, 17), ('google.es', 2000, 6)],
-        },
-        'dns': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsonly.example.com', 0, 0), ('dnsonly.google.es', 0, 0)],
-        },
-        'data': {
-            'data_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
-        },
-        'dnsspoof': {
-            'dns_laddr': [('0.0.0.0', 0, 6), ('0.0.0.0', 0, 17)],
-            'dns_raddr': [('1.2.3.4', 53, 17), ('8.8.8.8', 53, 17), ('8.8.4.4', 53, 17), ('8.8.8.8', 53, 6), ('8.8.4.4', 53, 6)],
-            'data_raddr': [('dnsspoof.example.com', 0, 0), ('dnsspoof.google.es', 0, 0)],
-        },
-        'dataspoof': {
-            'data_laddr': [('1.1.1.1', 2000, 17), ('2.2.2.2', 2000, 6)],
-            'data_raddr': [('1.2.3.4', 2000, 17), ('8.8.8.8', 2000, 6)],
-        },
-     },
-     # This models all the test traffic
-     'traffic': [
-                # dnsdata: TCP based data & UDP based resolution
-                 {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('google.es', 2000, 6)]},
-                # dnsdata: UDP based data & UDP based resolution
-                # {'type': 'dnsdata',  'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('udp2001.host.demo', 2001, 17)]},
-
-                # dns: UDP based resolution
-                # {'type': 'dns',      'load': 1, 'dns_laddr':[('0.0.0.0', 0, 17)], 'dns_raddr':[('8.8.8.8', 53, 17)], 'data_raddr': [('udp2002.host.demo', 2002, 17)]},
-
-                # data: TCP based data
-                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 6)],  'data_raddr': [('195.148.125.202', 3000, 6)]},
-                # data: UDP based data
-                # {'type': 'data',     'load': 1,                                                                      'data_laddr': [('0.0.0.0', 0, 17)], 'data_raddr': [('195.148.125.202', 3001, 17)]},
-
-                # dnsspoof: UDP based resolution only
-                # {'type': 'dnsspoof', 'load': 1, 'dns_laddr':[('198.18.0.1', 0, 17)], 'dns_raddr':[('195.148.125.201', 53, 17)], 'data_raddr': [('udp5002.host.demo', 5002, 17)]},
-
-                # dataspoof: UDP based data
-                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('1.1.1.1', 65535, 6)],  'data_raddr': [('9.9.9.9', 65535, 6)]},
-                # {'type': 'dataspoof', 'load': 1,                                                                     'data_laddr': [('2.2.2.2', 65535, 17)], 'data_raddr': [('9.9.9.9', 65535, 17)]},
-
-                # Test for global_traffic
-                 {'type': 'dnsdata',   'load': 1},
-                 {'type': 'dns',       'load': 1},
-                 {'type': 'data',      'load': 1},
-                 {'type': 'dataspoof', 'load': 1},
-                 {'type': 'dnsspoof',  'load': 1},
-                 ]
-     }
-
     try:
-        main = MainTestClient(config_d)
+        main = MainTestClient(args)
         loop.run_until_complete(main.monitor_pending_tasks())
     except KeyboardInterrupt:
         logger.warning('KeyboardInterrupt!')
