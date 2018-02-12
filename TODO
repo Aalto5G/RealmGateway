@@ -4,3 +4,4 @@
 - Use message.find_rrset() functions in dnspython for obtaining records from message section
 - Add mode selector for RGW or CES (DNS functions needs to be changed)
 - Add packet policy history to PBRA
+- Verisign open DNS servers (64.6.64.6 and 64.6.65.6) produces case insensitive resolutions, e.g. TESt202.gWA.CeSprOtO.re2EE.ORg.
