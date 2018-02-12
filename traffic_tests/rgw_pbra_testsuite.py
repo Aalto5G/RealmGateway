@@ -287,6 +287,27 @@ def _scapy_send_packet(packet, iface):
         logger.error('Failed to send / {} via {}  <{}>'.format(packet.command(), iface, e))
         return False
 
+def _get_service_tuple(local_l, remote_l):
+    # Return a random match from the list of local and remote services tuples
+    ## Use all options on the first iteration, then adjust protocol if no match was found
+    if len(local_l) == 0:
+        j = remote_l[random.randrange(0, len(remote_l))]
+        return (None, j)
+    elif len(remote_l) == 0:
+        i = local_l[random.randrange(0, len(local_l))]
+        return (i, None)
+
+    base = list(local_l)
+    while True:
+        i = base[random.randrange(0, len(base))]
+        r_matches = [_ for _ in remote_l if _[2]==i[2]]
+        # No match found in remote services for given protocol, readjust base and try again
+        if len(r_matches) == 0:
+            base = [_ for _ in base if _[2]!=i[2]]
+            continue
+
+        j = r_matches[random.randrange(0, len(r_matches))]
+        return (i, j)
 
 def add_result(name, success, metadata, ts_start, ts_end):
     # Add a result dictionary entry
@@ -312,31 +333,20 @@ class RealDNSDataTraffic(object):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = self._get_dns_parameters()
-            _data_laddr, _data_raddr, = self._get_data_parameters()
-            # Use timeout template(s)
+            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
+            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
+            # Use timeout template(s) and data_delay
             _dns_timeouts, _data_timeouts = self.dns_timeouts, self.data_timeouts
+            _data_delay = random.uniform(self.data_delay[0], self.data_delay[1])
             # Schedule task
-            args = (_dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr, _data_timeouts)
+            args = (_dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr, _data_timeouts, _data_delay)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
 
-    def _get_dns_parameters(self):
-        i = self.dns_raddr[random.randint(0, len(self.dns_raddr) - 1)]
-        _pmatch = [_ for _ in self.dns_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
-
-    def _get_data_parameters(self):
-        i = self.data_raddr[random.randint(0, len(self.data_raddr) - 1)]
-        _pmatch = [_ for _ in self.data_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
-
     @asyncio.coroutine
-    def run(self, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts):
-        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts)))
+    def run(self, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts, data_delay):
+        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts, data_delay)))
         ts_start = _now()
         metadata_d = {}
 
@@ -373,6 +383,9 @@ class RealDNSDataTraffic(object):
             return
         else:
             metadata_d['dns_success'] = True
+
+        # Await for data_delay
+        yield from asyncio.sleep(data_delay)
 
         ## Run data transfer
         ts_start_data = _now()
@@ -417,8 +430,8 @@ class RealDNSTraffic(object):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = self._get_dns_parameters()
-            _data_laddr, _data_raddr, = self._get_data_parameters()
+            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
+            _data_laddr, _data_raddr, = _get_service_tuple([], self.data_raddr)
             # Use timeout template(s)
             _dns_timeouts = self.dns_timeouts
             # Schedule task
@@ -426,17 +439,6 @@ class RealDNSTraffic(object):
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
-
-    def _get_dns_parameters(self):
-        i = self.dns_raddr[random.randint(0, len(self.dns_raddr) - 1)]
-        _pmatch = [_ for _ in self.dns_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
-
-    def _get_data_parameters(self):
-        i = self.data_raddr[random.randint(0, len(self.data_raddr) - 1)]
-        j = None
-        return (j, i)
 
     @asyncio.coroutine
     def run(self, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr):
@@ -496,7 +498,7 @@ class RealDataTraffic(object):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
-            _data_laddr, _data_raddr, = self._get_data_parameters()
+            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
             # Use timeout template(s)
             _data_timeouts = self.data_timeouts
             # Schedule task
@@ -504,12 +506,6 @@ class RealDataTraffic(object):
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
-
-    def _get_data_parameters(self):
-        i = self.data_raddr[random.randint(0, len(self.data_raddr) - 1)]
-        _pmatch = [_ for _ in self.data_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
 
     @asyncio.coroutine
     def run(self, data_laddr, data_raddr, data_timeouts):
@@ -566,24 +562,13 @@ class SpoofDNSTraffic(object):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = self._get_dns_parameters()
-            _data_laddr, _data_raddr, = self._get_data_parameters()
+            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
+            _data_laddr, _data_raddr, = _get_service_tuple([], self.data_raddr)
             # Schedule task
             args = (_dns_laddr, _dns_raddr, _data_laddr, _data_raddr)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
-
-    def _get_dns_parameters(self):
-        i = self.dns_raddr[random.randint(0, len(self.dns_raddr) - 1)]
-        _pmatch = [_ for _ in self.dns_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
-
-    def _get_data_parameters(self):
-        i = self.data_raddr[random.randint(0, len(self.data_raddr) - 1)]
-        j = None
-        return (j, i)
 
     @asyncio.coroutine
     def run(self, dns_raddr, dns_laddr, data_laddr, data_raddr):
@@ -634,18 +619,12 @@ class SpoofDataTraffic(object):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
-            _data_laddr, _data_raddr, = self._get_data_parameters()
+            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
             # Schedule task
             args = (_data_laddr, _data_raddr)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
-
-    def _get_data_parameters(self):
-        i = self.data_raddr[random.randint(0, len(self.data_raddr) - 1)]
-        _pmatch = [_ for _ in self.data_laddr if _[2]==i[2]]
-        j = _pmatch[random.randint(0, len(_pmatch) - 1)]
-        return (j, i)
 
     @asyncio.coroutine
     def run(self, data_laddr, data_raddr):
@@ -689,7 +668,7 @@ class MainTestClient(object):
         ts_backoff = config_d['backoff']
         ts_start = _now() + ts_backoff
 
-        type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts']),
+        type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts', 'data_delay']),
                        'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr', 'dns_timeouts']),
                        'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
                        'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr']),

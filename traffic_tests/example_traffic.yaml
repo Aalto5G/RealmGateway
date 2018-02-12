@@ -16,6 +16,7 @@ global_traffic:
         data_raddr: [["example.com", 80, 6], ["google-public-dns-a.google.com", 53, 17]]
         dns_timeouts: [1,5,5,5]
         data_timeouts: [1]
+        data_delay: [0.050, 0.250]
     dns:
         dns_laddr: [["0.0.0.0", 0, 6], ["0.0.0.0", 0, 17]]
         dns_raddr: [["8.8.8.8", 53, 17], ["8.8.8.8", 53, 6], ["8.8.4.4", 53, 17], ["8.8.4.4", 53, 6]]
