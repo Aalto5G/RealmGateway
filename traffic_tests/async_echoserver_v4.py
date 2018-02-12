@@ -11,7 +11,7 @@ class EchoServerProtocol:
         self.laddr = transport.get_extra_info('sockname')
 
     def datagram_received(self, data, addr):
-        print('Received {} from <{}:{}>'.format(data, addr[0], addr[1]))
+        print('[UDP] Received {} from <{}:{}>'.format(data, addr[0], addr[1]))
         self.transport.sendto(data, addr)
         global COUNTER
         COUNTER += 1
@@ -20,7 +20,7 @@ class EchoServerProtocol:
 def handle_echo(reader, writer, n=100):
     data = yield from reader.read(n)
     addr = writer.get_extra_info('peername')
-    print('Received {} from <{}:{}>'.format(data, addr[0], addr[1]))
+    print('[TCP] Received {} from <{}:{}>'.format(data, addr[0], addr[1]))
     writer.write(data)
     yield from writer.drain()
     writer.close()
