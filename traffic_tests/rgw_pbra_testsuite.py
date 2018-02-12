@@ -314,8 +314,10 @@ class RealDNSDataTraffic(object):
             # Select parameters randomly
             _dns_laddr, _dns_raddr, = self._get_dns_parameters()
             _data_laddr, _data_raddr, = self._get_data_parameters()
+            # Use timeout template(s)
+            _dns_timeouts, _data_timeouts = self.dns_timeouts, self.data_timeouts
             # Schedule task
-            args = (_dns_laddr, _dns_raddr, _data_laddr, _data_raddr)
+            args = (_dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr, _data_timeouts)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
@@ -333,8 +335,8 @@ class RealDNSDataTraffic(object):
         return (j, i)
 
     @asyncio.coroutine
-    def run(self, dns_laddr, dns_raddr, data_laddr, data_raddr):
-        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, data_laddr, data_raddr)))
+    def run(self, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts):
+        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts)))
         ts_start = _now()
         metadata_d = {}
 
@@ -343,16 +345,12 @@ class RealDNSDataTraffic(object):
         dns_lipaddr, dns_lport, dns_lproto = dns_laddr
         # Select socket type based on protocol number
         dns_sockettype = 'tcp' if dns_rproto == 6 else 'udp'
-        # DNS timeout template
-        dns_timeouts = [1, 5, 5, 5]
 
         # Unpack Data related data
         data_fqdn,    data_rport, data_rproto = data_raddr
         data_lipaddr, data_lport, data_lproto = data_laddr
         # Select socket type based on protocol number
         data_sockettype = 'tcp' if data_rproto == 6 else 'udp'
-        # DNS timeout template
-        data_timeouts = [1]
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
@@ -421,8 +419,10 @@ class RealDNSTraffic(object):
             # Select parameters randomly
             _dns_laddr, _dns_raddr, = self._get_dns_parameters()
             _data_laddr, _data_raddr, = self._get_data_parameters()
+            # Use timeout template(s)
+            _dns_timeouts = self.dns_timeouts
             # Schedule task
-            args = (_dns_laddr, _dns_raddr, _data_laddr, _data_raddr)
+            args = (_dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
@@ -439,8 +439,8 @@ class RealDNSTraffic(object):
         return (j, i)
 
     @asyncio.coroutine
-    def run(self, dns_laddr, dns_raddr, data_laddr, data_raddr):
-        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, data_laddr, data_raddr)))
+    def run(self, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr):
+        self.logger.info('[{}] Running task / {}'.format(_now(), (dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr)))
         ts_start = _now()
         metadata_d = {}
 
@@ -449,8 +449,6 @@ class RealDNSTraffic(object):
         dns_lipaddr, dns_lport, dns_lproto = dns_laddr
         # Select socket type based on protocol number
         dns_sockettype = 'tcp' if dns_rproto == 6 else 'udp'
-        # DNS timeout template
-        dns_timeouts = [5, 5, 5, 1]
 
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
@@ -499,8 +497,10 @@ class RealDataTraffic(object):
             taskdelay += random.expovariate(self.load)
             # Select parameters randomly
             _data_laddr, _data_raddr, = self._get_data_parameters()
+            # Use timeout template(s)
+            _data_timeouts = self.data_timeouts
             # Schedule task
-            args = (_data_laddr, _data_raddr)
+            args = (_data_laddr, _data_raddr, _data_timeouts)
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             self.logger.info('Scheduled task / {} @ {} / {}'.format(self.type, taskdelay, args))
@@ -512,8 +512,8 @@ class RealDataTraffic(object):
         return (j, i)
 
     @asyncio.coroutine
-    def run(self, data_laddr, data_raddr):
-        self.logger.info('[{}] Running task / {}'.format(_now(), (data_laddr, data_raddr)))
+    def run(self, data_laddr, data_raddr, data_timeouts):
+        self.logger.info('[{}] Running task / {}'.format(_now(), (data_laddr, data_raddr, data_timeouts)))
         ts_start = _now()
         metadata_d = {}
 
@@ -522,8 +522,6 @@ class RealDataTraffic(object):
         data_lipaddr, data_lport, data_lproto = data_laddr
         # Select socket type based on protocol number
         data_sockettype = 'tcp' if data_rproto == 6 else 'udp'
-        # Data timeout template
-        data_timeouts = [1]
 
         ## Run data transfer
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
@@ -598,8 +596,6 @@ class SpoofDNSTraffic(object):
         dns_lipaddr, dns_lport, dns_lproto = dns_laddr
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
-        # Data timeout template
-        data_timeouts = [1]
 
         # Build query message
         query = dns.message.make_query(data_fqdn, 1, 1)
@@ -660,8 +656,6 @@ class SpoofDataTraffic(object):
         # Unpack Data related data
         data_ripaddr, data_rport, data_rproto = data_raddr
         data_lipaddr, data_lport, data_lproto = data_laddr
-        # Data timeout template
-        data_timeouts = [1]
 
         # Use Scapy to build and send a packet
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr).encode()
@@ -695,9 +689,9 @@ class MainTestClient(object):
         ts_backoff = config_d['backoff']
         ts_start = _now() + ts_backoff
 
-        type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr']),
-                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr']),
-                       'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr']),
+        type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts']),
+                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr', 'dns_timeouts']),
+                       'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
                        'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr']),
                        'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr']),
                        }
