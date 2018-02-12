@@ -104,6 +104,7 @@ import yaml
 import dns
 import dns.message
 import dns.edns
+import dns.rdataclass
 import dns.rdatatype
 
 # For Scapy
@@ -160,8 +161,8 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
     """
     logger = logging.getLogger('gethostbyname')
     logger.debug('Resolving to {} with timeouts {}'.format(raddr, timeouts))
-    rdtype = 1
-    rdclass = 1
+    rdtype = dns.rdatatype.A
+    rdclass = dns.rdataclass.IN
     ipaddr = None
     attempt = 0
     response = None
@@ -195,14 +196,14 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
             response = dns.message.from_wire(dataresponse)
             assert(response.id == query.id)
             # Parsing result
-            rrset = response.find_rrset(response.answer, query.question[0].name, rdtype, rdclass)
-            ipaddr = None
-            for rdata in rrset:
-                if rdtype == dns.rdatatype.A:
-                    ipaddr = rdata.address
-                    break
-            if ipaddr:
-                break
+            for rrset in response.answer:
+                for rdata in rrset:
+                    if rdata.rdtype == dns.rdatatype.A:
+                        ipaddr = rdata.address
+                        print('[{:.3f}] {} @ {} via {}'.format(_now(), fqdn, ipaddr, raddr[0]))
+                        sock.close()
+                        return (ipaddr, query.id, attempt)
+
         except asyncio.TimeoutError:
             logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             continue
