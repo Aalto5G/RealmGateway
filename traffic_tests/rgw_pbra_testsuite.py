@@ -281,8 +281,10 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
 def _scapy_send_packet(packet, iface):
     try:
         sendp(packet, iface=iface, verbose=False)
+        return True
     except OSError as e:
         logger.error('Failed to send / {} via {}  <{}>'.format(packet.command(), iface, e))
+        return False
 
 
 def add_result(name, success, metadata, ts_start, ts_end):
@@ -341,7 +343,7 @@ class RealDNSDataTraffic(object):
         # Select socket type based on protocol number
         dns_sockettype = 'tcp' if dns_rproto == 6 else 'udp'
         # DNS timeout template
-        dns_timeouts = [5, 5, 5, 1]
+        dns_timeouts = [1, 5, 5, 5]
 
         # Unpack Data related data
         data_fqdn,    data_rport, data_rproto = data_raddr
@@ -352,12 +354,12 @@ class RealDNSDataTraffic(object):
         data_timeouts = [1]
 
         ## Run DNS resolution
-        data_ripaddr, query_id, dns_attempt = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                        timeouts=dns_timeouts, socktype=dns_sockettype)
+        data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
 
         # Populate partial results
         ts_end = _now()
-        metadata_d['dns_attempts'] = dns_attempt
+        metadata_d['dns_attempts'] = dns_attempts
         metadata_d['dns_duration'] = ts_end - ts_start
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
@@ -366,12 +368,12 @@ class RealDNSDataTraffic(object):
         # Evaluate DNS resolution
         if data_ripaddr is None:
             sucess = False
-            metadata_d['dns_sucess'] = False
+            metadata_d['dns_success'] = False
             metadata_d['duration'] = ts_end - ts_start
             add_result(self.type, sucess, metadata_d, ts_start, ts_end)
             return
         else:
-            metadata_d['dns_sucess'] = True
+            metadata_d['dns_success'] = True
 
         ## Run data transfer
         ts_start_data = _now()
@@ -390,10 +392,10 @@ class RealDNSDataTraffic(object):
         # Evaluate data transfer
         if data_recv is None:
             sucess = False
-            metadata_d['data_sucess'] = False
+            metadata_d['data_success'] = False
         else:
             sucess = True
-            metadata_d['data_sucess'] = True
+            metadata_d['data_success'] = True
 
         add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
@@ -453,12 +455,12 @@ class RealDNSTraffic(object):
         data_fqdn, data_rport, data_rproto = data_raddr
 
         ## Run DNS resolution
-        data_ripaddr, query_id, dns_attempt = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                        timeouts=dns_timeouts, socktype=dns_sockettype)
+        data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
 
         # Populate partial results
         ts_end = _now()
-        metadata_d['dns_attempts'] = dns_attempt
+        metadata_d['dns_attempts'] = dns_attempts
         metadata_d['dns_duration'] = ts_end - ts_start
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
@@ -469,10 +471,10 @@ class RealDNSTraffic(object):
         # Evaluate DNS resolution
         if data_ripaddr is None:
             sucess = False
-            metadata_d['dns_sucess'] = False
+            metadata_d['dns_success'] = False
         else:
             sucess = True
-            metadata_d['dns_sucess'] = True
+            metadata_d['dns_success'] = True
 
         add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
@@ -538,10 +540,10 @@ class RealDataTraffic(object):
         # Evaluate data transfer
         if data_recv is None:
             sucess = False
-            metadata_d['data_sucess'] = False
+            metadata_d['data_success'] = False
         else:
             sucess = True
-            metadata_d['data_sucess'] = True
+            metadata_d['data_success'] = True
 
         add_result(self.type, sucess, metadata_d, ts_start, ts_end)
 
@@ -604,7 +606,7 @@ class SpoofDNSTraffic(object):
 
         # Use Scapy to build and send a packet
         eth_pkt = _scapy_build_packet(dns_lipaddr, dns_ripaddr, dns_rproto, dns_lport, dns_rport, data_b)
-        _scapy_send_packet(eth_pkt, self.interface)
+        success = _scapy_send_packet(eth_pkt, self.interface)
 
         # Populate partial results
         ts_end = _now()
@@ -613,7 +615,7 @@ class SpoofDNSTraffic(object):
         metadata_d['dns_fqdn'] = data_fqdn
 
         # Add results
-        add_result(self.type, True, metadata_d, ts_start, ts_end)
+        add_result(self.type, success, metadata_d, ts_start, ts_end)
 
 
 class SpoofDataTraffic(object):
@@ -663,7 +665,7 @@ class SpoofDataTraffic(object):
         # Use Scapy to build and send a packet
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr).encode()
         eth_pkt = _scapy_build_packet(data_lipaddr, data_ripaddr, data_rproto, data_lport, data_rproto, data_b)
-        _scapy_send_packet(eth_pkt, self.interface)
+        success = _scapy_send_packet(eth_pkt, self.interface)
 
         # Populate partial results
         ts_end = _now()
@@ -671,7 +673,7 @@ class SpoofDataTraffic(object):
         metadata_d['data_raddr'] = data_raddr
 
         # Add results
-        add_result(self.type, True, metadata_d, ts_start, ts_end)
+        add_result(self.type, success, metadata_d, ts_start, ts_end)
 
 
 
@@ -735,21 +737,73 @@ class MainTestClient(object):
 
     def process_results(self):
         # Process results and show brief statistics
+        self._save_to_csv_summarized()
+        self._save_to_json()
+
+    def _save_to_csv_summarized(self):
+        # Save a CSV file
         global RESULTS
+
+        # Classify indidivual results from RESULTS list into a dictionary indexed by type
         results_d = {}
         for result_obj in RESULTS:
             data_l = results_d.setdefault(result_obj['name'], [])
             data_l.append(result_obj)
 
-        for data_key, data_l in results_d.items():
-            nof_ok  = len([1 for _ in data_l if _['success'] is True])
-            nof_nok = len([0 for _ in data_l if _['success'] is False])
-            self.logger.info('{}\t\t\tok={}\tnok={}'.format(data_key, nof_ok, nof_nok))
 
-        # Save results to file in json
+        def _get_data(d, tree, default=''):
+            # Generic function to access result data
+            try:
+                _d = dict(d)
+                for branch in tree:
+                    _d = _d[branch]
+                return _d
+            except KeyError:
+                return default
+
+        # Create list of lines to save result statistics
+        lines = []
+        header_fmt = 'name,total,success,failure,dns_success,dns_failure,dns_1,dns_2,dns_3,dns_4,dns_5,data_success,data_failure'
+        lines.append(header_fmt)
+
+        for data_key, data_l in results_d.items():
+            name = data_key
+            total = len(data_l)
+            success = len([1 for _ in data_l if _['success'] == True])
+            failure = len([1 for _ in data_l if _['success'] == False])
+            dns_success = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True])
+            dns_failure = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],True) == False])
+            data_success = len([1 for _ in data_l if _get_data(_,['metadata','data_success'],False) == True])
+            data_failure = len([1 for _ in data_l if _get_data(_,['metadata','data_success'],True) == False])
+            # Calculate DNS retransmission if DNS phase was successfull
+            dns_1 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 1])
+            dns_2 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 2])
+            dns_3 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 3])
+            dns_4 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 4])
+            dns_5 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 5])
+            # Create comma separated line matching header_fmt
+            line = '{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,total,success,failure,
+                                                                   dns_success,dns_failure,
+                                                                   dns_1,dns_2,dns_3,dns_4,dns_5,
+                                                                   data_success,data_failure)
+            lines.append(line)
+            # Log via console
+            self.logger.info('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
+
+        # Save results to file in csv
         if self.args.results:
-            self.logger.info('Writing results to file <{}>'.format(self.args.results))
-            with open(self.args.results, 'w') as outfile:
+            filename = self.args.results + '.csv'
+            self.logger.info('Writing results to file <{}>'.format(filename))
+            with open(filename, 'w') as outfile:
+                outfile.writelines('\n'.join(lines))
+
+    def _save_to_json(self):
+        # Save results to file in json
+        global RESULTS
+        if self.args.results:
+            filename = self.args.results + '.json'
+            self.logger.info('Writing results to file <{}>'.format(filename))
+            with open(filename, 'w') as outfile:
                 json.dump(RESULTS, outfile)
 
 
