@@ -184,6 +184,13 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
                 _data = query.to_wire()
                 yield from loop.sock_sendall(sock, _data)
                 dataresponse = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
+                response = dns.message.from_wire(dataresponse)
+
+                # Check if response is truncated and retry in TCP with a recursive call
+                if (response.flags & dns.flags.TC == dns.flags.TC):
+                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp')
+                    return (_data_ripaddr, _query_id, _dns_attempts)
+
 
             elif socktype == 'tcp':
                 _data = query.to_wire()
@@ -195,7 +202,10 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
 
             response = dns.message.from_wire(dataresponse)
             assert(response.id == query.id)
+
             # Parsing result
+            ## With new PBRA DNS design, we might receive a CNAME instead of an A record, so we have to follow up with a new query to the given domain
+            ## First try to obtain the A record and return if successful
             for rrset in response.answer:
                 for rdata in rrset:
                     if rdata.rdtype == dns.rdatatype.A:
@@ -203,6 +213,14 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
                         print('[{:.3f}] {} @ {} via {}'.format(_now(), fqdn, ipaddr, raddr[0]))
                         sock.close()
                         return (ipaddr, query.id, attempt)
+            ## Alternatively, try to follow-up through the CNAME record and with a recursive call
+            for rrset in response.answer:
+                for rdata in rrset:
+                    if rdata.rdtype == dns.rdatatype.CNAME:
+                        target = rdata.to_text()
+                        print('[{:.3f}] {} @ {} via {}'.format(_now(), fqdn, target, raddr[0]))
+                        _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(target, raddr, laddr, timeouts, socktype='udp')
+                        return (_data_ripaddr, _query_id, _dns_attempts)
 
         except asyncio.TimeoutError:
             logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
@@ -749,7 +767,7 @@ class MainTestClient(object):
             dns_failure = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],True) == False])
             data_success = len([1 for _ in data_l if _get_data(_,['metadata','data_success'],False) == True])
             data_failure = len([1 for _ in data_l if _get_data(_,['metadata','data_success'],True) == False])
-            # Calculate DNS retransmission if DNS phase was successfull
+            # Calculate DNS retransmission if DNS phase was successful
             dns_1 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 1])
             dns_2 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 2])
             dns_3 = len([1 for _ in data_l if _get_data(_,['metadata','dns_success'],False) == True and _get_data(_,['metadata','dns_attempts'],0) == 3])
