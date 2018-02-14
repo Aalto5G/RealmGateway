@@ -24,5 +24,5 @@ global_traffic:
 # This models all the test traffic
 traffic:
     # Example of tests with global_traffic parameters
-    #- {"type": "dnsdata",   "load": 6, dns_raddr:[["195.148.125.201", 53, 17]]}
-    - {"type": "dnsdata",   "load": 30}
+    - {"type": "dnsdata",   "load": 30, dns_raddr:[["195.148.125.201", 53, 17]]}
+    #- {"type": "dnsdata",   "load": 30}

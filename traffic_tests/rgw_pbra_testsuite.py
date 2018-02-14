@@ -783,6 +783,7 @@ class MainTestClient(object):
 
     def process_results(self):
         # Process results and show brief statistics
+        self.logger.warning('Processing results')
         self._save_to_csv_summarized()
         self._save_to_json()
 
@@ -795,9 +796,6 @@ class MainTestClient(object):
         for result_obj in RESULTS:
             data_l = results_d.setdefault(result_obj['name'], [])
             data_l.append(result_obj)
-
-
-
 
         # Create list of lines to save result statistics
         lines = []
@@ -826,12 +824,12 @@ class MainTestClient(object):
                                                                    data_success,data_failure)
             lines.append(line)
             # Log via console
-            self.logger.info('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
+            self.logger.warning('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
 
         # Save results to file in csv
         if self.args.results:
             filename = self.args.results + '.csv'
-            self.logger.info('Writing results to file <{}>'.format(filename))
+            self.logger.warning('Writing results to file <{}>'.format(filename))
             with open(filename, 'w') as outfile:
                 outfile.writelines('\n'.join(lines))
 
@@ -840,7 +838,7 @@ class MainTestClient(object):
         global RESULTS
         if self.args.results:
             filename = self.args.results + '.json'
-            self.logger.info('Writing results to file <{}>'.format(filename))
+            self.logger.warning('Writing results to file <{}>'.format(filename))
             with open(filename, 'w') as outfile:
                 json.dump(RESULTS, outfile)
 
@@ -888,7 +886,6 @@ if __name__ == '__main__':
 
     #logger.warning('All tasks completed!')
     loop.stop()
-    logger.warning('Processing results...')
     main.process_results()
     sys.exit(0)
 
