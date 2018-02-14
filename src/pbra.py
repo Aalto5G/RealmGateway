@@ -737,7 +737,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         if query.transport == 'udp' and self.PBRA_DNS_POLICY_TCPCNAME:
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response / {}'.format(service_data))
+            self._logger.debug('Create TRUNCATED response / {}'.format(service_data))
             return response
 
         ## Enforce PBRA_DNS_POLICY_TCP
@@ -746,7 +746,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Ensure spoofed-free communications by triggering TCP requests
             ## Create truncated response
             response = self._policy_tcp(query)
-            self._logger.info('Create TRUNCATED response / {}'.format(service_data))
+            self._logger.debug('Create TRUNCATED response / {}'.format(service_data))
             return response
 
         # Continue processing with *trusted* DNS query
@@ -772,7 +772,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                 # Create reputation metadata in query object
                 self._load_metadata_resolver(query, addr, create=True)
 
-            self._logger.info('Create CNAME response / {}'.format(alias_service_data))
+            self._logger.debug('Create CNAME response / {}'.format(alias_service_data))
             # Return CNAME response
             return response
 
@@ -815,11 +815,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Evaluate host data service and use appropriate address pool
         if service_data['proxy_required'] is True:
             # Resolve via Service Pool
-            self._logger.info('Process {} with ServicePool ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), service_data))
+            self._logger.debug('Process {} with ServicePool ({}) / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), service_data))
             allocated_ipv4 =  self._rgw_allocate_servicepool()
         else:
             # Resolve via Circular Pool
-            self._logger.info('Process {} with CircularPool ({}) for {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipv4, service_data))
+            self._logger.debug('Process {} with CircularPool ({}) for {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipv4, service_data))
             # Decision making based on load level(s) and reputation
             allocated_ipv4 = self._rgw_allocate_circularpool(query, addr, host_obj, service_data, host_ipv4)
 

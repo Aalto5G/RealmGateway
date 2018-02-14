@@ -703,6 +703,9 @@ class Network(object):
     def _synproxy_create(self):
         # Initialize object
         self.synproxy_sock = None
+        # Variables used to calculate avg time per operation
+        self._synproxy_nofops = 0
+        self._synproxy_aggtime = 0
         # Create TCP socket
         sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -739,20 +742,28 @@ class Network(object):
         _t = self.loop.time()
         success = yield from self._synproxy_sendrecv('mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         _tdelay = (self.loop.time() - _t) * 1000
+        self._synproxy_nofops += 1
+        self._synproxy_aggtime += _tdelay
+        _tdelay_avg = self._synproxy_aggtime / self._synproxy_nofops
+        msg = '({:.3} ms / avg {:.3} ms): ipaddr={} port={} protocol={} mss={} sack={} wscale={}'.format(_tdelay, _tdelay_avg, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         if success:
-            self._logger.info('Successfully added connection to SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.info('Added connection to SYNPROXY {}'.format(msg))
         else:
-            self._logger.warning('Failed to add connection to SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)))
+            self._logger.warning('Failed to add connection to SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
     def synproxy_del_connection(self, ipaddr, port, proto):
         _t = self.loop.time()
         success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto)
         _tdelay = (self.loop.time() - _t) * 1000
+        self._synproxy_nofops += 1
+        self._synproxy_aggtime += _tdelay
+        _tdelay_avg = self._synproxy_aggtime / self._synproxy_nofops
+        msg = '({:.3} ms / avg {:.3} ms): ipaddr={} port={} protocol={} mss={} sack={} wscale={}'.format(_tdelay, _tdelay_avg, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         if success:
-            self._logger.info('Successfully deleted connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto)))
+            self._logger.debug('Deleted connection from SYNPROXY {}'.format(msg))
         else:
-            self._logger.warning('Failed to delete connection from SYNPROXY ({:.3} ms): {}'.format(_tdelay, (ipaddr, port, proto)))
+            self._logger.warning('Failed to delete connection from SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
     def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):

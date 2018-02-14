@@ -193,7 +193,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def run(self):
-        self._logger.info('RealmGateway_v2 is starting...')
+        self._logger.warning('RealmGateway_v2 is starting...')
         # Initialize Data Repository
         yield from self._init_datarepository()
         # Initialize Address Pools
@@ -221,12 +221,14 @@ class RealmGateway(object):
         RUNNING_TASKS.append((_t, 'show_dnsgroups'))
         # Initialize Subscriber information
         yield from self._init_subscriberdata()
+        # Ready!
+        self._logger.warning('RealmGateway_v2 is ready!')
 
 
     @asyncio.coroutine
     def _init_datarepository(self):
         # Initialize Data Repository
-        self._logger.info('Initializing data repository')
+        self._logger.warning('Initializing Data Repository')
         configfile   = self._config.getdefault('repository_subscriber_file', None)
         configfolder = self._config.getdefault('repository_subscriber_folder', None)
         policyfile   = self._config.getdefault('repository_policy_file', None)
@@ -238,6 +240,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_pools(self):
+        self._logger.warning('Initializing Address Pools')
         # Create container of Address Pools
         self._pooltable = PoolContainer()
 
@@ -276,6 +279,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_network(self):
+        self._logger.warning('Initializing Network')
         self._network = Network(ipt_cpool_queue  = self._config.ipt_cpool_queue,
                                 ipt_cpool_chain  = self._config.ipt_cpool_chain,
                                 ipt_host_chain   = self._config.ipt_host_chain ,
@@ -292,6 +296,7 @@ class RealmGateway(object):
     @asyncio.coroutine
     def _init_pbra(self):
         # Create container of Reputation objects
+        self._logger.warning('Initializing Policy Based Resource Allocation')
         self._pbra = PolicyBasedResourceAllocation(pooltable       = self._pooltable,
                                                    hosttable       = self._hosttable,
                                                    connectiontable = self._connectiontable,
@@ -380,7 +385,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
-        self._logger.info('Initializing subscriber data')
+        self._logger.warning('Initializing subscriber data')
         tzero = time.time()
         for subs_id, subs_data in self._datarepository.get_policy_host_all({}).items():
             ipaddr = subs_data['ID']['ipv4'][0]
@@ -391,7 +396,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_cleanup_cpool(self, delay):
-        self._logger.info('Initiating cleanup of the Circular Pool every {} seconds'.format(delay))
+        self._logger.warning('Initiating cleanup of the Circular Pool every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
             # Update table and remove expired elements
@@ -399,7 +404,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_cleanup_pbra_timers(self, delay):
-        self._logger.info('Initiating cleanup of PBRA timers every {} seconds'.format(delay))
+        self._logger.warning('Initiating cleanup of PBRA timers every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
             # Update table and remove expired elements
@@ -407,7 +412,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def _init_show_dnsgroups(self, delay):
-        self._logger.info('Initiating display of DNSGroup information every {} seconds'.format(delay))
+        self._logger.warning('Initiating display of DNSGroup information every {} seconds'.format(delay))
         while True:
             yield from asyncio.sleep(delay)
             # Update table and remove expired elements
@@ -415,7 +420,7 @@ class RealmGateway(object):
 
     @asyncio.coroutine
     def shutdown(self):
-        self._logger.info('RealmGateway_v2 is shutting down...')
+        self._logger.warning('RealmGateway_v2 is shutting down...')
         # Close registered sockets in callback module
         for obj in self.dnscb.get_object(None):
             obj.connection_lost(None)
@@ -431,7 +436,7 @@ class RealmGateway(object):
                 task_obj.cancel()
                 yield from asyncio.sleep(1)
                 yield from task_obj
-                self._logger.info('>> Cancelled {} task'.format(task_name))
+                self._logger.warning('>> Cancelled {} task'.format(task_name))
 
 
 if __name__ == '__main__':
