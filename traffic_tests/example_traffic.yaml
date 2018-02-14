@@ -46,8 +46,10 @@ traffic:
     - {"type": "dnsspoof",  "load": 2, interface: "ens18"}
 
     ## Example of tests with specific values
-    ## dnsdata: TCP based data & UDP based resolution
-    #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 17]], dns_raddr:[["8.8.8.8", 53, 17]], data_laddr: [["0.0.0.0", 0, 6]],  data_raddr: [["google.es", 2000, 6]]}
+    ## dnsdata: Specific duration and starting time
+    - {"type": "dnsdata",   "load": 2, "ts_start": 10, "duration": 10}
+    ## dnsdata: TCP based data & TCP based resolution
+    #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 6]], dns_raddr:[["8.8.8.8", 53, 6]], data_laddr: [["0.0.0.0", 0, 6]],  data_raddr: [["google.es", 2000, 6]]}
     ## dnsdata: UDP based data & UDP based resolution
     #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 17]], dns_raddr:[["8.8.8.8", 53, 17]], data_laddr: [["0.0.0.0", 0, 17]], data_raddr: [["udp2001.host.demo", 2001, 17]]}
     #
