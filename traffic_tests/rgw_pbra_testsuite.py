@@ -427,7 +427,8 @@ class RealDNSDataTraffic(object):
             metadata_d['dns_success'] = True
 
         # Await for data_delay
-        yield from asyncio.sleep(data_delay)
+        if data_delay > 0:
+            yield from asyncio.sleep(data_delay)
 
         ## Run data transfer
         ts_start_data = _now()
