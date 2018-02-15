@@ -35,37 +35,28 @@ Run as:
 
 import argparse
 import asyncio
-import pool
-import configparser
-
-
+import dns
+import dns.rcode
+import functools
 import logging
 import logging.config
-import yaml
 import os
-
 import time
+import yaml
 from contextlib import suppress
 
-from datarepository import DataRepository
-from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
-from host import HostTable, HostEntry
-from connection import ConnectionTable
-from network import Network
 from callbacks import DNSCallbacks, PacketCallbacks
-
-import customdns
+from connection import ConnectionTable
 from customdns.ddns import DDNSServer
 from customdns.dnsproxy import DNSProxy, DNSTCPProxy
-
+from datarepository import DataRepository
+from host import HostTable, HostEntry
+from network import Network
+from pbra import PolicyBasedResourceAllocation
+from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
 from helpers_n_wrappers import utils3
 from global_variables import RUNNING_TASKS
 
-import pbra
-from pbra import PolicyBasedResourceAllocation
-
-import dns
-import dns.rcode
 
 def setup_logging_yaml(default_path='logging.yaml',
                        default_level=logging.INFO,
@@ -344,7 +335,7 @@ class RealmGateway(object):
         # Dynamic DNS Server for DNS update messages
         for ipaddr, port in self._config.ddns_server:
             cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
-            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DDNSServer(cb_default = cb_function), local_addr=(ipaddr, port))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DDNSServer, cb_default = cb_function), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
@@ -352,15 +343,24 @@ class RealmGateway(object):
         for ipaddr, port in self._config.dns_server_wan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
-            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
+
+        # DNS Server for WAN via TCP
+        for ipaddr, port in self._config.dns_server_wan:
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+            server = yield from self._loop.create_server(functools.partial(DNSTCPProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), host=ipaddr, port=port, reuse_address=True)
+            server.connection_lost = lambda x: server.close()
+            self._logger.info('Creating DNS TCP Server endpoint @{}:{}'.format(ipaddr, port))
+            self.dnscb.register_object('DNSTCPServer@{}:{}'.format(ipaddr, port), server)
 
         # DNS Proxy for LAN
         for ipaddr, port in self._config.dns_server_lan:
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
-            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
@@ -369,30 +369,20 @@ class RealmGateway(object):
             cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
             # Disable resolutions of non SOA domains for self generated DNS queries (i.e. HTTP proxy) - Answer with REFUSED
             cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_error_response(x,y,z,rcode=dns.rcode.REFUSED))
-            transport, protocol = yield from self._loop.create_datagram_endpoint(lambda: DNSProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
+            transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
-
-        # BUG: If we move this part upwards, there is misrouting of messages to dns_process_rgw_lan_soa/dns_process_rgw_lan_nosoa
-        # DNS Server for WAN via TCP
-        for ipaddr, port in self._config.dns_server_wan:
-            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
-            server = yield from self._loop.create_server(lambda: DNSTCPProxy(soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), host=ipaddr, port=port, reuse_address=True)
-            server.connection_lost = lambda x: server.close()
-            self._logger.info('Creating DNS TCP Server endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DNSTCPServer@{}:{}'.format(ipaddr, port), server)
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
-        tzero = time.time()
+        tzero = self._loop.time()
         for subs_id, subs_data in self._datarepository.get_policy_host_all({}).items():
             ipaddr = subs_data['ID']['ipv4'][0]
             fqdn = subs_data['ID']['fqdn'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
             yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
-        self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(time.time()-tzero))
+        self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(self._loop.time()-tzero))
 
     @asyncio.coroutine
     def _init_cleanup_cpool(self, delay):
