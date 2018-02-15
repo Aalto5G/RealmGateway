@@ -1102,9 +1102,11 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Synchronize connection with SYNPROXY module
         ## TODO: Get TCP options policy from host
-        tcpmss, tcpsack, tcpwscale = 1460, 1, 7
-        # Do this in parallel ?
-        asyncio.ensure_future(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
+        if service_data['protocol'] in [0, 6]:
+            # Do this in parallel ?
+            # TODO: Test performance and consider optimizations
+            tcpmss, tcpsack, tcpwscale = 1460, 1, 7
+            asyncio.ensure_future(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
 
         # Return the allocated address
         return allocated_ipv4
