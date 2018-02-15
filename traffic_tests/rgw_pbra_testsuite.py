@@ -342,7 +342,7 @@ def _get_data_dict(d, tree, default=''):
 def add_result(name, success, metadata, ts_start, ts_end):
     # Add a result dictionary entry
     global RESULTS
-    RESULTS.append({'name':name, 'success':success, 'metadata': metadata, 'ts_start': ts_start, 'ts_end': ts_end})
+    RESULTS.append({'name':name, 'success':success, 'metadata': metadata, 'ts_start': ts_start, 'ts_end': ts_end, 'duration': ts_end - ts_start})
 
 
 class RealDNSDataTraffic(object):
@@ -432,12 +432,12 @@ class RealDNSDataTraffic(object):
         ## Run data transfer
         ts_start_data = _now()
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
-        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
-                                                      (data_lipaddr, data_lport),
-                                                       timeouts=data_timeouts, socktype=data_sockettype)
+        data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+                                                       (data_lipaddr, data_lport),
+                                                        timeouts=data_timeouts, socktype=data_sockettype)
         # Populate partial results
         ts_end = _now()
-        metadata_d['data_attempts'] = data_attempt
+        metadata_d['data_attempts'] = data_attempts
         metadata_d['data_duration'] = ts_end - ts_start_data
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = (data_ripaddr, data_rport, data_rproto)
@@ -581,12 +581,12 @@ class RealDataTraffic(object):
 
         ## Run data transfer
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
-        data_recv, data_attempt = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
-                                                      (data_lipaddr, data_lport),
-                                                       timeouts=data_timeouts, socktype=data_sockettype)
+        data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+                                                       (data_lipaddr, data_lport),
+                                                        timeouts=data_timeouts, socktype=data_sockettype)
         # Populate partial results
         ts_end = _now()
-        metadata_d['data_attempts'] = data_attempt
+        metadata_d['data_attempts'] = data_attempts
         metadata_d['data_duration'] = ts_end - ts_start
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = data_raddr
@@ -784,8 +784,9 @@ class MainTestClient(object):
     def process_results(self):
         # Process results and show brief statistics
         self.logger.warning('Processing results')
-        self._save_to_csv_summarized()
         self._save_to_json()
+        self._save_to_csv()
+        self._save_to_csv_summarized()
 
     def _save_to_csv_summarized(self):
         # Save a CSV file
@@ -793,9 +794,9 @@ class MainTestClient(object):
 
         # Classify indidivual results from RESULTS list into a dictionary indexed by type
         results_d = {}
-        for result_obj in RESULTS:
-            data_l = results_d.setdefault(result_obj['name'], [])
-            data_l.append(result_obj)
+        for result_d in RESULTS:
+            data_l = results_d.setdefault(result_d['name'], [])
+            data_l.append(result_d)
 
         # Create list of lines to save result statistics
         lines = []
@@ -825,6 +826,40 @@ class MainTestClient(object):
             lines.append(line)
             # Log via console
             self.logger.warning('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
+
+        # Save results to file in csv
+        if self.args.results:
+            filename = self.args.results + '.summary.csv'
+            self.logger.warning('Writing results to file <{}>'.format(filename))
+            with open(filename, 'w') as outfile:
+                outfile.writelines('\n'.join(lines))
+
+    def _save_to_csv(self):
+        # Save a CSV file
+        global RESULTS
+
+        # Create list of lines to save result statistics
+        lines = []
+        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_duration,data_success,data_attempts,data_duration'
+        lines.append(header_fmt)
+
+        for result_d in RESULTS:
+            name          = result_d['name']
+            success       = result_d['success']
+            ts_start      = result_d['ts_start']
+            ts_end        = result_d['ts_end']
+            duration      = result_d['duration']
+            metadata_d    = result_d.setdefault('metadata', {})
+            dns_success   = metadata_d.get('dns_success', '')
+            dns_attempts  = metadata_d.get('dns_attempts', '')
+            dns_duration  = metadata_d.get('dns_duration', '')
+            data_success  = metadata_d.get('data_success', '')
+            data_attempts = metadata_d.get('data_attempts', '')
+            data_duration = metadata_d.get('data_duration', '')
+            line = '{},{},{},{},{},{},{},{},{},{},{}'.format(name,success,ts_start,ts_end,duration,
+                                                             dns_success,dns_attempts,dns_duration,
+                                                             data_success,data_attempts,data_duration)
+            lines.append(line)
 
         # Save results to file in csv
         if self.args.results:
