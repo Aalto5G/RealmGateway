@@ -2,8 +2,11 @@
 
 import asyncio
 import argparse
+import sys
 
-COUNTER = 0
+MONITOR_INTERVAL = 2
+TCP_COUNTER = 0
+UDP_COUNTER = 0
 
 class EchoServerProtocol:
     def connection_made(self, transport):
@@ -13,8 +16,8 @@ class EchoServerProtocol:
     def datagram_received(self, data, addr):
         print('[UDP] Received {} from <{}:{}>'.format(data, addr[0], addr[1]))
         self.transport.sendto(data, addr)
-        global COUNTER
-        COUNTER += 1
+        global UDP_COUNTER
+        UDP_COUNTER += 1
 
 @asyncio.coroutine
 def handle_echo(reader, writer, n=100):
@@ -24,8 +27,16 @@ def handle_echo(reader, writer, n=100):
     writer.write(data)
     yield from writer.drain()
     writer.close()
-    global COUNTER
-    COUNTER += 1
+    global TCP_COUNTER
+    TCP_COUNTER += 1
+
+@asyncio.coroutine
+def monitor(period = MONITOR_INTERVAL):
+    while True:
+        print('TCP messages: {}'.format(TCP_COUNTER), file=sys.stderr, flush=True)
+        print('UDP messages: {}'.format(UDP_COUNTER), file=sys.stderr, flush=True)
+        yield from asyncio.sleep(period)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data test server with python3 and asyncio')
@@ -45,13 +56,16 @@ if __name__ == '__main__':
         print('Starting TCP EchoServer @{}:{}'.format(laddr[0], laddr[1]))
         coro = asyncio.start_server(handle_echo, laddr[0], laddr[1])
         transport = loop.run_until_complete(coro)
-
+    # Run monitor task
+    loop.run_until_complete(monitor())
     try:
         loop.run_forever()
     except KeyboardInterrupt:
+        print('Terminating!', file=sys.stderr, flush=True)
         pass
 
     for transport in transports:
         transport.close()
     loop.close()
-    print('Answered {} messages'.format(COUNTER))
+    print('TCP messages: {}'.format(TCP_COUNTER), file=sys.stderr, flush=True)
+    print('UDP messages: {}'.format(UDP_COUNTER), file=sys.stderr, flush=True)
