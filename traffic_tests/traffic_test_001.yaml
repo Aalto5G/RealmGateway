@@ -2,7 +2,7 @@
 ## 100% FQDN traffic
 
 # Total duration of the test (sec)
-duration: 60
+duration: 5
 
 # Backoff time before scheduling tests (sec)
 backoff: 3
@@ -20,7 +20,7 @@ global_traffic:
         ## 100% FQDN traffic with mixed UDP and TCP services -> Requires TCP SYNPROXY sync even for UDP traffic
         #data_raddr: [["test200.gwa.cesproto.re2ee.org", 2000, 6], ["test201.gwa.cesproto.re2ee.org", 2000, 6], ["test202.gwa.cesproto.re2ee.org", 2000, 6], ["test203.gwa.cesproto.re2ee.org", 2000, 6], ["test204.gwa.cesproto.re2ee.org", 2000, 6], ["test205.gwa.cesproto.re2ee.org", 2000, 6], ["test206.gwa.cesproto.re2ee.org", 2000, 6], ["test207.gwa.cesproto.re2ee.org", 2000, 6], ["test208.gwa.cesproto.re2ee.org", 2000, 6], ["test209.gwa.cesproto.re2ee.org", 2000, 6], ["test200.gwa.cesproto.re2ee.org", 2000, 17], ["test201.gwa.cesproto.re2ee.org", 2000, 17], ["test202.gwa.cesproto.re2ee.org", 2000, 17], ["test203.gwa.cesproto.re2ee.org", 2000, 17], ["test204.gwa.cesproto.re2ee.org", 2000, 17], ["test205.gwa.cesproto.re2ee.org", 2000, 17], ["test206.gwa.cesproto.re2ee.org", 2000, 17], ["test207.gwa.cesproto.re2ee.org", 2000, 17], ["test208.gwa.cesproto.re2ee.org", 2000, 17], ["test209.gwa.cesproto.re2ee.org", 2000, 17]]
 
-        # 100% FQDN traffic with mixed UDP and TCP services - Technically 100% SFQDN but they are all the same service which yields FQDN-like allocations
+        # 100% FQDN traffic with mixed UDP and TCP services - Technically 100% SFQDN but they are all the same service which yields FQDN-like allocations with known protocol
         data_raddr: [["tcp2000.test200.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test201.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test202.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test203.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test204.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test205.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test206.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test207.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test208.gwa.cesproto.re2ee.org", 2000, 6], ["tcp2000.test209.gwa.cesproto.re2ee.org", 2000, 6], ["udp2000.test200.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test201.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test202.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test203.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test204.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test205.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test206.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test207.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test208.gwa.cesproto.re2ee.org", 2000, 17], ["udp2000.test209.gwa.cesproto.re2ee.org", 2000, 17]]
 
         dns_timeouts: [1,5,5,5]
@@ -30,4 +30,5 @@ global_traffic:
 # This models all the test traffic
 traffic:
     # Example of tests with global_traffic parameters
-    - {"type": "dnsdata",   "load": 60, dns_raddr:[["195.148.125.201", 53, 17]]}
+    - {"type": "dnsdata",   "load": 1, "dns_raddr":[["195.148.125.201", 53, 17]]}
+    - {"type": "dns",       "load": 1000, "dns_raddr":[["195.148.125.201", 53, 17]], "dns_laddr": [["0.0.0.0", 0, 17]], "data_raddr": [["gwa.cesproto.re2ee.org", 0, 0]], "dns_timeouts": [1,5,5,5]}
