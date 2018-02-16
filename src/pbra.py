@@ -1090,23 +1090,22 @@ class PolicyBasedResourceAllocation(container3.Container):
                       'query': query
                       }
 
-        connection_obj = ConnectionLegacy(**conn_param)
+        conn = ConnectionLegacy(**conn_param)
         # Monkey patch delete function for connection object
         ## TODO: Execute this as a coroutine to yield from synproxy_del_connection ?
-        connection_obj.delete = partial(self._cb_connection_deleted, connection_obj)
+        conn.delete = partial(self._cb_connection_deleted, conn)
         # Add connection to table
-        self.connectiontable.add(connection_obj)
+        self.connectiontable.add(conn)
         # Log
-        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, connection_obj.timeout*1000))
-        self._logger.debug('New Circular Pool connection: {}'.format(connection_obj))
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, conn.timeout*1000))
+        self._logger.debug('New Circular Pool connection: {}'.format(conn))
 
         # Synchronize connection with SYNPROXY module
         ## TODO: Get TCP options policy from host
         if service_data['protocol'] in [0, 6]:
-            # Do this in parallel ?
-            # TODO: Test performance and consider optimizations
+            # TODO: Test performance and consider optimizations / Do this in parallel or yield from it?
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
-            asyncio.ensure_future(self.network.synproxy_add_connection(allocated_ipv4, 6, service_data['port'], tcpmss, tcpsack, tcpwscale))
+            asyncio.ensure_future(self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale))
 
         # Return the allocated address
         return allocated_ipv4
@@ -1136,6 +1135,15 @@ class PolicyBasedResourceAllocation(container3.Container):
                 conn.query.reputation_resolver.event_ok()
             if conn.query.reputation_requestor is not None:
                 conn.query.reputation_requestor.event_ok()
+
+        # Synchronize connection with SYNPROXY module
+        if (conn.outbound_port, conn.protocol) == (0 ,0):
+            # This is an FQDN connection -> Reset TCP default options in SYNPROXY connection!
+            tcpmss, tcpsack, tcpwscale = 1460, 1, 7
+            asyncio.ensure_future(self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale))
+        else:
+            # This is an SFQDN connection -> Remove from SYNPROXY!
+            asyncio.ensure_future(self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol))
 
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
