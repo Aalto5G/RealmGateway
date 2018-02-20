@@ -176,7 +176,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=True, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=1)
     if sock is None:
         logger.debug('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
         return (ipaddr, query.id, attempt)
@@ -228,13 +228,15 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
             logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             continue
         except ConnectionRefusedError:
-            logger.debug('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
+            logger.exception('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             break
         except AssertionError:
-            logger.info('Wrong message id: {}!={} / {} ({})'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype)))
+            # This may happen if we have many sockets open
+            _laddr = sock.getsockname()
+            logger.exception('Wrong message id: {}!={} / {} ({}) / {}:{}'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype), _laddr[0], _laddr[1]))
             break
         except KeyError:
-            logger.info('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
+            logger.exception('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
             break
         except Exception as e:
             logger.warning('Exception {}: {}:{} ({}) / {} ({})'.format(e, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
@@ -259,7 +261,7 @@ def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=True, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=1)
     if sock is None:
         logger.debug('Socket failed to connect: {}:{} ({})'.format(raddr[0], raddr[1], socktype))
         return (recvdata, attempt)
@@ -428,6 +430,7 @@ class RealDNSDataTraffic(object):
 
         # Await for data_delay
         if data_delay > 0:
+            self.logge.warning('RealDNSDataTraffic sleep({}) before sending data', data_delay)
             yield from asyncio.sleep(data_delay)
 
         ## Run data transfer

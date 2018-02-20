@@ -579,16 +579,17 @@ class PolicyBasedResourceAllocation(container3.Container):
             if node.hasexpired():
                 self.remove(node)
 
-    def debug_dnsgroups(self):
+    def debug_dnsgroups(self, transition = False):
         # For debugging purposes
         #nodes = self.lookup(KEY_DNSGROUP, update=False, check_expire=False)
         nodes = self.lookup(KEY_DNS_REPUTATION, update=False, check_expire=False)
         if nodes is None:
             return
 
-        [node.transition_period() for node in nodes]
-        [print(node) for node in nodes]
-        #[node.show_reputation() for node in nodes]
+        if transition:
+            [node.transition_period() for node in nodes]
+            [print(node) for node in nodes]
+            #[node.show_reputation() for node in nodes]
 
 
     def _policy_tcp(self, query):
@@ -1099,14 +1100,14 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Log
         self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, conn.timeout*1000))
         self._logger.debug('New Circular Pool connection: {}'.format(conn))
-
+        '''
         # Synchronize connection with SYNPROXY module
         ## TODO: Get TCP options policy from host
         if service_data['protocol'] in [0, 6]:
             # TODO: Test performance and consider optimizations / Do this in parallel or yield from it?
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
             asyncio.ensure_future(self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale))
-
+        '''
         # Return the allocated address
         return allocated_ipv4
 
@@ -1135,7 +1136,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                 conn.query.reputation_resolver.event_ok()
             if conn.query.reputation_requestor is not None:
                 conn.query.reputation_requestor.event_ok()
-
+        '''
         # Synchronize connection with SYNPROXY module
         if (conn.outbound_port, conn.protocol) == (0 ,0):
             # This is an FQDN connection -> Reset TCP default options in SYNPROXY connection!
@@ -1144,7 +1145,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         else:
             # This is an SFQDN connection -> Remove from SYNPROXY!
             asyncio.ensure_future(self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol))
-
+        '''
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
             self._logger.debug('Cannot release IP address to Circular Pool: {} @ {} still in use for {:.3f} msec'.format(conn.fqdn, ipaddr, conn.age*1000))

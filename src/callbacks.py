@@ -427,7 +427,7 @@ class DNSCallbacks(object):
         # Evaluate allocated address
         if not allocated_ipv4:
             # Failed to allocate an address - Drop DNS Query to trigger reattempt
-            self._logger.warning('Failed to allocate an address for {}'.format(fqdn))
+            #self._logger.debug('Failed to allocate an address for {}'.format(fqdn))
             return
 
         # Create DNS response based on received query type
