@@ -1,4 +1,4 @@
-# Customer Edge Switching
+# Customer Edge Switching / Realm Gateway
 
 ## Requirements
 
@@ -66,7 +66,10 @@ Run as:
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/
+          --repository-policy-folder     gwa.policy.d/                       \
+          --repository-api-url  http://127.0.0.1:8082/                       \
+          --network-api-url     http://127.0.0.1:8081/                       \
+          --synproxy         172.31.255.14 12345
 ```
 
 
@@ -81,9 +84,9 @@ However, if we plan on making a new deployment there are a few things we need to
 Setting incorrect values on these fields may make debugging quite difficult as you might need to trace packets in iptables.
 
 * iptables.policy: This is one of the most critical files that needs editing. Please pay attention to the following:
-    
+
     NAT.rules: In mangle.CIRCULAR_POOL chain the targets NFQUEUE queue-num need to match the argument ```--ipt-cpool-queue``` passed to the python program.
-    
+
     NAT.rules: In nat.POSTROUTING chain we use 2 rules for SNAT target that match on a different packet mark.
 The most crucial is the one indicated as ```SNAT to available pool``` and it should include the available addresses in the Circular Pool for better efficiency of outgoing connections.
 
@@ -165,6 +168,65 @@ for i in $(seq 1 254); do
 	sed -i "s/358145000REPLACE_SEQ3/358145000$i3/g" ue$i3.gwa.cesproto.re2ee.org.yaml
 done
 ```
+
+## Considerations to performance testing of Realm Gateway
+
+Use the developed client to specifically control the IP addresses for DNS resolution and Data transfers.
+- You may need to add host-only addresses (/32) to an interface and configure the routing table accordingly.
+- Using several IP sources also enables more socket binding options, which is necesarry for high test loads.
+
+Use well defined (S)FQDN to test specifically UDP and TCP connections, as they may be subjected to different network delays.
+
+Raise the maximum file descriptors available, here is a howto:
+
+- Add to /etc/sysctl.conf
+```
+# Custom extend number of files
+fs.file-max=2097152
+fs.inotify.max_queued_events=1048576
+fs.inotify.max_user_instances=1048576
+fs.inotify.max_user_watches=1048576
+```
+
+- Reload sysctl configuration
+```
+sysctl -p
+```
+
+- Add to /etc/security/limits.conf
+```
+# Added on 17/01/2017
+*         hard    nofile      500000
+*         soft    nofile      500000
+root      hard    nofile      500000
+root      soft    nofile      500000
+```
+
+- Check that /etc/ssh/sshd_config contains:
+```
+UsePAM=yes
+```
+
+- Check that /etc/pam.d/sshd contains
+```
+session    required   pam_limits.so
+```
+
+- Restart SSH service and reconnect
+
+
+Disable iptables rules that may rate limit packet per second (hashlimit).
+
+Consider using tc/netem for network simulations on a Linux bridge.
+```
+tc qdisc add    dev eth0 root netem delay 1000ms
+tc qdisc change dev eth0 root netem delay 1000ms 50ms
+tc qdisc del    dev eth0 root
+```
+
+Configure TCP SYNPROXY in default mode for all the required IP addresses and disable synchronization of Realm Gateway connections (add & delete)
+
+Reduce console logging (WARNING level) and deactivate other file loggers.
 
 
 ## Other useful information
