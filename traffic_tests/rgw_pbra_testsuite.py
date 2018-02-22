@@ -146,12 +146,18 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if not laddr:
         laddr=('0.0.0.0', 0)
+    if type == socket.SOCK_STREAM:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 0, 0))
+
     sock.bind(laddr)
     sock.setblocking(False)
     try:
         yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
         return sock
-    except:
+    except Exception as e:
+        logger = logging.getLogger('_socket_connect')
+        logger.exception(e)
         return None
 
 @asyncio.coroutine
@@ -176,9 +182,9 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=2)
     if sock is None:
-        logger.debug('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
+        logger.warning('Socket failed to connect: {}:{} > {}:{} ({}) / {} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
         return (ipaddr, query.id, attempt)
 
     for tout in timeouts:
@@ -261,9 +267,9 @@ def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=2)
     if sock is None:
-        logger.debug('Socket failed to connect: {}:{} ({})'.format(raddr[0], raddr[1], socktype))
+        logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
         return (recvdata, attempt)
 
     for tout in timeouts:
