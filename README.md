@@ -175,9 +175,11 @@ Use the developed client to specifically control the IP addresses for DNS resolu
 - You may need to add host-only addresses (/32) to an interface and configure the routing table accordingly.
 - Using several IP sources also enables more socket binding options, which is necesarry for high test loads.
 
-Use well defined (S)FQDN to test specifically UDP and TCP connections, as they may be subjected to different network delays.
+Use well defined (S)FQDN to test specifically UDP and TCP connections, as they may be subjected to different network delays due to the presence of an in-network TCP SYNPROXY.
 
-Raise the maximum file descriptors available, here is a howto:
+### Increase the number of file descriptors
+
+This is the workaround for the "too many files open" problem:
 
 - Add to /etc/sysctl.conf
 ```
@@ -215,18 +217,66 @@ session    required   pam_limits.so
 - Restart SSH service and reconnect
 
 
+### Configure the system for high traffic volume
+
+- Add to /etc/sysctl.conf
+```
+# Reduce TIME_WAIT socket connections
+net.ipv4.tcp_fin_timeout=1
+
+# Increase virtual memory areas
+vm.max_map_count=262144
+
+# Increase system IP port limits
+net.ipv4.ip_local_port_range=1024 65535
+
+
+# Increase conntrack size 1:16 bucket ratio for 4M connections
+
+## Increase bucket size: Verify input parameter with "modinfo nf_conntrack" / (expect_hashsize or hashsize)
+net.netfilter.nf_conntrack_buckets=262144
+### In recent kernels it might not be possible to modify this value on the fly, alternatively try one of the following:
+### Option 1: echo "options nf_conntrack expect_hashsize=262144" > /etc/modprobe.d/nf_conntrack.conf
+### Option 2: /sbin/modprobe nf_conntrack expect_hashsize=262144
+
+## Increase max number of connections
+net.netfilter.nf_conntrack_max=4194304
+
+### It is a good idea to reboot the system to ensure the kernel module is loaded with the appropriate configuration and reapplying the settings with "sysctl -p"
+### Verify the values are loaded correctly!
+```
+
+- Reload sysctl configuration
+```
+sysctl -p
+```
+
+
+### Rate limiting policies
+
 Disable iptables rules that may rate limit packet per second (hashlimit).
 
-Consider using tc/netem for network simulations on a Linux bridge.
+
+### Network related considerations
+
+- Use tc/netem for network simulations on the interfaces of a Linux bridge
 ```
 tc qdisc add    dev eth0 root netem delay 1000ms
 tc qdisc change dev eth0 root netem delay 1000ms 50ms
 tc qdisc del    dev eth0 root
 ```
 
-Configure TCP SYNPROXY in default mode for all the required IP addresses and disable synchronization of Realm Gateway connections (add & delete)
+- Increase the qlen size of your virtual adaptors. We have witnessed how veth pairs with qlen=1000 have resulted in packet loss when testing >2000 new TCP connections per second. Experimentally we have used the value qlen=25000.
+```
+ip link set dev eth0 qlen 25000
+```
 
-Reduce console logging (WARNING level) and deactivate other file loggers.
+
+### Miscellaneous
+
+- Configure TCP SYNPROXY in default mode for all the required IP addresses and disable synchronization of Realm Gateway connections (add & delete)
+
+- Reduce console logging (WARNING level) and deactivate other file loggers.
 
 
 ## Other useful information
