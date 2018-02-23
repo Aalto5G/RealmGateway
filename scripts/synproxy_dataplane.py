@@ -219,6 +219,16 @@ class SYNProxyDataplane():
         for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = True, silent = False)
 
+        ## Configure txqueuelen / default is 1000
+        MAX_QLEN=25000
+        to_exec = ['ip link set dev {}    qlen {}'.format(self.nic_wan, MAX_QLEN),
+                   'ip link set dev {}    qlen {}'.format(self.nic_wanp, MAX_QLEN),
+                   'ip link set dev mitm0 qlen {}'.format(MAX_QLEN),
+                   'ip link set dev mitm1 qlen {}'.format(MAX_QLEN),
+                   'ip link set dev br-synproxy qlen {}'.format(MAX_QLEN)]
+        for _ in to_exec:
+            self._do_subprocess_call(_, raise_exc = True, silent = False)
+
         ## Configure default gateway
         if self.default_gw:
             self._logger.info('Adding route to default gateway via mimt0')
@@ -235,37 +245,32 @@ class SYNProxyDataplane():
     def ovs_init_flows(self):
         self._logger.info('Initialize OpenvSwitch flows')
 
-        ## Create basic table architecture
-        to_exec = ['ovs-ofctl del-flows -O OpenFlow13 br-synproxy',
-                   ### Go to ARP MAC Learning table
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0806,           actions=goto_table:1"',
-                   ### Go to TCP Forwading table
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800,nw_proto=6 actions=goto_table:2"',
-                   ### Default flow
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                             actions=NORMAL"',
-                   ### ARP MAC Learning Learning table 1
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=1                             actions=NORMAL"',
-                   ### TCP Forwading table 2
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=1                             actions=goto_table:3"']
+        ## Initialize flow table
+        to_exec = [### Delete default flows
+                   'ovs-ofctl del-flows -O OpenFlow13 br-synproxy',
+                   ### Table 0: Traffic selector
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800 actions=resubmit(,2)"',
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                  actions=resubmit(,1)"',
+                   ### Table 1: Enable transparent L2-switching
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=100,in_port=1      actions=output:4"',
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=100,in_port=4      actions=output:1"',
+                   ### Table 2: Controls the packet pipelining
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=100                actions=resubmit(,10),resubmit(,11),resubmit(,12)"',
+                   ### Table 10: Load port values in NXM registry
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=10,priority=100               actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15]"',
+                   ### Table 11: Contains the learning flows
+                   # Learn new flows coming from WAN
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=11,priority=1,in_port=1,dl_type=0x0800                                                                                                                      \
+                           actions=learn(table=12,priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[] output:NXM_NX_REG0[0..15]), \
+                                   learn(table=12,priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[] output:NXM_NX_REG3[0..15])"',
+                   # Learn new flows coming from WAN_proxied
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=11,priority=1,in_port=4,dl_type=0x0800                                                                                                                      \
+                           actions=learn(table=12,priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[] output:NXM_NX_REG0[0..15]), \
+                                   learn(table=12,priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[] output:NXM_NX_REG3[0..15])"',
+                    ### Table 12: Contains the self-populated learned flows and the default forwarding flows
+                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=12,priority=1,in_port=1,      actions=load:0x000000aabbcc->NXM_OF_ETH_DST[], output:2"',
+                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=12,priority=1,in_port=4,      actions=load:0x000000ddeeff->NXM_OF_ETH_DST[], output:3"']
 
-        for _ in to_exec:
-            self._do_subprocess_call(_, raise_exc = True, silent = False)
-
-        ## Create TCP learning flows
-        #### Learn new flows coming from WAN
-        to_exec = ['ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=1,dl_type=0x0800 actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15],                                                                                                           \
-                learn(table=2,hard_timeout=30,priority=200,in_port=1,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_SRC[],NXM_OF_ETH_DST[]=NXM_OF_ETH_DST[],NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:0x000000aabbcc->NXM_OF_ETH_DST[], output:NXM_NX_REG1[0..15]), \
-                learn(table=2,                priority=200,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],                           output:NXM_NX_REG0[0..15]), \
-                learn(table=2,                priority=200,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],                           output:NXM_NX_REG3[0..15]), \
-                learn(table=2,hard_timeout=30,priority=200,in_port=4,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_DST[],NXM_OF_ETH_DST[]=NXM_OF_ETH_SRC[],NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:0x000000ddeeff->NXM_OF_ETH_DST[], output:NXM_NX_REG2[0..15]), \
-                resubmit(,2)"',
-                    #### Learn new flows coming from WAN_proxied
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=4,dl_type=0x0800 actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15],                                                                                                           \
-                learn(table=2,hard_timeout=30,priority=100,in_port=1,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_DST[],NXM_OF_ETH_DST[]=NXM_OF_ETH_SRC[],NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:0x000000aabbcc->NXM_OF_ETH_DST[], output:NXM_NX_REG1[0..15]), \
-                learn(table=2,                priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],                           output:NXM_NX_REG0[0..15]), \
-                learn(table=2,                priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],                           output:NXM_NX_REG3[0..15]), \
-                learn(table=2,hard_timeout=30,priority=100,in_port=4,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_SRC[],NXM_OF_ETH_DST[]=NXM_OF_ETH_DST[],NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:0x000000ddeeff->NXM_OF_ETH_DST[], output:NXM_NX_REG2[0..15]), \
-                resubmit(,2)"']
         for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = True, silent = False)
 
