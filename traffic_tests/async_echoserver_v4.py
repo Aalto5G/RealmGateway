@@ -56,8 +56,8 @@ def monitor(period = MONITOR_INTERVAL):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data test server with python3 and asyncio')
-    parser.add_argument('--udp', nargs='+', required=False, help='Server UDP address (ipaddr:port)')
-    parser.add_argument('--tcp', nargs='+', required=False, help='Server TCP address (ipaddr:port)')
+    parser.add_argument('--udp', nargs='+', default=[], required=False, help='Server UDP address (ipaddr:port)')
+    parser.add_argument('--tcp', nargs='+', default=[], required=False, help='Server TCP address (ipaddr:port)')
     args = parser.parse_args()
     loop = asyncio.get_event_loop()
     transports = []
