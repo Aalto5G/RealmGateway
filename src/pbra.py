@@ -645,7 +645,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         meta_flag = False
 
         for opt in query.options:
-            self._logger.debug('Found EDNS0: {}'.format(opt.to_text()))
+            if hasattr(opt, 'to_text'):
+                self._logger.debug('Found EDNS0: {}'.format(opt.to_text()))
+            else:
+                self._logger.debug('Found EDNS0: Generic {}'.format(opt.otype))
+
             if opt.otype == 0x08 and meta_ipaddr is None:
                 # ClientSubnet
                 meta_ipaddr = opt.address
