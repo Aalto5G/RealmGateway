@@ -11,7 +11,10 @@ CIRCULARPOOL:
         SYSTEM_LOAD_HIGH:          {load_threshold: 60, reputation_fqdn: 0.75, reputation_sfqdn: 0.6}
         SYSTEM_LOAD_VERY_HIGH:     {load_threshold: 80, reputation_fqdn: -1,   reputation_sfqdn: 0.8}
         PBRA_DNS_POLICY_TCPCNAME:  false
-        PBRA_DNS_POLICY_TCP:       true
-        PBRA_DNS_POLICY_CNAME:     true
-        PBRA_DNS_LOG_UNTRUSTED:    true
+        #PBRA_DNS_POLICY_TCP:       true
+        #PBRA_DNS_POLICY_CNAME:     true
+        #PBRA_DNS_LOG_UNTRUSTED:    true
+        PBRA_DNS_POLICY_TCP:       false
+        PBRA_DNS_POLICY_CNAME:     false
+        PBRA_DNS_LOG_UNTRUSTED:    false
         PBRA_DNS_LOAD_POLICING:    false
