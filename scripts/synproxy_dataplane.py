@@ -512,10 +512,7 @@ class SYNProxyDataplaneEndpoint(asyncio.Protocol):
         self.raddr = transport.get_extra_info('peername')
         # Set TCP_NODELAY
         sock = transport.get_extra_info('socket')
-        try:
-            sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        except (OSError, NameError):
-            pass
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._logger.info('Connected endpoint @{0}:{1}'.format(self.raddr[0], self.raddr[1]))
 
     def connection_lost(self, exc):
@@ -708,4 +705,3 @@ TESTS
 ./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0                                                                                        --benchmark --benchmark-seq 1 --benchmark-iter 1
 
 '''
-
