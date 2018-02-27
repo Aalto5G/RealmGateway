@@ -6,6 +6,9 @@ if [[ $UID != 0 ]]; then
     exit 1
 fi
 
+# Definition of IP addresses protected by SYNPROXY
+IP_POOL="195.148.125.201 195.148.125.202 195.148.125.203 195.148.125.204"
+
 # Restart OpenvSwitch service
 systemctl restart openvswitch-switch
 
@@ -38,19 +41,17 @@ ip link set dev mitm1 arp off
 ip link set dev mitm0 address 00:00:00:aa:bb:cc
 ip link set dev mitm1 address 00:00:00:dd:ee:ff
 ip route add default dev mitm0
-ip route add 195.148.125.201/32 dev mitm1
-ip route add 195.148.125.202/32 dev mitm1
-ip route add 195.148.125.203/32 dev mitm1
-ip route add 195.148.125.204/32 dev mitm1
+for ipaddr in $IP_POOL; do
+    ip route add $ipaddr/32 dev mitm1
+done
 
 # Setup flows & rules
 ## Create ipset for matching
 ipset create circularpool hash:ip -!
 ipset flush  circularpool
-ipset add circularpool 195.148.125.201
-ipset add circularpool 195.148.125.202
-ipset add circularpool 195.148.125.203
-ipset add circularpool 195.148.125.204
+for ipaddr in $IP_POOL; do
+    ipset add circularpool $ipaddr
+done
 
 # Setting up TCP SYNPROXY ipt_SYNPROXY
 # https://r00t-services.net/knowledgebase/14/Homemade-DDoS-Protection-Using-IPTables-SYNPROXY.html
