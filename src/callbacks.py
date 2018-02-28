@@ -44,6 +44,12 @@ class DNSCallbacks(object):
         self.registry = {}
         self.activequeries = {}
 
+    def shutdown(self):
+        self._logger.warning('Shutdown')
+        # Close registered sockets
+        for obj in self.get_object(None):
+            obj.connection_lost(None)
+
     def get_object(self, name=None):
         if name is None:
             return self.registry.values()

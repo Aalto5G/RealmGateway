@@ -26,12 +26,19 @@ class DataRepository(object):
         # Initiate HTTP session with PolicyDatabase
         self.rest_api_init()
 
+    def shutdown(self):
+        self._logger.warning('Shutdown')
+        self.rest_api_close()
+
     def rest_api_init(self, n=5):
         """ Create long lived HTTP session """
         self.rest_api = aiohttp_client.HTTPRestClient(n)
 
     def rest_api_close(self):
-        self.rest_api.close()
+        try:
+            self.rest_api.close()
+        except:
+            pass
 
     def _reload_policies(self):
         self._reload_policy_host()

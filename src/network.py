@@ -84,12 +84,22 @@ class Network(object):
         self.ips_init()
         # Initialize iptables
         self.ipt_init()
+        # Create SYNPROXY instance
+        self.synproxy_create()
+        '''
+        # TODO: Uncomment these lines when CES support is added
         # Create HTTP REST Client
         self.rest_api_init()
         # Create OpenvSwitch
         self.ovs_create()
-        # Create SYNPROXY instance
-        self.synproxy_create()
+        '''
+
+    def shutdown(self):
+        self._logger.warning('Shutdown')
+        # Close bound NFQUEUEs
+        self.ipt_deregister_nfqueues()
+        # Close open aiohttp_client objects
+        self.rest_api_close()
 
     def ips_init(self):
         data_d = self.datarepository.get_policy_ces('IPSET', {})
@@ -449,7 +459,10 @@ class Network(object):
         self.rest_api = aiohttp_client.HTTPRestClient(n)
 
     def rest_api_close(self):
-        self.rest_api.close()
+        try:
+            self.rest_api.close()
+        except:
+            pass
 
     def ovs_create(self):
         self._logger.info('Create OpenvSwitch for CES data tunnelling')
@@ -695,8 +708,13 @@ class Network(object):
 
 
     def synproxy_create(self):
-        self._logger.info('Create SYNPROXY connection')
+        if self.synproxy is None:
+            self._logger.warning('No SYNPROXY defined!')
+            self.synproxy_sock = None
+            return
+
         # Create connection to SYNPROXY
+        self._logger.info('Create SYNPROXY connection')
         asyncio.ensure_future(self._synproxy_connect())
 
     @asyncio.coroutine
@@ -738,6 +756,11 @@ class Network(object):
 
     @asyncio.coroutine
     def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
+        # Return if proxy is not connected
+        if self.synproxy_sock is None:
+            self._logger.debug('Failed to add connection: SYNPROXY is not connected!')
+            return
+
         _t = self.loop.time()
         success = yield from self._synproxy_sendrecv('mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         _tdelay = (self.loop.time() - _t) * 1000
@@ -752,6 +775,11 @@ class Network(object):
 
     @asyncio.coroutine
     def synproxy_del_connection(self, ipaddr, port, proto):
+        # Return if proxy is not connected
+        if self.synproxy_sock is None:
+            self._logger.debug('Failed to delete connection: SYNPROXY is not connected!')
+            return
+
         _t = self.loop.time()
         tcpmss, tcpsack, tcpwscale = 0, 0, 0
         success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
@@ -768,7 +796,6 @@ class Network(object):
     @asyncio.coroutine
     def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
         if self.synproxy_sock is None:
-            #self._logger.warning('SYNPROXY is not connected!')
             return False
 
         try:
