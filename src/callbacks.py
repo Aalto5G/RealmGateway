@@ -285,6 +285,13 @@ class DNSCallbacks(object):
         # Evaluate host and service
         if service_data['carriergrade'] is True:
             # Resolve via CarrierGrade
+
+            # Answer with empty records for other types not A
+            if rdtype != dns.rdatatype.A:
+                response = dnsutils.make_response_rcode(query, dns.rcode.NOERROR, recursion_available=True)
+                cback(query, addr, response)
+                return
+
             self._logger.debug('Process {} with CarrierGrade resolution'.format(fqdn))
             _rcode, _ipv4, _service_data = yield from self._dns_resolve_circularpool_carriergrade(host_obj, fqdn, addr, service_data)
             if not _ipv4:
