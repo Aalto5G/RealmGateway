@@ -1,0 +1,19 @@
+test102.nest.gwb.cesproto.re2ee.org.:
+    ID:
+        fqdn:   ['test102.nest.gwb.cesproto.re2ee.org.']
+        ipv4:   ['192.168.10.102']
+        msisdn: ['0000010102']
+    GROUP:
+        - IPS_GROUP_PREPAID2
+    CIRCULARPOOL:
+        max: 3
+    SFQDN:
+        - {fqdn:          'test102.nest.gwb.cesproto.re2ee.org.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test102.nest.gwb.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:      'sip.test102.nest.gwb.cesproto.re2ee.org.',  proxy_required: true , carriergrade: false                             }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS',  'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',  'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS', 'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
