@@ -214,7 +214,7 @@ class RealmGateway(object):
         yield from self._init_subscriberdata()
 
         # Initialize Subscriber information
-        yield from self._init_suricata('0.0.0.0', 12345)
+        yield from self._init_suricata('0.0.0.0', 12346)
 
 
         # Ready!
