@@ -403,7 +403,7 @@ class DNSCallbacks(object):
         #TODO: At this point we have the host object and the service_data.
         # Maybe it's possible to centralize the PBRA from here instead?
         # Load reputation metadata in DNS query?
-        response = self.pbra.pbra_dns_preprocess_rgw_wan_soa(query, addr, host_obj, service_data)
+        response = yield from self.pbra.pbra_dns_preprocess_rgw_wan_soa(query, addr, host_obj, service_data)
         if response is not None:
             self._logger.debug('Preprocessing DNS response\n{}'.format(response))
             cback(query, addr, response)
@@ -435,7 +435,7 @@ class DNSCallbacks(object):
             return
 
         # Use PBRA to allocate an address according to policy
-        allocated_ipv4 = self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
+        allocated_ipv4 = yield from self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
 
         # Evaluate allocated address
         if not allocated_ipv4:
