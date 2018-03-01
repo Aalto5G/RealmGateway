@@ -54,6 +54,7 @@ from host import HostTable, HostEntry
 from network import Network
 from pbra import PolicyBasedResourceAllocation
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
+from suricata import SuricataAlert
 from helpers_n_wrappers import utils3
 from global_variables import RUNNING_TASKS
 
@@ -211,6 +212,11 @@ class RealmGateway(object):
         RUNNING_TASKS.append((_t, 'show_dnsgroups'))
         # Initialize Subscriber information
         yield from self._init_subscriberdata()
+
+        # Initialize Subscriber information
+        yield from self._init_suricata('0.0.0.0', 12345)
+
+
         # Ready!
         self._logger.warning('RealmGateway_v2 is ready!')
 
@@ -372,6 +378,7 @@ class RealmGateway(object):
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
             self._dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
+
     @asyncio.coroutine
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
@@ -422,6 +429,12 @@ class RealmGateway(object):
                 yield from asyncio.sleep(1)
                 yield from task_obj
                 self._logger.warning('>> Cancelled {} task'.format(task_name))
+
+    @asyncio.coroutine
+    def _init_suricata(self, ipaddr, port):
+        ## Added for Suricata testing
+        transport, protocol = yield from self._loop.create_datagram_endpoint(SuricataAlert, local_addr=(ipaddr, port))
+        self._logger.warning('Creating SuricataAlert endpoint @{}:{}'.format(ipaddr, port))
 
 
 if __name__ == '__main__':
