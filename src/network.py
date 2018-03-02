@@ -2,6 +2,7 @@ import asyncio
 import aiohttp
 import json
 import logging
+import functools
 import socket, struct
 import os, subprocess
 import random, string
@@ -100,6 +101,8 @@ class Network(object):
         self.ipt_deregister_nfqueues()
         # Close open aiohttp_client objects
         self.rest_api_close()
+        # Close SYNPROXY socket
+        self.synproxy_close()
 
     def ips_init(self):
         data_d = self.datarepository.get_policy_ces('IPSET', {})
@@ -708,41 +711,66 @@ class Network(object):
 
 
     def synproxy_create(self):
+        self.synproxy_sock = None
         if self.synproxy is None:
             self._logger.warning('No SYNPROXY defined!')
-            self.synproxy_sock = None
             return
 
-        # Create connection to SYNPROXY
-        self._logger.info('Create SYNPROXY connection')
-        asyncio.ensure_future(self._synproxy_connect())
+        # Create 2 queues for reading and writing responses
+        # The synchronization protocol only supports 1 operation at a time
+        self._spq_req = asyncio.Queue(maxsize=1)
+        self._spq_res = asyncio.Queue(maxsize=1)
+        # Create SYNPROXY connection worker
+        asyncio.ensure_future(self._synproxy_worker())
+
+    def synproxy_close(self):
+        if self.synproxy_sock is not None:
+            self.synproxy_sock.close()
 
     @asyncio.coroutine
-    def _synproxy_connect(self):
-        # Initialize object
-        self.synproxy_sock = None
+    def _synproxy_worker(self):
+        self._logger.info('Starting SYNPROXY connection worker')
+        while True:
+            # Make sure the connection is always open!
+            yield from self._synproxy_ensure_connection(self.synproxy)
+            # Dequeue a request
+            partial_func = yield from self._spq_req.get()
+            # Execute operation
+            ret = yield from partial_func()
+            # Notify the queue that the item has been processed
+            self._spq_req.task_done()
+            # Enqueue a result
+            yield from self._spq_res.put(ret)
+
+    @asyncio.coroutine
+    def _synproxy_ensure_connection(self, addr):
+        # Quick return if socket is connected
+        if self.synproxy_sock is not None:
+            return
+
         # Variables used to calculate avg time per operation
         self._synproxy_nofops = 0
         self._synproxy_aggtime = 0
-        # Create TCP socket
-        sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setblocking(False)
 
+        # Enter loop until socket is connected
         while True:
+            self._logger.warning('Attempting to connect to SYNPROXY @ <{}:{}>'.format(addr[0], addr[1]))
+            sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setblocking(False)
             try:
-                # Connect TCP socket
-                yield from self.loop.sock_connect(sock, (self.synproxy[0], self.synproxy[1]))
-                self._logger.warning('Connected to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
+                yield from self.loop.sock_connect(sock, addr)
+                self._logger.warning('Connected to SYNPROXY @ <{}:{}>'.format(addr[0], addr[1]))
                 break
             except Exception as e:
-                self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(self.synproxy[0], self.synproxy[1]))
+                self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(addr[0], addr[1]))
+                sock.lose()
                 yield from asyncio.sleep(5)
+                continue
 
         # Set socket object
         self.synproxy_sock = sock
-
         # Flush all connections from SYNPROXY
         yield from self._synproxy_sendrecv('flush', '0.0.0.0', 0, 0, 0, 0, 0)
         # Set default connection
@@ -752,70 +780,79 @@ class Network(object):
         ap_spool = self.pooltable.get('servicepool')
         ap_pool  = ap_cpool.get_pool() + ap_spool.get_pool()
         for ipaddr in ap_pool:
-            yield from self.synproxy_add_connection(ipaddr, 0, 0, 1460, 1, 7)
+            yield from self._synproxy_sendrecv('mod', ipaddr, 0, 0, 1460, 1, 7)
 
     @asyncio.coroutine
-    def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
-        # Return if proxy is not connected
-        if self.synproxy_sock is None:
-            self._logger.debug('Failed to add connection: SYNPROXY is not connected!')
+    def synproxy_add_connection(self, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, timeout = 1):
+        # This is the API function
+
+        # Return if synproxy is not defined
+        if self.synproxy is None:
             return
 
+        # Create partial function for execution
+        partial_func = functools.partial(self._synproxy_sendrecv, 'mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         _t = self.loop.time()
-        success = yield from self._synproxy_sendrecv('mod', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        # Enqueue a request
+        yield from self._spq_req.put(partial_func)
+        # Dequeue a result
+        ret = yield from self._spq_res.get()
+        # Notify the queue that the item has been processed
+        self._spq_res.task_done()
+        # Post operations
         _tdelay = (self.loop.time() - _t) * 1000
         self._synproxy_nofops += 1
         self._synproxy_aggtime += _tdelay
         _tdelay_avg = self._synproxy_aggtime / self._synproxy_nofops
         msg = '({:.3} ms / avg {:.3} ms): ipaddr={} port={} protocol={} mss={} sack={} wscale={}'.format(_tdelay, _tdelay_avg, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
-        if success:
+        if ret:
             self._logger.info('Added connection to SYNPROXY {}'.format(msg))
         else:
             self._logger.warning('Failed to add connection to SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
-    def synproxy_del_connection(self, ipaddr, port, proto):
-        # Return if proxy is not connected
-        if self.synproxy_sock is None:
-            self._logger.debug('Failed to delete connection: SYNPROXY is not connected!')
+    def synproxy_del_connection(self, ipaddr, port, proto, timeout = 5):
+        # This is the API function
+
+        ## TODO: How to handle timeout for the whole operation? Now it only applies to the socket level...
+
+        # Return if synproxy is not defined
+        if self.synproxy is None:
             return
 
-        _t = self.loop.time()
+        # Create partial function for execution
         tcpmss, tcpsack, tcpwscale = 0, 0, 0
-        success = yield from self._synproxy_sendrecv('del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        partial_func = functools.partial(self._synproxy_sendrecv, 'del', ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, timeout)
+        _t = self.loop.time()
+        # Enqueue a request
+        yield from self._spq_req.put(partial_func)
+        # Dequeue a result
+        ret = yield from self._spq_res.get()
+        # Post operations
         _tdelay = (self.loop.time() - _t) * 1000
         self._synproxy_nofops += 1
         self._synproxy_aggtime += _tdelay
         _tdelay_avg = self._synproxy_aggtime / self._synproxy_nofops
         msg = '({:.3} ms / avg {:.3} ms): ipaddr={} port={} protocol={} mss={} sack={} wscale={}'.format(_tdelay, _tdelay_avg, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
-        if success:
-            self._logger.debug('Deleted connection from SYNPROXY {}'.format(msg))
+        if ret:
+            self._logger.info('Deleted connection from SYNPROXY {}'.format(msg))
         else:
             self._logger.warning('Failed to delete connection from SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
-    def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
-        if self.synproxy_sock is None:
+    def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, timeout = 5):
+        msg = self._synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
+        #self._logger.debug('Send control message <{}>'.format(msg))
+        yield from self.loop.sock_sendall(self.synproxy_sock, msg)
+        data = yield from asyncio.wait_for(self.loop.sock_recv(self.synproxy_sock, 2), timeout=timeout)
+        # Evaluate response
+        if data == b'1\n':
+            return True
+        elif data == b'0\n':
             return False
-
-        try:
-            msg = self._synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
-            #self._logger.debug('Send control message <{}>'.format(msg))
-            yield from self.loop.sock_sendall(self.synproxy_sock, msg)
-            data = yield from asyncio.wait_for(self.loop.sock_recv(self.synproxy_sock, 2), timeout=5)
-            # Evaluate response
-            if data == b'1\n':
-                return True
-            elif data == b'0\n':
-                return False
-        except Exception as e:
-            # TODO: Currently, we do not handle re-connection to socket
-            self._logger.exception('SYNPROXY connection failed, initiate reconnection... ?')
-            #self.synproxy_sock.close()
-            self.synproxy_sock = None
-            #asyncio.ensure_future(self._synproxy_create())
+        else:
+            self._logger.debug('Unrecognised message <{}>'.format(data))
             return False
-
 
     def _synproxy_build_message(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
         """

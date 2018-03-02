@@ -1,8 +1,7 @@
 import asyncio
 import logging
 import time
-from functools import partial
-
+import functools
 import ipaddress
 
 from helpers_n_wrappers import container3
@@ -769,7 +768,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             ## Create uDNSQueryTimer object
             timer_obj = uDNSQueryTimer(query, addr[0], service_data, alias_service_data)
             # Monkey patch delete function for timer object
-            timer_obj.delete = partial(self._cb_dnstimer_deleted, timer_obj, host_obj)
+            timer_obj.delete = functools.partial(self._cb_dnstimer_deleted, timer_obj, host_obj)
             self.add(timer_obj)
 
             # Evaluate resolver metadata and create new if does not exist
@@ -1109,9 +1108,8 @@ class PolicyBasedResourceAllocation(container3.Container):
                       }
 
         conn = ConnectionLegacy(**conn_param)
-        # Monkey patch delete function for connection object
-        ## TODO: Execute this as a coroutine to yield from synproxy_del_connection ?
-        conn.delete = partial(self._cb_connection_deleted, conn)
+        # Monkey patch delete function as a coroutine for the connection object
+        conn.delete = functools.partial(asyncio.ensure_future, self._cb_connection_deleted(conn))
         # Add connection to table
         self.connectiontable.add(conn)
         # Log
@@ -1123,11 +1121,12 @@ class PolicyBasedResourceAllocation(container3.Container):
         if service_data['protocol'] in [0, 6]:
             # TODO: Test performance and consider optimizations / Do this in parallel or yield from it?
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
-            asyncio.ensure_future(self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale))
+            yield from self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale)
 
         # Return the allocated address
         return allocated_ipv4
 
+    @asyncio.coroutine
     def _cb_connection_deleted(self, conn):
         # Get Circular Pool address pool
         ap_cpool = self.pooltable.get('circularpool')
@@ -1135,7 +1134,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         if conn.hasexpired():
             # Connection expired
-            self._logger.info('Connection expired: {} in {:.3f} msec '.format(conn, conn.age*1000))
+            self._logger.warning('Connection expired: {} in {:.3f} msec '.format(conn, conn.age*1000))
             # Blame attribution to DNS resolver and requestor
             self._logger.debug('  >> Blame attribution!')
             # Register a nok event
@@ -1158,10 +1157,10 @@ class PolicyBasedResourceAllocation(container3.Container):
         if (conn.outbound_port, conn.protocol) == (0 ,0):
             # This is an FQDN connection -> Reset TCP default options in SYNPROXY connection!
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
-            asyncio.ensure_future(self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale))
+            yield from self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale)
         else:
             # This is an SFQDN connection -> Remove from SYNPROXY!
-            asyncio.ensure_future(self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol))
+            yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
 
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
