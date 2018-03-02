@@ -747,7 +747,8 @@ class Network(object):
         # Quick return if socket is connected
         if self.synproxy_sock is not None:
             return
-
+        # Define re-attempt period
+        retry_sec = 5
         # Variables used to calculate avg time per operation
         self._synproxy_nofops = 0
         self._synproxy_aggtime = 0
@@ -764,9 +765,9 @@ class Network(object):
                 self._logger.warning('Connected to SYNPROXY @ <{}:{}>'.format(addr[0], addr[1]))
                 break
             except Exception as e:
-                self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>'.format(addr[0], addr[1]))
-                sock.lose()
-                yield from asyncio.sleep(5)
+                self._logger.warning('Failed to connect to SYNPROXY @ <{}:{}>. Retry in {} sec(s)'.format(addr[0], addr[1], retry_sec))
+                sock.close()
+                yield from asyncio.sleep(retry_sec)
                 continue
 
         # Set socket object
@@ -811,7 +812,7 @@ class Network(object):
             self._logger.warning('Failed to add connection to SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
-    def synproxy_del_connection(self, ipaddr, port, proto, timeout = 5):
+    def synproxy_del_connection(self, ipaddr, port, proto, timeout = 1):
         # This is the API function
 
         ## TODO: How to handle timeout for the whole operation? Now it only applies to the socket level...
@@ -840,7 +841,8 @@ class Network(object):
             self._logger.warning('Failed to delete connection from SYNPROXY {}'.format(msg))
 
     @asyncio.coroutine
-    def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, timeout = 5):
+    def _synproxy_sendrecv(self, mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, timeout = 2):
+        """ Raises exceptions if socket error or timeout """
         msg = self._synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale)
         #self._logger.debug('Send control message <{}>'.format(msg))
         yield from self.loop.sock_sendall(self.synproxy_sock, msg)
