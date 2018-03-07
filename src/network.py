@@ -782,7 +782,7 @@ class Network(object):
         _tdelay = (self.loop.time() - _t) * 1000
         msg = 'ipaddr={} port={} protocol={} mss={} sack={} wscale={} in {:.3} ms / {}'.format(ipaddr, port, proto, tcpmss, tcpsack, tcpwscale, _tdelay, self.synproxy_obj.stats())
         if ret:
-            self._logger.info('Succeded to <{}> connection to SYNPROXY {}'.format(mode, msg))
+            self._logger.debug('Succeded to <{}> connection to SYNPROXY {}'.format(mode, msg))
         else:
             self._logger.warning('Failed to <{}> connection to SYNPROXY {}'.format(mode, msg))
 
