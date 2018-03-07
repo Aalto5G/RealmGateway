@@ -328,7 +328,10 @@ def _scapy_send_packet(packet, iface):
         l2socket.outs.send(packet)
         return True
     except OSError as e:
-        logger.error('Failed to send / {} via {}  <{}>'.format(packet.command(), iface, e))
+        if isinstance(packet, bytes):
+            # Packetize to enhance logging information
+            packet = Ether(packet)
+        logger.error('Failed to send packet via {} <{}> / {}'.format(iface, e, packet.command()))
         return False
 
 def _get_service_tuple(local_l, remote_l):
@@ -761,6 +764,8 @@ class MainTestClient(object):
         self._spawn_traffic_tests(config_d)
 
     def _spawn_traffic_tests(self, config_d):
+        # TODO: Use parameters defined in globals as base, then overwrite with test specific?
+
         global TS_ZERO
         duration = config_d['duration']
         ts_backoff = config_d['backoff']
@@ -773,8 +778,8 @@ class MainTestClient(object):
         type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts', 'data_delay']),
                        'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr', 'dns_timeouts']),
                        'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
-                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr']),
-                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr']),
+                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr', 'interface']),
+                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr', 'interface']),
                        }
 
         for item_d in config_d['traffic']:
