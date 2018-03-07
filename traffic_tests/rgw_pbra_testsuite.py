@@ -156,8 +156,8 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
         yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
         return sock
     except Exception as e:
-        logger = logging.getLogger('_socket_connect')
-        logger.exception(e)
+        #logger = logging.getLogger('_socket_connect')
+        #logger.exception(e)
         return None
 
 @asyncio.coroutine
