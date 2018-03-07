@@ -161,7 +161,7 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
         return None
 
 @asyncio.coroutine
-def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
+def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
     """
     fqdn: Domain name to be resolved
     raddr: Remote tuple information
@@ -182,7 +182,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=2)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
         logger.warning('Socket failed to connect: {}:{} > {}:{} ({}) / {} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
         return (ipaddr, query.id, attempt)
@@ -197,7 +197,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
                 response = dns.message.from_wire(dataresponse)
                 # Check if response is truncated and retry in TCP with a recursive call
                 if (response.flags & dns.flags.TC == dns.flags.TC):
-                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp')
+                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
                     return (_data_ripaddr, _query_id, _dns_attempts)
 
             elif socktype == 'tcp':
@@ -252,7 +252,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
     return (ipaddr, query.id, attempt)
 
 @asyncio.coroutine
-def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
+def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
     """
     data: Data to send
     raddr: Remote tuple information
@@ -267,7 +267,7 @@ def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=False, timeout=2)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
         logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
         return (recvdata, attempt)
@@ -383,6 +383,7 @@ class RealDNSDataTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSDataTraffic')
 
@@ -433,7 +434,8 @@ class RealDNSDataTraffic(object):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                         reuseaddr=self.reuseaddr)
 
         # Populate partial results
         ts_end = _now()
@@ -463,7 +465,8 @@ class RealDNSDataTraffic(object):
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
-                                                        timeouts=data_timeouts, socktype=data_sockettype)
+                                                        timeouts=data_timeouts, socktype=data_sockettype,
+                                                        reuseaddr=self.reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
@@ -494,6 +497,7 @@ class RealDNSTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSTraffic')
 
@@ -537,7 +541,8 @@ class RealDNSTraffic(object):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                         reuseaddr=self.reuseaddr)
 
         # Populate partial results
         ts_end = _now()
@@ -571,6 +576,7 @@ class RealDataTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDataTraffic')
 
@@ -612,7 +618,8 @@ class RealDataTraffic(object):
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
-                                                        timeouts=data_timeouts, socktype=data_sockettype)
+                                                        timeouts=data_timeouts, socktype=data_sockettype,
+                                                        reuseaddr = self.reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
