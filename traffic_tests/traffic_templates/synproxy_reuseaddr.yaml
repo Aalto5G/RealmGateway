@@ -1,0 +1,22 @@
+# YAML configuration file for Realm Gateway Traffic Test Suite v0.1
+## Testing TCP attack traffic on SYNPROXY
+
+# Total duration of the test (sec)
+duration: 60
+
+# Backoff time before scheduling tests (sec)
+backoff: 2
+
+# Global definitions for traffic tests, used if no test specific parameter is defined
+global_traffic:
+    data:
+        data_laddr: [["100.64.0.1", 50022, 6]]
+        data_raddr: [["100.64.1.130", 81, 6]]
+        data_timeouts: [1]
+        data_delay: [0.000, 0.000]
+
+# This models all the test traffic
+traffic:
+    - {type: "data",      load: 1, duration: 1, ts_start: 0, reuseaddr: true}
+    - {type: "data",      load: 1, duration: 1, ts_start: 8, reuseaddr: true}
+    - {type: "data",      load: 1, duration: 1, ts_start: 16, reuseaddr: true}
