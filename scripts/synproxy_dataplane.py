@@ -132,6 +132,7 @@ class SYNProxyDataplane():
         self.nic_wanp = kwargs['nic_wanp']
         self.default_gw = kwargs['default_gw']
         self.secure_net = kwargs['secure_net']
+        self.ratelimit = kwargs['ratelimit']
         # Create a connection table to store the rules
         self.connectiontable = container3.Container(name='ConnectionTable')
         # Continue with bootstrapping actions
@@ -291,6 +292,12 @@ class SYNProxyDataplane():
 
         # Populate chains with basic rules
         ## raw.PREROUTING
+        ### Add a rate limitation to raw.PREROUTING via hashlimit module
+        _above = '{}/sec'.format(self.ratelimit[0])
+        _burst = '{}'.format(self.ratelimit[1])
+        rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'target': 'DROP', 'hashlimit': {'hashlimit-above':_above, 'hashlimit-burst':_burst, 'hashlimit-name':'internet_syn', 'hashlimit-mode':'srcip', 'hashlimit-htable-size':'2097152', 'hashlimit-srcmask':'24', 'hashlimit-htable-expire':'1001'}}
+        iptc_helper3.add_rule('raw', 'PREROUTING', rule_d, position=0, ipv6=False)
+        ###
         rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'target': 'synproxy_chain'}
         iptc_helper3.add_rule('raw', 'PREROUTING', rule_d, position=0, ipv6=False)
         rule_d = {'in-interface': 'mitm1', 'protocol': 'tcp', 'target': 'synproxy_chain'}
@@ -603,6 +610,10 @@ def parse_arguments():
                         help='Networks behind SYNPROXY in CIDR format e.g. 195.148.124.0/24 195.148.125.0/24')
     parser.add_argument('--default-gw', action='store_true',
                         help='Add default gateway route')
+    # Define hashlimit parameters for new connections
+    parser.add_argument('--ratelimit', type=int, nargs=2, default=(100, 100),
+                        metavar=('ABOVELIMIT', 'BURST'),
+                        help='Rate limit via iptables hashtable with srcip/24 and htable-size 2097152')
 
     args = parser.parse_args()
     validate_arguments(args)
@@ -626,7 +637,8 @@ if __name__ == '__main__':
                                      tcpsack = args.default_tcpsack,
                                      tcpwscale = args.default_tcpwscale,
                                      secure_net = args.secure_net,
-                                     default_gw = args.default_gw
+                                     default_gw = args.default_gw,
+                                     ratelimit = args.ratelimit
                                      )
     cb = synproxy_obj.process_message
     coro = loop.create_server(lambda: SYNProxyDataplaneEndpoint(cb = cb),
