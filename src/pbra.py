@@ -1158,9 +1158,12 @@ class PolicyBasedResourceAllocation(container3.Container):
             # This is an FQDN connection -> Reset TCP default options in SYNPROXY connection!
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
             yield from self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale)
-        else:
-            # This is an SFQDN connection -> Remove from SYNPROXY!
+        elif conn.protocol in [0, 6]:
+            # This is an (S)FQDN connection -> Remove from SYNPROXY!
             yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
+        #else:
+        #    # This is an SFQDN connection -> Remove from SYNPROXY!
+        #    yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
 
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
