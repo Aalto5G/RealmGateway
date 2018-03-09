@@ -499,11 +499,9 @@ class PolicyBasedResourceAllocation(container3.Container):
     * PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
     * PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
 
-    # Load levels in 100% (Use -1 value in load_threshold parameter to disable step)
-    * SYSTEM_LOAD_VERY_HIGH
-    * SYSTEM_LOAD_HIGH
-    * SYSTEM_LOAD_MEDIUM
-    * SYSTEM_LOAD_LOW
+    # Load levels in 100% (Use -1 value in threshold parameter to disable step)
+    ## math choices 'min', 'max', 'avg'
+    {'threshold': 80, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
 
     """
 
@@ -513,12 +511,13 @@ class PolicyBasedResourceAllocation(container3.Container):
     PBRA_DNS_POLICY_CNAME     = False
     PBRA_DNS_LOG_UNTRUSTED    = False
     PBRA_DNS_LOAD_POLICING    = False
-
-    # Define default load threshold levels when PBRA_DNS_LOAD_POLICING is active
-    SYSTEM_LOAD_LOW           = {'load_threshold': 0,  'reputation_fqdn': 0,    'reputation_sfqdn': 0}
-    SYSTEM_LOAD_MEDIUM        = {'load_threshold': 20, 'reputation_fqdn': 0.5,  'reputation_sfqdn': 0.3}
-    SYSTEM_LOAD_HIGH          = {'load_threshold': 60, 'reputation_fqdn': 0.75, 'reputation_sfqdn': 0.6}
-    SYSTEM_LOAD_VERY_HIGH     = {'load_threshold': 80, 'reputation_fqdn': -1,   'reputation_sfqdn': 0.8}
+    # Define default system load policies
+    SYSTEM_LOAD = [{'threshold': 80, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'},
+                   {'threshold': 66, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'},
+                   {'threshold': 33, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'},
+                   {'threshold':  0, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'},
+                   {'threshold': -1, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'min'} # This is disabled
+                   ]
 
 
     def __init__(self, **kwargs):
@@ -542,10 +541,17 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Set all existing values of the policy
         kwargs = cpool_policy['CONTROL_VARIABLES']
         utils3.set_attributes(self, override=True, **kwargs)
+        # Reverse sort SYSTEM_LOAD levels for sanity
+        self.SYSTEM_LOAD = sorted(self.SYSTEM_LOAD, key=lambda entry: entry['threshold'], reverse=True)
+
         # Show running control variables
-        control_variables = ['PBRA_DNS_POLICY_TCPCNAME', 'PBRA_DNS_POLICY_TCP', 'PBRA_DNS_POLICY_CNAME', 'PBRA_DNS_LOG_UNTRUSTED', 'PBRA_DNS_LOAD_POLICING', 'SYSTEM_LOAD_VERY_HIGH', 'SYSTEM_LOAD_HIGH', 'SYSTEM_LOAD_MEDIUM', 'SYSTEM_LOAD_LOW']
-        for _name in control_variables:
-            self._logger.info('Control variable: {}={}'.format(_name, getattr(self, _name)))
+        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_TCPCNAME', self.PBRA_DNS_POLICY_TCPCNAME))
+        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_TCP', self.PBRA_DNS_POLICY_TCP))
+        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_CNAME', self.PBRA_DNS_POLICY_CNAME))
+        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_LOG_UNTRUSTED', self.PBRA_DNS_LOG_UNTRUSTED))
+        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_LOAD_POLICING', self.PBRA_DNS_LOAD_POLICING))
+        self._logger.info('Control variable: {}=\n{}'.format('SYSTEM_LOAD', '\n'.join(format(_) for _ in self.SYSTEM_LOAD)))
+
 
     def _init_dns_group_policy(self):
         # Initialize DNS Group Policy with bootstrapping values
@@ -754,6 +760,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             return response
 
         # Continue processing with *trusted* DNS query
+        #self._logger.debug('WAN SOA detected trusted query for {} / {}'.format(fqdn, service_data))
 
         ## Enforce PBRA_DNS_POLICY_CNAME
         if self.PBRA_DNS_POLICY_CNAME is False:
@@ -782,8 +789,6 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Query is trusted, load/create metadata related to requestor
         self._load_metadata_requestor(query, addr, create=True)
-
-        self._logger.info('WAN SOA detected trusted query for {} / {}'.format(fqdn, service_data))
 
         # Evaluate seen IP addresses for current FQDN
         timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
@@ -886,7 +891,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Evaluate host policy for quick exit
         if host_conns >= host_policy['max']:
-            self._logger.warning('RealmGateway host policy exceeded: {}'.format(host_policy['max']))
+            self._logger.warning('RealmGateway host policy exceeded: {} pending connection(s)'.format(host_policy['max']))
             return None
 
         # Calculate system load and find executing policy function
@@ -895,41 +900,68 @@ class PolicyBasedResourceAllocation(container3.Container):
         pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
         ## Calculate current load in 100%
         sysload = (pool_allocated / pool_size) * 100
+        # Enforce Circular Pool policy to allocate an address
+        allocated_ipv4 = yield from self._unified_policy_circularpool(query, addr, host_obj, service_data, host_ipv4, sysload)
+        return allocated_ipv4
 
-        ## Get executing function
-        ### Execute best-effort policy if DNS Load Policing is disabled
+    def _policy_get_query_reputation(self, query, math):
+        """ Return the maximum reputation value among DNS resolver and requestor """
+        r_resolver = 0
+        r_requestor = 0
+        if query.reputation_resolver:
+            r_resolver = query.reputation_resolver.reputation
+        if query.reputation_requestor:
+            r_resolver = query.reputation_requestor.reputation
+        # Validate choice for math operation
+        assert math in ('max', 'min', 'avg')
+        if math == 'max':
+            return max(r_resolver, r_requestor)
+        elif math == 'min':
+            return min(r_resolver, r_requestor)
+        elif math == 'avg':
+            return (r_resolver + r_requestor) / 2.0
+
+    @asyncio.coroutine
+    def _unified_policy_circularpool(self, query, addr, host_obj, service_data, host_ipv4, sysload):
+        # Obtain load policy parameters
         if self.PBRA_DNS_LOAD_POLICING is False:
-            allocated_ipv4 = yield from self._policy_circularpool_low(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
+            load_policy = {'threshold': -1, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'}
+            self._logger.debug('System load at {:.2f}%% / Best effort allocation'.format(sysload))
         else:
-            cb_f = self._get_policy_load_function(sysload)
-            allocated_ipv4 = yield from cb_f(query, addr, host_obj, service_data, host_ipv4)
+            load_policy = [entry for entry in self.SYSTEM_LOAD if sysload>=entry['threshold']].pop(0)
+            self._logger.debug('System load at {:.2f}%% / Using policy {}'.format(sysload, load_policy))
+
+        # Calculate values for policy match
+        reputation = self._policy_get_query_reputation(query, load_policy['math'])
+        fqdn, sfqdn_reuse = self._describe_service_data(service_data, partial_reuse=False)
+        sfqdn      = not fqdn
+
+        # 1. Minimum reputation is required for allocating a new IP address for an FQDN service
+        if fqdn and reputation >= load_policy['fqdn_new']:
+            self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'fqdn_new', reputation, load_policy['fqdn_new']))
+            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
             return allocated_ipv4
 
+        # 2. Minimum reputation is required for allocating a new IP address for an SFQDN service
+        elif sfqdn and reputation >= load_policy['sfqdn_new'] and sfqdn_reuse is False:
+            self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_new', reputation, load_policy['sfqdn_new']))
+            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
+            return allocated_ipv4
 
-    def _get_policy_load_function(self, sysload):
-        """ Based on current load, return callback function for policy processing """
-        # We define up to 4 different levels of system load
+        # 3. Minimum reputation is required for overloading an existing IP address for an SFQDN service
+        elif sfqdn and reputation >= load_policy['sfqdn_reuse'] and sfqdn_reuse is True:
+            self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_reuse', reputation, load_policy['sfqdn_reuse']))
+            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
+            return allocated_ipv4
 
-        if SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_VERY_HIGH['load_threshold']) and \
-          sysload >= self.SYSTEM_LOAD_VERY_HIGH['load_threshold']:
-            self._logger.warning('SYSTEM_LOAD_VERY_HIGH ({:.2f}%%)'.format(sysload))
-            return self._policy_circularpool_veryhigh
+        # Fine-grained logging of policy violation
+        elif fqdn:
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'fqdn_new', reputation, load_policy['fqdn_new']))
+        elif sfqdn and not sfqdn_reuse:
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_new', reputation, load_policy['sfqdn_new']))
+        elif sfqdn and sfqdn_reuse:
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_reuse', reputation, load_policy['sfqdn_reuse']))
 
-        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_HIGH['load_threshold']) and \
-          sysload >= self.SYSTEM_LOAD_HIGH['load_threshold']:
-            self._logger.warning('SYSTEM_LOAD_HIGH ({:.2f}%%)'.format(sysload))
-            return self._policy_circularpool_high
-
-        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_MEDIUM['load_threshold']) and \
-          sysload >= self.SYSTEM_LOAD_MEDIUM['load_threshold']:
-            self._logger.info('SYSTEM_LOAD_MEDIUM ({:.2f}%%)'.format(sysload))
-            return self._policy_circularpool_medium
-
-        elif SYSTEM_LOAD_ENABLED(self.SYSTEM_LOAD_LOW['load_threshold']) and \
-          sysload >= self.SYSTEM_LOAD_LOW['load_threshold']:
-            self._logger.debug('SYSTEM_LOAD_LOW ({:.2f}%%)'.format(sysload))
-            return self._policy_circularpool_low
 
     def _policy_get_max_reputation(self, query):
         """ Return the maximum reputation value among DNS resolver and requestor """
@@ -952,108 +984,9 @@ class PolicyBasedResourceAllocation(container3.Container):
         return min(r_resolver, r_requestor)
 
     @asyncio.coroutine
-    def _policy_circularpool_veryhigh(self, query, addr, host_obj, service_data, host_ipv4):
-        """ The following restrictions apply
-        1. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        """
-        # TODO: Calculate _reputation with max() if dns group SLA is active, else with min()
-
-        self._logger.debug('SYSTEM_LOAD_VERY_HIGH')
-
-        _reputation = self._policy_get_max_reputation(query)
-        _overload   = self._service_is_overloadable(service_data, partial_overload=False)
-
-        # 1. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        if _reputation >= self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_VERY_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'], _overload, True))
-            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
-
-        # Log error violation
-        self._logger.info('Policy violation @ SYSTEM_LOAD_VERY_HIGH')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_VERY_HIGH['reputation_sfqdn'], True))
-        self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
-        return None
-
-    @asyncio.coroutine
-    def _policy_circularpool_high(self, query, addr, host_obj, service_data, host_ipv4):
-        """ The following restrictions apply
-        1. Minimum reputation1 is required for allocating new IP address regardless of the service
-        2. Minimum reputation2 is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        #3. Minimum reputation3 is required for allocating new IP address only if service can be overloaded, supposed there are multiple overloadable IP addresses.
-        Note: reputation1 > reputation2 > reputation3
-        """
-        self._logger.debug('SYSTEM_LOAD_HIGH')
-
-        _reputation = self._policy_get_max_reputation(query)
-        _overload   = self._service_is_overloadable(service_data, partial_overload=False)
-
-        # 1. Minimum reputation is required for allocating new IP address regardless of the service
-        if _reputation >= self.SYSTEM_LOAD_HIGH['reputation_fqdn']:
-            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f}'.format(_reputation, self.SYSTEM_LOAD_HIGH['reputation_fqdn']))
-            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
-
-        # 2. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port and protocol are not zero
-        if _reputation >= self.SYSTEM_LOAD_HIGH['reputation_sfqdn'] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_HIGH: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_HIGH['reputation_sfqdn'], _overload, True))
-            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
-
-        # Log error violation
-        self._logger.info('Policy violation @ SYSTEM_LOAD_HIGH')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_HIGH['reputation_fqdn'], False))
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_HIGH['reputation_sfqdn'], True))
-        self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
-        return None
-
-    @asyncio.coroutine
-    def _policy_circularpool_medium(self, query, addr, host_obj, service_data, host_ipv4):
-        """ The following restrictions apply
-        1. Minimum reputation1 is required for allocating new IP address regardless of the service
-        2. Minimum reputation2 is required for allocating new IP address only if service can be overloaded, i.e. port or protocol are not zero
-        #3. Minimum reputation3 is required for allocating new IP address only if service can be overloaded, supposed there are multiple overloadable IP addresses.
-        Note: reputation1 > reputation2 > reputation3
-        """
-        self._logger.debug('SYSTEM_LOAD_MEDIUM')
-
-        _reputation = self._policy_get_max_reputation(query)
-        _overload   = self._service_is_overloadable(service_data, partial_overload=True)
-
-        # 1. Minimum reputation is required for allocating new IP address regardless of the service
-        if _reputation >= self.SYSTEM_LOAD_MEDIUM['reputation_fqdn']:
-            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f}'.format(_reputation, self.SYSTEM_LOAD_MEDIUM['reputation_fqdn']))
-            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
-
-        # 2. Minimum reputation is required for allocating new IP address only if service can be overloaded, i.e. port or protocol are not zero
-        if _reputation >= self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'] and _overload is True:
-            self._logger.info('Policy match @ SYSTEM_LOAD_MEDIUM: reputation={:.2f}/{:.2f} overload={}/{}'.format(_reputation, self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'], _overload, True))
-            allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-            return allocated_ipv4
-
-        # Log error violation
-        self._logger.info('Policy violation @ SYSTEM_LOAD_MEDIUM')
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_MEDIUM['reputation_fqdn'], False))
-        self._logger.info('Policy violation: required reputation={:.2f} overload={}'.format(self.SYSTEM_LOAD_MEDIUM['reputation_sfqdn'], True))
-        self._logger.info('Policy violation: offered  reputation={:.2f} overload={}'.format(_reputation, _overload))
-        return None
-
-    @asyncio.coroutine
-    def _policy_circularpool_low(self, query, addr, host_obj, service_data, host_ipv4):
-        """ No restrictions apply
-        Note: Gambling stage
-        """
-        self._logger.debug('SYSTEM_LOAD_LOW')
-        allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-        return allocated_ipv4
-
-
-    @asyncio.coroutine
     def _best_effort_allocate(self, query, addr, host_obj, service_data, host_ipv4):
         # TODO: Improve connection creation to include DNS metadata and check for SLA
         # TODO: Define a connection KEY when creating the object to indicate what tuples need to be registered?
-        self._logger.debug('_best_effort_allocate')
 
         # Obtain FQDN from query
         fqdn = format(query.question[0].name)
@@ -1161,9 +1094,6 @@ class PolicyBasedResourceAllocation(container3.Container):
         elif conn.protocol in [0, 6]:
             # This is an (S)FQDN connection -> Remove from SYNPROXY!
             yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
-        #else:
-        #    # This is an SFQDN connection -> Remove from SYNPROXY!
-        #    yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
 
         # Get RealmGateway connections
         if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
@@ -1173,12 +1103,21 @@ class PolicyBasedResourceAllocation(container3.Container):
         ap_cpool.release(ipaddr)
         self._logger.info('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
 
-    def _service_is_overloadable(self, service_data, partial_overload=True):
-        """ Return True if service is overloadable """
-        if partial_overload:
-            return (service_data['port'] != 0 or service_data['protocol'] != 0)
+    def _describe_service_data(self, service_data, partial_reuse=True):
+        """ Return fqdn, sfqdn_reuse booleans according to service_data definition """
+        if service_data['port'] == 0 and service_data['protocol'] == 0:
+            fqdn = True
+            sfqdn_reuse = False
+        elif service_data['port'] != 0 and service_data['protocol'] != 0:
+            fqdn = False
+            sfqdn_reuse = True
+        elif (service_data['port'] != 0 or service_data['protocol'] != 0) and partial_reuse:
+            fqdn = False
+            sfqdn_reuse = True
         else:
-            return (service_data['port'] != 0 and service_data['protocol'] != 0)
+            fqdn = False
+            sfqdn_reuse = False
+        return (fqdn, sfqdn_reuse)
 
     def _connection_circularpool_get_overloadable(self, service_data):
         """ Returns a list of IPv4 address that can be overloaded """
