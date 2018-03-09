@@ -2,10 +2,11 @@ CIRCULARPOOL:
     max: 1000
     DNS_GROUP_POLICY: []
     CONTROL_VARIABLES:
-        SYSTEM_LOAD_LOW:           {load_threshold: 0,  reputation_fqdn: 0,    reputation_sfqdn: 0}
-        SYSTEM_LOAD_MEDIUM:        {load_threshold: 20, reputation_fqdn: 0.5,  reputation_sfqdn: 0.3}
-        SYSTEM_LOAD_HIGH:          {load_threshold: 60, reputation_fqdn: 0.75, reputation_sfqdn: 0.6}
-        SYSTEM_LOAD_VERY_HIGH:     {load_threshold: 80, reputation_fqdn: -1,   reputation_sfqdn: 0.8}
+        SYSTEM_LOAD:
+            - {'threshold': 99, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
+            - {'threshold': 66, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'}
+            - {'threshold': 33, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'}
+            - {'threshold':  0, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'}
         PBRA_DNS_POLICY_TCPCNAME:  false
         PBRA_DNS_POLICY_TCP:       false
         PBRA_DNS_POLICY_CNAME:     false
