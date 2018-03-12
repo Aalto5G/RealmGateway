@@ -81,6 +81,8 @@ def parse_arguments():
     # DNS parameters
     parser.add_argument('--dns-soa', nargs='*', required=True,
                         help='Available SOA zones (FQDN and PTR)')
+    parser.add_argument('--dns-cname-soa', nargs='*', required=True,
+                        help='Available SOA zones for CNAME alias generation')
     parser.add_argument('--dns-server-local', nargs=2, action='append',
                         metavar=('IPADDR', 'PORT'),
                         help='DNS serving own host')
@@ -297,7 +299,8 @@ class RealmGateway(object):
                                                    hosttable       = self._hosttable,
                                                    connectiontable = self._connectiontable,
                                                    datarepository  = self._datarepository,
-                                                   network         = self._network)
+                                                   network         = self._network,
+                                                   cname_soa       = self._config.dns_cname_soa)
 
     @asyncio.coroutine
     def _init_packet_callbacks(self):

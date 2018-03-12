@@ -3,6 +3,7 @@ import logging
 import time
 import functools
 import ipaddress
+import random
 
 from helpers_n_wrappers import container3
 from helpers_n_wrappers import utils3
@@ -614,12 +615,14 @@ class PolicyBasedResourceAllocation(container3.Container):
         The ideal MAX_LENGTH_LABEL should have value of 63. For compatibility, we use 32.
         """
         MAX_LENGTH_LABEL = 32
-        _fqdn = utils3.random_string(MAX_LENGTH_LABEL) + '.' + fqdn
+        # Get random SOA name from list
+        cname_soa = self.cname_soa[random.randrange(0, len(self.cname_soa))]
+        cname_fqdn = utils3.random_string(MAX_LENGTH_LABEL) + '.' + cname_soa
         ttl = 0
         response = dns.message.make_response(query, recursion_available=False)
         response.set_rcode(dns.rcode.NOERROR)
-        response.answer = [dns.rrset.from_text(fqdn, ttl, 1, dns.rdatatype.CNAME, _fqdn)]
-        return response, _fqdn
+        response.answer = [dns.rrset.from_text(fqdn, ttl, 1, dns.rdatatype.CNAME, cname_fqdn)]
+        return response, cname_fqdn
 
     def _load_metadata_resolver(self, query, addr, create=False):
         # Collect metadata from DNS query related to resolver based on IP address
