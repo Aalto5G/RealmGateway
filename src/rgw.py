@@ -172,8 +172,7 @@ def parse_arguments():
     parser.add_argument('--synproxy', nargs=2, default=None, #('127.0.0.1', 12345),
                         metavar=('IPADDR', 'PORT'),
                         help='SYNPROXY control endpoint')
-    # Operation mode
-    parser.add_argument('--mode', dest='mode', default='rgw') #choices=['rgw', 'ces']
+
     return parser.parse_args()
 
 class RealmGateway(object):
