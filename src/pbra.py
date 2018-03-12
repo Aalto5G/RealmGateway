@@ -992,7 +992,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         # TODO: Define a connection KEY when creating the object to indicate what tuples need to be registered?
 
         # Obtain FQDN from query
-        fqdn = format(query.question[0].name)
+        fqdn_query = format(query.question[0].name)
+        fqdn_alias = service_data.get('_fqdn', fqdn_query)
 
         # Get Circular Pool address pool stats
         ap_cpool = self.pooltable.get('circularpool')
@@ -1004,12 +1005,12 @@ class PolicyBasedResourceAllocation(container3.Container):
             # Use first available address from the pool
             allocated_ipv4 = reuse_ipaddr_l[0]
             self._logger.debug('Found {} IP(s) for reuse: {}'.format(len(reuse_ipaddr_l), reuse_ipaddr_l))
-            self._logger.info('Overloading reserved address: {} @ {}'.format(fqdn, allocated_ipv4))
+            self._logger.info('Overloading reserved address: {} @ {}'.format(fqdn_alias, allocated_ipv4))
         elif pool_available > 0:
             # Allocate a new address from the pool
             allocated_ipv4 = ap_cpool.allocate()
         else:
-            self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn))
+            self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn_alias))
             return None
 
         # TODO: Improve dns_host representation and consider the use within connection object (contains())
@@ -1032,7 +1033,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                       #'remote_ip': remote_ip,
                       #'remote_port': remote_port,
                       'protocol': service_data['protocol'],
-                      'fqdn': fqdn,
+                      'fqdn': fqdn_alias,
                       'host_fqdn': host_obj.fqdn,
                       'dns_resolver': dns_resolver,
                       'dns_host': dns_host,
@@ -1049,7 +1050,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Add connection to table
         self.connectiontable.add(conn)
         # Log
-        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec'.format(fqdn, allocated_ipv4, conn.timeout*1000))
+        via_text = '(via {})'.format(fqdn_query) if fqdn_query != fqdn_alias else ''
+        self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec {}'.format(fqdn_alias, allocated_ipv4, conn.timeout*1000, via_text))
         self._logger.debug('New Circular Pool connection: {}'.format(conn))
 
         # Synchronize connection with SYNPROXY module
