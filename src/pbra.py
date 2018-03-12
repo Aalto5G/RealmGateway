@@ -607,6 +607,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def _policy_cname(self, query):
         # Answer CNAME
+        ## Use original FQDN as it comes in the query
         fqdn = format(query.question[0].name)
         """
         There seems to be a bug using LXC and string match.
@@ -726,7 +727,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # TODO: Implement TCPCNAME or CNAME based on reputation of the sender?
         # TODO: Specify the event logging sequence, when do neutral, trusted and untrusted
 
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         alias = service_data['alias']
 
         self._logger.debug('WAN SOA pre-process for {} / {}'.format(fqdn, service_data))
@@ -816,7 +817,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     @asyncio.coroutine
     def pbra_dns_process_rgw_wan_soa(self, query, addr, host_obj, service_data, host_ipv4):
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
 
         # Get cached record
@@ -992,7 +993,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # TODO: Define a connection KEY when creating the object to indicate what tuples need to be registered?
 
         # Obtain FQDN from query
-        fqdn_query = format(query.question[0].name)
+        fqdn_query = query.fqdn
         fqdn_alias = service_data.get('_fqdn', fqdn_query)
 
         # Get Circular Pool address pool stats

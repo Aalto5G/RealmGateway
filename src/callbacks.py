@@ -173,7 +173,7 @@ class DNSCallbacks(object):
     def _do_resolve_carriergrade(self, query, host_addr, circular_pool = False):
         """ Resolve DNS query with host_addr. Return (dns_rcode, ipv4, service_data) """
         # Obtain FQDN from query
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         # Obtain query type to determine resolution model
         rdtype = query.question[0].rdtype
         # Obtain timeouts for given query type
@@ -256,7 +256,7 @@ class DNSCallbacks(object):
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
         # Forward or continue to DNS resolver
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
 
         self._logger.debug('LAN SOA: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
@@ -366,7 +366,7 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
 
         # Initialize to None to prevent AttributeError
@@ -530,7 +530,7 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
         self._logger.warning('Drop DNS query for non-SOA domain: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
         # TODO: Feed this to the algorithm as untrusted events? What about misconfigured DNS servers?

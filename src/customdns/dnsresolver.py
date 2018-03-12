@@ -168,7 +168,7 @@ class uDNSResolver():
         self.sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.sock.setblocking(False)
         yield from loop.sock_connect(self.sock, addr)
-        fqdn = query.question[0].name
+        fqdn = format(query.question[0].name).lower()
         response = None
         i = 0
         for tout in timeouts:

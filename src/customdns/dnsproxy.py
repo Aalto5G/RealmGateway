@@ -25,9 +25,9 @@ class DNSProxy(asyncio.DatagramProtocol):
             self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
             query = dns.message.from_wire(data)
             query.transport = 'udp'
-            fqdn = format(query.question[0].name)
+            query.fqdn = format(query.question[0].name).lower()
             cb_f = self.callback_send
-            if self._name_in_soa(fqdn) and self.cb_soa:
+            if self._name_in_soa(query.fqdn) and self.cb_soa:
                 self.cb_soa(query, addr, cb_f)
             elif self.cb_nosoa:
                 self.cb_nosoa(query, addr, cb_f)
@@ -86,9 +86,9 @@ class DNSTCPProxy(asyncio.Protocol):
             self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
             query = dns.message.from_wire(data[2:])
             query.transport = 'tcp'
-            fqdn = format(query.question[0].name)
+            query.fqdn = format(query.question[0].name).lower()
             cb_f = self.callback_send
-            if self._name_in_soa(fqdn) and self.cb_soa:
+            if self._name_in_soa(query.fqdn) and self.cb_soa:
                 self.cb_soa(query, addr, cb_f)
             elif self.cb_nosoa:
                 self.cb_nosoa(query, addr, cb_f)
