@@ -2,7 +2,7 @@ CIRCULARPOOL:
     max: 1000
     DNS_GROUP_POLICY:
         - {'initial_reputation': 1.0, 'sla': true, 'nodes': ['100.64.0.100']}
-        - {'initial_reputation': 0.0, 'sla': true, 'nodes': ['100.64.0.99']}
+        - {'initial_reputation': 0.0, 'sla': true, 'nodes': ['100.64.0.101']}
     CONTROL_VARIABLES:
         SYSTEM_LOAD:
             - {'threshold': 99, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
@@ -11,6 +11,6 @@ CIRCULARPOOL:
             - {'threshold':  0, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'}
         PBRA_DNS_POLICY_TCPCNAME:  false
         PBRA_DNS_POLICY_TCP:       true
-        PBRA_DNS_POLICY_CNAME:     false
+        PBRA_DNS_POLICY_CNAME:     true
         PBRA_DNS_LOG_UNTRUSTED:    true
         PBRA_DNS_LOAD_POLICING:    true
