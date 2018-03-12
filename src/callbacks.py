@@ -609,7 +609,7 @@ class PacketCallbacks(object):
         # Pre-emptive check with PBRA if the packet is blacklister
         response = self.pbra.pbra_data_preaccept_circularpool(data, packet_fields)
         if response is False:
-            self._logger.info('Reject / CircularPool pre-emptive check failed: [{}]'.format(dst,self._format_5tuple(packet_fields)))
+            self._logger.info('Reject / CircularPool pre-emptive check failed for IP {}: [{}]'.format(dst,self._format_5tuple(packet_fields)))
             self.network.ipt_nfpacket_reject(packet)
             self.pbra.pbra_data_track_circularpool(data, packet_fields)
             return
