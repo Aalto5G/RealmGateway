@@ -47,7 +47,6 @@ KEY_DNS_REPUTATION  = 50
 # Keys for uStateDataPacket
 KEY_DATA_PACKET     = 60
 
-# TODO: Create minimal unit that extends ContainerNode and implements a uReputation object with basic methods to avoid code duplication
 
 class uReputation(object):
     """
@@ -723,10 +722,13 @@ class PolicyBasedResourceAllocation(container3.Container):
     @asyncio.coroutine
     def pbra_dns_preprocess_rgw_wan_soa(self, query, addr, host_obj, service_data):
         """ This function implements section: Tackling real resolutions and reputation for remote server(s) and DNS clusters """
-        # TODO: Add a case when reputation is very high and UDP.cookie is found for resolver ?
-        # TODO: Implement TCPCNAME or CNAME based on reputation of the sender?
-        # TODO: Specify the event logging sequence, when do neutral, trusted and untrusted
-
+        '''
+        TODO: Here is a list with ideas related to policy enforcement
+            - Override TCP.tc if UDP.cookie is present ?
+            - Dynamic enforcing of TCPCNAME or CNAME policies based on reputation of the sender ?
+            - Neutral events may indicate a correct behaviour of a server (DNSoTCP or CNAME follow-up), however,
+            limiting the penalty to a host-only, my open the door to rogue servers impersonating numerous clients. Tread carefully!!!
+        '''
         fqdn = query.fqdn
         alias = service_data['alias']
 
@@ -881,8 +883,6 @@ class PolicyBasedResourceAllocation(container3.Container):
     @asyncio.coroutine
     def _rgw_allocate_circularpool(self, query, addr, host_obj, service_data, host_ipv4):
         """ Takes in a DNS query for CircularPool """
-        # TODO: Implement logic for policy and reputation checking
-
         # Get Circular Pool policy for host
         host_policy = host_obj.get_service('CIRCULARPOOL')
 
@@ -989,9 +989,6 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     @asyncio.coroutine
     def _best_effort_allocate(self, query, addr, host_obj, service_data, host_ipv4):
-        # TODO: Improve connection creation to include DNS metadata and check for SLA
-        # TODO: Define a connection KEY when creating the object to indicate what tuples need to be registered?
-
         # Obtain FQDN from query
         fqdn_query = query.fqdn
         fqdn_alias = service_data.get('_fqdn', fqdn_query)
@@ -1014,7 +1011,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn_alias))
             return None
 
-        # TODO: Improve dns_host representation and consider the use within connection object (contains())
 
         dns_resolver = addr[0]
         dns_host = query.reputation_requestor
@@ -1053,12 +1049,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Log
         via_text = '(via {})'.format(fqdn_query) if fqdn_query != fqdn_alias else ''
         self._logger.info('Allocated IP address from Circular Pool: {} @ {} for {:.3f} msec {}'.format(fqdn_alias, allocated_ipv4, conn.timeout*1000, via_text))
-        self._logger.debug('New Circular Pool connection: {}'.format(conn))
+        self._logger.info('New Circular Pool connection: {}'.format(conn))
 
         # Synchronize connection with SYNPROXY module
-        ## TODO: Get TCP options policy from host
+        ## TODO: Implement retrieval of TCP options policy from host
         if service_data['protocol'] in [0, 6]:
-            # TODO: Test performance and consider optimizations / Do this in parallel or yield from it?
             tcpmss, tcpsack, tcpwscale = 1460, 1, 7
             yield from self.network.synproxy_add_connection(conn.outbound_ip, conn.outbound_port, conn.protocol, tcpmss, tcpsack, tcpwscale)
 
