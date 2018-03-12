@@ -1,0 +1,9 @@
+CIRCULARPOOL:
+    max: 1000
+    DNS_GROUP_POLICY: []
+    CONTROL_VARIABLES:
+        PBRA_DNS_POLICY_TCPCNAME:  false
+        PBRA_DNS_POLICY_TCP:       false
+        PBRA_DNS_POLICY_CNAME:     false
+        PBRA_DNS_LOG_UNTRUSTED:    false
+        PBRA_DNS_LOAD_POLICING:    false

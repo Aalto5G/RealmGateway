@@ -1,0 +1,519 @@
+test200.gwa.demo.:
+    ID:
+        fqdn:   ['test200.gwa.demo.']
+        ipv4:   ['192.168.0.200']
+        msisdn: ['0000000200']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test200.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test200.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test200.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test201.gwa.demo.:
+    ID:
+        fqdn:   ['test201.gwa.demo.']
+        ipv4:   ['192.168.0.201']
+        msisdn: ['0000000201']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test201.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test201.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test201.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test202.gwa.demo.:
+    ID:
+        fqdn:   ['test202.gwa.demo.']
+        ipv4:   ['192.168.0.202']
+        msisdn: ['0000000202']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test202.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test202.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test202.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test203.gwa.demo.:
+    ID:
+        fqdn:   ['test203.gwa.demo.']
+        ipv4:   ['192.168.0.203']
+        msisdn: ['0000000203']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test203.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test203.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test203.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test204.gwa.demo.:
+    ID:
+        fqdn:   ['test204.gwa.demo.']
+        ipv4:   ['192.168.0.204']
+        msisdn: ['0000000204']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test204.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test204.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test204.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test205.gwa.demo.:
+    ID:
+        fqdn:   ['test205.gwa.demo.']
+        ipv4:   ['192.168.0.205']
+        msisdn: ['0000000205']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test205.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test205.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test205.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test206.gwa.demo.:
+    ID:
+        fqdn:   ['test206.gwa.demo.']
+        ipv4:   ['192.168.0.206']
+        msisdn: ['0000000206']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test206.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test206.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test206.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test207.gwa.demo.:
+    ID:
+        fqdn:   ['test207.gwa.demo.']
+        ipv4:   ['192.168.0.207']
+        msisdn: ['0000000207']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test207.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test207.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test207.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test208.gwa.demo.:
+    ID:
+        fqdn:   ['test208.gwa.demo.']
+        ipv4:   ['192.168.0.208']
+        msisdn: ['0000000208']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test208.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test208.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test208.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}
+
+test209.gwa.demo.:
+    ID:
+        fqdn:   ['test209.gwa.demo.']
+        ipv4:   ['192.168.0.209']
+        msisdn: ['0000000209']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 1000
+    SFQDN:
+        - {fqdn:          'test209.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test209.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:  'tcp2000.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2000 }
+        - {fqdn:  'tcp2001.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2001 }
+        - {fqdn:  'tcp2002.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2002 }
+        - {fqdn:  'tcp2003.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2003 }
+        - {fqdn:  'tcp2004.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2004 }
+        - {fqdn:  'tcp2005.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2005 }
+        - {fqdn:  'tcp2006.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2006 }
+        - {fqdn:  'tcp2007.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2007 }
+        - {fqdn:  'tcp2008.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2008 }
+        - {fqdn:  'tcp2009.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2009 }
+        - {fqdn:  'tcp2010.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 2010 }
+        - {fqdn:  'udp2000.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2000 }
+        - {fqdn:  'udp2001.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2001 }
+        - {fqdn:  'udp2002.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2002 }
+        - {fqdn:  'udp2003.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2003 }
+        - {fqdn:  'udp2004.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2004 }
+        - {fqdn:  'udp2005.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2005 }
+        - {fqdn:  'udp2006.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2006 }
+        - {fqdn:  'udp2007.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2007 }
+        - {fqdn:  'udp2008.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2008 }
+        - {fqdn:  'udp2009.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2009 }
+        - {fqdn:  'udp2010.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 2010 }
+        - {fqdn: 'sctp2000.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2000 }
+        - {fqdn: 'sctp2001.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2001 }
+        - {fqdn: 'sctp2002.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2002 }
+        - {fqdn: 'sctp2003.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2003 }
+        - {fqdn: 'sctp2004.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2004 }
+        - {fqdn: 'sctp2005.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2005 }
+        - {fqdn: 'sctp2006.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2006 }
+        - {fqdn: 'sctp2007.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2007 }
+        - {fqdn: 'sctp2008.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2008 }
+        - {fqdn: 'sctp2009.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2009 }
+        - {fqdn: 'sctp2010.test209.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 2010 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}

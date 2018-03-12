@@ -64,6 +64,11 @@ def make_response_rcode(query, rcode = dns.rcode.NOERROR, recursion_available=Fa
     return response
 
 def make_response_answer_rr(query, name, rdtype, target, rdclass=1, ttl=60, recursion_available=False):
+    fqdn = format(query.question[0].name)
+    if fqdn != name and fqdn.lower() == name.lower():
+        # Use original fqdn formatted name instead of the given name (lowercase) for very strict DNS servers
+        name = fqdn
+
     response = dns.message.make_response(query, recursion_available=recursion_available)
 #    response.flags |= dns.flags.CD
     response.answer = [dns.rrset.from_text(name, ttl, rdclass, rdtype, target)]

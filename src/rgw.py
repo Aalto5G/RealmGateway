@@ -4,16 +4,18 @@
 #TODO: Define better transition from CUSTOMER_POLICY towards ADMIN_POLICY in filter.FORWARD - Use ipt-host-unknown ?
 '''
 Run as:
-./rgw.py  --name gwa.demo                                                    \
-          --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
+./rgw.py  --name             gwa.demo                                        \
+          --dns-soa          gwa.demo. cname-gwa.demo.                       \
+                             0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa.  \
+          --dns-cname-soa    cname-gwa.demo.                                 \
           --dns-server-local 127.0.0.1 53                                    \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
-          --dns-resolver     8.8.8.8 53                                      \
+          --dns-resolver     127.0.0.1 54                                    \
           --ddns-server      127.0.0.2 53                                    \
-          --dns-timeout      0.010 0.100 0.200                               \
+          --dns-timeout      0.25 0.25 0.25                                  \
           --pool-serviceip   100.64.1.130/32                                 \
-          --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
+          --pool-cpoolip     100.64.1.131/32 100.64.1.132/32 100.64.1.133/32 \
           --ipt-cpool-queue  1                                               \
           --ipt-cpool-chain  CIRCULAR_POOL                                   \
           --ipt-host-chain   CUSTOMER_POLICY                                 \
@@ -26,11 +28,12 @@ Run as:
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --network-api-url  http://127.0.0.1:8081/                          \
-          --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
-          --repository-policy-folder     ../config.d/gwa.demo.policy.d/      \
+          --repository-subscriber-folder /customer_edge_switching_v2/config.d/gwa.demo.subscriber.d/ \
+          --repository-policy-folder     /customer_edge_switching_v2/config.d/gwa.demo.policy.d/     \
           --repository-api-url  http://127.0.0.1:8082/                       \
-          --mode rgw
+          --network-api-url     http://127.0.0.1:8081/                       \
+          --synproxy         172.31.255.14 12345
+
 '''
 
 import argparse
@@ -54,6 +57,7 @@ from host import HostTable, HostEntry
 from network import Network
 from pbra import PolicyBasedResourceAllocation
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
+from suricata import SuricataAlert
 from helpers_n_wrappers import utils3
 from global_variables import RUNNING_TASKS
 
@@ -80,6 +84,8 @@ def parse_arguments():
     # DNS parameters
     parser.add_argument('--dns-soa', nargs='*', required=True,
                         help='Available SOA zones (FQDN and PTR)')
+    parser.add_argument('--dns-cname-soa', nargs='*', required=True,
+                        help='Available SOA zones for CNAME alias generation')
     parser.add_argument('--dns-server-local', nargs=2, action='append',
                         metavar=('IPADDR', 'PORT'),
                         help='DNS serving own host')
@@ -166,11 +172,9 @@ def parse_arguments():
                         help='Configuration folder with local policy information')
 
     ## SYNPROXY information
-    parser.add_argument('--synproxy', nargs=2, default=('127.0.0.1', 12345),
+    parser.add_argument('--synproxy', nargs=2, default=None, #('127.0.0.1', 12345),
                         metavar=('IPADDR', 'PORT'),
                         help='SYNPROXY control endpoint')
-    # Operation mode
-    parser.add_argument('--mode', dest='mode', default='rgw', choices=['rgw', 'ces'])
 
     return parser.parse_args()
 
@@ -208,10 +212,15 @@ class RealmGateway(object):
         _t = asyncio.ensure_future(self._init_cleanup_pbra_timers(10.0))
         RUNNING_TASKS.append((_t, 'cleanup_pbra_timers'))
         # Create task: Show DNS groups
-        _t = asyncio.ensure_future(self._init_show_dnsgroups(60.0))
+        _t = asyncio.ensure_future(self._init_show_dnsgroups(20.0))
         RUNNING_TASKS.append((_t, 'show_dnsgroups'))
         # Initialize Subscriber information
         yield from self._init_subscriberdata()
+
+        # Initialize Subscriber information
+        yield from self._init_suricata('0.0.0.0', 12346)
+
+
         # Ready!
         self._logger.warning('RealmGateway_v2 is ready!')
 
@@ -292,7 +301,8 @@ class RealmGateway(object):
                                                    hosttable       = self._hosttable,
                                                    connectiontable = self._connectiontable,
                                                    datarepository  = self._datarepository,
-                                                   network         = self._network)
+                                                   network         = self._network,
+                                                   cname_soa       = self._config.dns_cname_soa)
 
     @asyncio.coroutine
     def _init_packet_callbacks(self):
@@ -306,7 +316,7 @@ class RealmGateway(object):
     @asyncio.coroutine
     def _init_dns(self):
         # Create object for storing all DNS-related information
-        self.dnscb = DNSCallbacks(cachetable      = None,
+        self._dnscb = DNSCallbacks(cachetable      = None,
                                   datarepository  = self._datarepository,
                                   network         = self._network,
                                   hosttable       = self._hosttable,
@@ -315,63 +325,64 @@ class RealmGateway(object):
                                   pbra            = self._pbra)
 
         # Register defined DNS timeouts
-        self.dnscb.dns_register_timeout(self._config.dns_timeout, None)
-        self.dnscb.dns_register_timeout(self._config.dns_timeout_a, 1)
-        self.dnscb.dns_register_timeout(self._config.dns_timeout_aaaa, 28)
-        self.dnscb.dns_register_timeout(self._config.dns_timeout_srv, 33)
-        self.dnscb.dns_register_timeout(self._config.dns_timeout_naptr, 35)
+        self._dnscb.dns_register_timeout(self._config.dns_timeout, None)
+        self._dnscb.dns_register_timeout(self._config.dns_timeout_a, 1)
+        self._dnscb.dns_register_timeout(self._config.dns_timeout_aaaa, 28)
+        self._dnscb.dns_register_timeout(self._config.dns_timeout_srv, 33)
+        self._dnscb.dns_register_timeout(self._config.dns_timeout_naptr, 35)
 
         # Register defined SOA zones
         for soa_name in self._config.dns_soa:
             self._logger.info('Registering DNS SOA {}'.format(soa_name))
-            self.dnscb.dns_register_soa(soa_name)
-        soa_list = self.dnscb.dns_get_soa()
+            self._dnscb.dns_register_soa(soa_name)
+        soa_list = self._dnscb.dns_get_soa()
 
         # Register DNS resolvers
         for ipaddr, port in self._config.dns_resolver:
             self._logger.info('Creating DNS Resolver endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.dns_register_resolver((ipaddr, port))
+            self._dnscb.dns_register_resolver((ipaddr, port))
 
         # Dynamic DNS Server for DNS update messages
         for ipaddr, port in self._config.ddns_server:
-            cb_function = lambda x,y,z: asyncio.ensure_future(self.dnscb.ddns_process(x,y,z))
+            cb_function = lambda x,y,z: asyncio.ensure_future(self._dnscb.ddns_process(x,y,z))
             transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DDNSServer, cb_default = cb_function), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS DDNS endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
+            self._dnscb.register_object('DDNS@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Server for WAN via UDP
         for ipaddr, port in self._config.dns_server_wan:
-            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_wan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_wan_nosoa(x,y,z))
             transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Server endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
+            self._dnscb.register_object('DNSServer@{}:{}'.format(ipaddr, port), protocol)
 
         # DNS Server for WAN via TCP
         for ipaddr, port in self._config.dns_server_wan:
-            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_soa(x,y,z))
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_wan_nosoa(x,y,z))
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_wan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_wan_nosoa(x,y,z))
             server = yield from self._loop.create_server(functools.partial(DNSTCPProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), host=ipaddr, port=port, reuse_address=True)
             server.connection_lost = lambda x: server.close()
             self._logger.info('Creating DNS TCP Server endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DNSTCPServer@{}:{}'.format(ipaddr, port), server)
+            self._dnscb.register_object('DNSTCPServer@{}:{}'.format(ipaddr, port), server)
 
         # DNS Proxy for LAN
         for ipaddr, port in self._config.dns_server_lan:
-            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_nosoa(x,y,z))
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_lan_soa(x,y,z))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_lan_nosoa(x,y,z))
             transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
+            self._dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
 
         ## DNS Proxy for Local
         for ipaddr, port in self._config.dns_server_local:
-            cb_soa   = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_process_rgw_lan_soa(x,y,z))
+            cb_soa   = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_process_rgw_lan_soa(x,y,z))
             # Disable resolutions of non SOA domains for self generated DNS queries (i.e. HTTP proxy) - Answer with REFUSED
-            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self.dnscb.dns_error_response(x,y,z,rcode=dns.rcode.REFUSED))
+            cb_nosoa = lambda x,y,z: asyncio.ensure_future(self._dnscb.dns_error_response(x,y,z,rcode=dns.rcode.REFUSED))
             transport, protocol = yield from self._loop.create_datagram_endpoint(functools.partial(DNSProxy, soa_list = soa_list, cb_soa = cb_soa, cb_nosoa = cb_nosoa), local_addr=(ipaddr, port))
             self._logger.info('Creating DNS Proxy endpoint @{}:{}'.format(ipaddr, port))
-            self.dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
+            self._dnscb.register_object('DNSProxy@{}:{}'.format(ipaddr, port), protocol)
+
 
     @asyncio.coroutine
     def _init_subscriberdata(self):
@@ -381,7 +392,7 @@ class RealmGateway(object):
             ipaddr = subs_data['ID']['ipv4'][0]
             fqdn = subs_data['ID']['fqdn'][0]
             self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
-            yield from self.dnscb.ddns_register_user(fqdn, 1, ipaddr)
+            yield from self._dnscb.ddns_register_user(fqdn, 1, ipaddr)
         self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(self._loop.time()-tzero))
 
     @asyncio.coroutine
@@ -403,22 +414,18 @@ class RealmGateway(object):
     @asyncio.coroutine
     def _init_show_dnsgroups(self, delay):
         self._logger.warning('Initiating display of DNSGroup information every {} seconds'.format(delay))
+        self._pbra.debug_dnsgroups(transition = False)
         while True:
             yield from asyncio.sleep(delay)
             # Update table and remove expired elements
-            self._pbra.debug_dnsgroups()
+            self._pbra.debug_dnsgroups(transition = True)
 
     @asyncio.coroutine
     def shutdown(self):
         self._logger.warning('RealmGateway_v2 is shutting down...')
-        # Close registered sockets in callback module
-        for obj in self.dnscb.get_object(None):
-            obj.connection_lost(None)
-        # Close bound NFQUEUEs
-        self._network.ipt_deregister_nfqueues()
-        # Close open aiohttp_client objects
-        self._network.rest_api_close()
-        self._datarepository.rest_api_close()
+        self._dnscb.shutdown()
+        self._network.shutdown()
+        self._datarepository.shutdown()
 
         for task_obj, task_name in RUNNING_TASKS:
             with suppress(asyncio.CancelledError):
@@ -427,6 +434,12 @@ class RealmGateway(object):
                 yield from asyncio.sleep(1)
                 yield from task_obj
                 self._logger.warning('>> Cancelled {} task'.format(task_name))
+
+    @asyncio.coroutine
+    def _init_suricata(self, ipaddr, port):
+        ## Added for Suricata testing
+        transport, protocol = yield from self._loop.create_datagram_endpoint(SuricataAlert, local_addr=(ipaddr, port))
+        self._logger.warning('Creating SuricataAlert endpoint @{}:{}'.format(ipaddr, port))
 
 
 if __name__ == '__main__':

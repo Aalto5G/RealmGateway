@@ -1,0 +1,41 @@
+test.nest.gwa.demo.:
+    ID:
+        fqdn:   ['test.nest.gwa.demo.']
+        ipv4:   ['192.168.10.100']
+        msisdn: ['0000010100']
+    GROUP:
+        - IPS_GROUP_POSTPAID
+    CIRCULARPOOL:
+        max: 100
+    CARRIERGRADE:
+        - {ipv4: 192.168.10.100}
+        - {ipv4: 192.168.10.10}
+        - {ipv4: 192.168.10.11}
+        - {ipv4: 192.168.10.12}
+    SFQDN:
+        - {fqdn:          'test.nest.gwa.demo.',  proxy_required: false, carriergrade: false                             }
+        - {fqdn:      'www.test.nest.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:      'sip.test.nest.gwa.demo.',  proxy_required: true , carriergrade: false                             }
+        - {fqdn:     'icmp.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
+        - {fqdn:     'ping.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 1,    port: 0    }
+        - {fqdn:      'tcp.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 0    }
+        - {fqdn:      'udp.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 0    }
+        - {fqdn:     'sctp.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 0    }
+        - {fqdn:      'ssh.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 22   }
+        - {fqdn:  'tcp1234.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 6,    port: 1234 }
+        - {fqdn:  'udp1234.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 17,   port: 1234, loose_packet: 3 }
+        - {fqdn: 'sctp1234.test.nest.gwa.demo.',  proxy_required: false, carriergrade: false, protocol: 132,  port: 1234 }
+    FIREWALL:
+        FIREWALL_ADMIN:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'hashlimit': {'hashlimit-above':'5/sec', 'hashlimit-burst':'50', 'hashlimit-name':'DnsLanHosts', 'hashlimit-mode':'srcip', 'hashlimit-htable-expire':'1001'}, 'comment':{'comment':'Host DNS limit'}}
+        FIREWALL_USER:
+            - {'priority': 0,   'direction': 'EGRESS', 'protocol': '17', 'udp':{'dport': '53'}, 'target': 'REJECT', 'string': {'algo':'bm', 'hex-string':'|04|nsfw'}, 'comment':{'comment':'Forbidden DNS domain'}}
+            - {'priority': 10,  'direction': 'INGRESS', 'src': '195.148.125.201/32', 'protocol': '1', 'icmp':{'icmp-type':'8/0'}, 'target': 'ACCEPT', 'comment':{'comment':'Allow incoming ICMP'}}
+            - {'priority': 10,  'direction': 'INGRESS', 'src': '195.148.125.201/32',                                              'target': 'DROP',   'comment':{'comment':'Deny all incoming'}}
+            - {'priority': 50,  'direction': 'INGRESS', 'protocol': '6',   'tcp':{'dport': '12345'},                         'target': 'DROP',   'comment':{'comment':'Deny port 12345'}}
+            - {'priority': 50,  'direction': 'INGRESS', 'protocol': '17',  'udp':{'dport': '12345'},                         'target': 'DROP',   'comment':{'comment':'Deny port 12345'}}
+            - {'priority': 50,  'direction': 'INGRESS', 'protocol': '132', 'sctp':{'dport': '12345'},                        'target': 'DROP',   'comment':{'comment':'Deny port 12345'}}
+            - {'priority': 50,  'direction': 'EGRESS',  'dst': '8.8.4.4/32', 'protocol': '17', 'udp':{'dport': '53'},        'target': 'ACCEPT', 'comment':{'comment':'Allow DNS to Google#2'}}
+            - {'priority': 50,  'direction': 'EGRESS',  'dst': '8.8.8.8/32', 'protocol': '17', 'udp':{'dport': '53'},        'target': 'DROP',   'comment':{'comment':'Deny  DNS to Google#1'}}
+            - {'priority': 100, 'direction': 'EGRESS',                                                                       'target': 'ACCEPT', 'comment':{'comment':'Allow outgoing'}}
+            - {'priority': 100, 'direction': 'INGRESS',                                                                      'target': 'ACCEPT', 'comment':{'comment':'Allow incoming'}}

@@ -146,16 +146,22 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if not laddr:
         laddr=('0.0.0.0', 0)
+    if type == socket.SOCK_STREAM:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 0, 0))
+
     sock.bind(laddr)
     sock.setblocking(False)
     try:
         yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
         return sock
-    except:
+    except Exception as e:
+        #logger = logging.getLogger('_socket_connect')
+        #logger.exception(e)
         return None
 
 @asyncio.coroutine
-def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
+def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
     """
     fqdn: Domain name to be resolved
     raddr: Remote tuple information
@@ -176,9 +182,9 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=True, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
-        logger.debug('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
+        logger.warning('Socket failed to connect: {}:{} > {}:{} ({}) / {} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
         return (ipaddr, query.id, attempt)
 
     for tout in timeouts:
@@ -191,7 +197,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
                 response = dns.message.from_wire(dataresponse)
                 # Check if response is truncated and retry in TCP with a recursive call
                 if (response.flags & dns.flags.TC == dns.flags.TC):
-                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp')
+                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
                     return (_data_ripaddr, _query_id, _dns_attempts)
 
             elif socktype == 'tcp':
@@ -228,13 +234,15 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
             logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             continue
         except ConnectionRefusedError:
-            logger.debug('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
+            logger.exception('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             break
         except AssertionError:
-            logger.info('Wrong message id: {}!={} / {} ({})'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype)))
+            # This may happen if we have many sockets open
+            _laddr = sock.getsockname()
+            logger.exception('Wrong message id: {}!={} / {} ({}) / {}:{}'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype), _laddr[0], _laddr[1]))
             break
         except KeyError:
-            logger.info('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
+            logger.exception('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
             break
         except Exception as e:
             logger.warning('Exception {}: {}:{} ({}) / {} ({})'.format(e, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
@@ -244,7 +252,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp'):
     return (ipaddr, query.id, attempt)
 
 @asyncio.coroutine
-def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
+def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
     """
     data: Data to send
     raddr: Remote tuple information
@@ -259,9 +267,9 @@ def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp'):
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=True, timeout=1)
+    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
-        logger.debug('Socket failed to connect: {}:{} ({})'.format(raddr[0], raddr[1], socktype))
+        logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
         return (recvdata, attempt)
 
     for tout in timeouts:
@@ -290,7 +298,7 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     if dport == 0:
         dport = random.randint(1,65535)
     if proto == 6:
-        layer_4 = TCP(sport=sport, dport=dport)
+        layer_4 = TCP(sport=sport, dport=dport, seq=random.randint(1,2**32-1))
     elif proto == 17:
         layer_4 = UDP(sport=sport, dport=dport)/Raw(payload)
     else:
@@ -299,12 +307,31 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     eth_pkt = Ether()/IP(src=src, dst=dst)/layer_4
     return eth_pkt
 
+_l2socket_cache = {}
 def _scapy_send_packet(packet, iface):
+    """ Accepts packet of type Packet() or bytes """
     try:
-        sendp(packet, iface=iface, verbose=False)
+        # Get sending raw socket
+        if iface is None and not isinstance(packet, bytes):
+            sendp(packet, iface=iface, verbose=False)
+            return True
+
+        # Create new L2Socket and add it to the local cache
+        if iface not in _l2socket_cache:
+            _l2socket_cache[iface] = scapy.arch.linux.L2Socket(iface=iface)
+        # Continue with L2Socket
+        l2socket = _l2socket_cache[iface]
+        # Obtain wire representation of the packet
+        if not isinstance(packet, bytes):
+            packet = bytes(packet)
+        # Streamlined send function
+        l2socket.outs.send(packet)
         return True
     except OSError as e:
-        logger.error('Failed to send / {} via {}  <{}>'.format(packet.command(), iface, e))
+        if isinstance(packet, bytes):
+            # Packetize to enhance logging information
+            packet = Ether(packet)
+        logger.error('Failed to send packet via {} <{}> / {}'.format(iface, e, packet.command()))
         return False
 
 def _get_service_tuple(local_l, remote_l):
@@ -356,6 +383,7 @@ class RealDNSDataTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSDataTraffic')
 
@@ -406,7 +434,8 @@ class RealDNSDataTraffic(object):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                         reuseaddr=self.reuseaddr)
 
         # Populate partial results
         ts_end = _now()
@@ -428,6 +457,7 @@ class RealDNSDataTraffic(object):
 
         # Await for data_delay
         if data_delay > 0:
+            self.logge.warning('RealDNSDataTraffic sleep({}) before sending data', data_delay)
             yield from asyncio.sleep(data_delay)
 
         ## Run data transfer
@@ -435,7 +465,8 @@ class RealDNSDataTraffic(object):
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
-                                                        timeouts=data_timeouts, socktype=data_sockettype)
+                                                        timeouts=data_timeouts, socktype=data_sockettype,
+                                                        reuseaddr=self.reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
@@ -466,6 +497,7 @@ class RealDNSTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDNSTraffic')
 
@@ -509,7 +541,8 @@ class RealDNSTraffic(object):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype)
+                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                         reuseaddr=self.reuseaddr)
 
         # Populate partial results
         ts_end = _now()
@@ -543,6 +576,7 @@ class RealDataTraffic(object):
         global TS_ZERO
         global TASK_NUMBER
 
+        self.reuseaddr = False
         set_attributes(self, override=True, **kwargs)
         self.logger = logging.getLogger('RealDataTraffic')
 
@@ -584,7 +618,8 @@ class RealDataTraffic(object):
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
-                                                        timeouts=data_timeouts, socktype=data_sockettype)
+                                                        timeouts=data_timeouts, socktype=data_sockettype,
+                                                        reuseaddr = self.reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
@@ -630,8 +665,12 @@ class SpoofDNSTraffic(object):
             # Select parameters randomly
             _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
             _data_laddr, _data_raddr, = _get_service_tuple([], self.data_raddr)
+            # Pre-compute packet build to avoid lagging due to Scapy.
+            ## Build query message
+            _data_b = dns.message.make_query(_data_raddr[0], 1, 1).to_wire()
+            _eth_pkt = _scapy_build_packet(_dns_laddr[0], _dns_raddr[0], _dns_raddr[2], _dns_laddr[1], _dns_raddr[1], _data_b)
             # Schedule task
-            args = (task_nth, _dns_laddr, _dns_raddr, _data_laddr, _data_raddr)
+            args = (task_nth, _dns_laddr, _dns_raddr, _data_laddr, _data_raddr, bytes(_eth_pkt))
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             args_str = 'SpoofDNS {}:{}/{} => {}:{}/{}'.format(_dns_laddr[0], _dns_laddr[1], _dns_laddr[2],
@@ -639,7 +678,7 @@ class SpoofDNSTraffic(object):
             self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
 
     @asyncio.coroutine
-    def run(self, task_nth, dns_raddr, dns_laddr, data_laddr, data_raddr):
+    def run(self, task_nth, dns_raddr, dns_laddr, data_laddr, data_raddr, eth_pkt):
         global TS_ZERO
         self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
@@ -650,21 +689,13 @@ class SpoofDNSTraffic(object):
         dns_lipaddr, dns_lport, dns_lproto = dns_laddr
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
-
-        # Build query message
-        query = dns.message.make_query(data_fqdn, 1, 1)
-        data_b = query.to_wire()
-
-        # Use Scapy to build and send a packet
-        eth_pkt = _scapy_build_packet(dns_lipaddr, dns_ripaddr, dns_rproto, dns_lport, dns_rport, data_b)
+        # Send the packet
         success = _scapy_send_packet(eth_pkt, self.interface)
-
         # Populate partial results
         ts_end = _now()
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
         metadata_d['dns_fqdn'] = data_fqdn
-
         # Add results
         add_result(self.type, success, metadata_d, ts_start, ts_end)
 
@@ -687,6 +718,7 @@ class SpoofDataTraffic(object):
         # Adjust next taskdelay time
         taskdelay = self.ts_start
         iterations = int(self.load * self.duration)
+
         for i in range(0, iterations):
             # Set starting time for task
             taskdelay += random.expovariate(self.load)
@@ -694,8 +726,11 @@ class SpoofDataTraffic(object):
             task_nth = TASK_NUMBER
             # Select parameters randomly
             _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
+            # Pre-compute packet build to avoid lagging due to Scapy.
+            _data_b = '{}@{}'.format(_data_raddr[0], _data_raddr[0]).encode()
+            _eth_pkt = _scapy_build_packet(_data_laddr[0], _data_raddr[0], _data_raddr[2], _data_laddr[1], _data_raddr[1], _data_b)
             # Schedule task
-            args = (task_nth, _data_laddr, _data_raddr)
+            args = (task_nth, _data_laddr, _data_raddr, bytes(_eth_pkt))
             cb = functools.partial(asyncio.ensure_future, self.run(*args))
             loop.call_at(taskdelay, cb)
             args_str = 'SpoofData {}:{}/{} => {}:{}/{}'.format(_data_laddr[0], _data_laddr[1], _data_laddr[2],
@@ -703,7 +738,7 @@ class SpoofDataTraffic(object):
             self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
 
     @asyncio.coroutine
-    def run(self, task_nth, data_laddr, data_raddr):
+    def run(self, task_nth, data_laddr, data_raddr, eth_pkt):
         global TS_ZERO
         self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
@@ -712,17 +747,12 @@ class SpoofDataTraffic(object):
         # Unpack Data related data
         data_ripaddr, data_rport, data_rproto = data_raddr
         data_lipaddr, data_lport, data_lproto = data_laddr
-
-        # Use Scapy to build and send a packet
-        data_b = '{}@{}'.format(data_ripaddr, data_ripaddr).encode()
-        eth_pkt = _scapy_build_packet(data_lipaddr, data_ripaddr, data_rproto, data_lport, data_rproto, data_b)
+        # Send the packet
         success = _scapy_send_packet(eth_pkt, self.interface)
-
         # Populate partial results
         ts_end = _now()
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = data_raddr
-
         # Add results
         add_result(self.type, success, metadata_d, ts_start, ts_end)
 
@@ -741,16 +771,22 @@ class MainTestClient(object):
         self._spawn_traffic_tests(config_d)
 
     def _spawn_traffic_tests(self, config_d):
+        # TODO: Use parameters defined in globals as base, then overwrite with test specific?
+
+        global TS_ZERO
         duration = config_d['duration']
         ts_backoff = config_d['backoff']
         ts_start = _now() + ts_backoff
+
+        self.logger.warning('({:.3f}) Starting task generation!'.format(_now(TS_ZERO)))
+        self.logger.warning('({:.3f}) Scheduling first task @{}!'.format(_now(TS_ZERO), ts_backoff))
 
         # Define test test specific parameters
         type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts', 'data_delay']),
                        'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr', 'dns_timeouts']),
                        'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
-                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr']),
-                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr']),
+                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr', 'interface']),
+                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr', 'interface']),
                        }
 
         for item_d in config_d['traffic']:
@@ -769,6 +805,8 @@ class MainTestClient(object):
 
             # Create object
             obj = cls(**item_d)
+
+        self.logger.warning('({:.3f}) Terminated task generation!'.format(_now(TS_ZERO)))
 
     @asyncio.coroutine
     def monitor_pending_tasks(self, watchdog = WATCHDOG):

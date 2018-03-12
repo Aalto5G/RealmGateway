@@ -100,9 +100,9 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'set': {'match-set': ['IPS_SPOOFED_NET_WAN', 'src']}, 'comment': {'comment': 'WAN IP Spoofing'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'set': {'match-set': ['IPS_SPOOFED_NET_TUN', 'src']}, 'comment': {'comment': 'TUN IP Spoofing'}, 'target': 'DROP'}}
             - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'comment': {'comment': 'Reject vulnerable multiport TCP services'}, 'multiport': {'dports': '135,137,138,139'}, 'protocol': 'tcp', 'conntrack': {'ctstate': 'NEW'}, 'target': 'mREJECT'}}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
-            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+#            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+#            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
+#            - {'table': 'filter', 'chain': 'ADMIN_PREEMPTIVE', 'rule': {'mark': {'mark': '0xff000004/0xff00000f'}, 'comment': {'comment': 'New connection'}, 'hashlimit': {'hashlimit-above': '500/sec', 'hashlimit-name': 'GlobalNewConn', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '750'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}}}
 
     GROUP_POLICY:
     # This policy installs the basic group functionality upon which users traffic is processed by a set of policy rules specific to each group or membership.
@@ -210,30 +210,30 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Apply blacklist'}, 'target': 'POLICY_DNS_LAN_BLACKLIST'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Apply global limitation'}, 'target': 'POLICY_DNS_LAN_GLOBAL_LIMIT'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept DNS LAN traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsLan', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept DNS LAN traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsLan', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'DNS LAN rate exceeded'}, 'target': 'DROP'}}
 
             - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'rule': {'comment': {'comment': 'Drop DNS @TUN'}, 'target': 'DROP'}}
-
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply blacklist'}, 'target': 'POLICY_DNS_WAN_BLACKLIST'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply domain limitation'}, 'target': 'POLICY_DNS_WAN_DOMAIN_LIMIT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WHITELIST', 'src']}, 'comment': {'comment': 'Apply whitelist'}, 'target': 'POLICY_DNS_WAN_WHITELIST'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WKGREYLIST', 'src']}, 'comment': {'comment': 'Apply wellknown greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'set': {'match-set': ['IPS_DNS_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklist DNS source'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'comment': {'comment': 'DNS unexpected response'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}, 'u32': {'u32': '0x1c&0xf800=0x8000'}}}
+            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Accept all during testing'}, 'target': 'ACCEPT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply blacklist'}, 'target': 'POLICY_DNS_WAN_BLACKLIST'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply domain limitation'}, 'target': 'POLICY_DNS_WAN_DOMAIN_LIMIT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WHITELIST', 'src']}, 'comment': {'comment': 'Apply whitelist'}, 'target': 'POLICY_DNS_WAN_WHITELIST'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'set': {'match-set': ['IPS_DNS_WKGREYLIST', 'src']}, 'comment': {'comment': 'Apply wellknown greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Apply greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'rule': {'comment': {'comment': 'Should not be here'}, 'target': 'DROP'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'set': {'match-set': ['IPS_DNS_BLACKLIST', 'src']}, 'comment': {'comment': 'Drop blacklist DNS source'}, 'target': 'DROP'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_BLACKLIST',    'rule': {'comment': {'comment': 'DNS unexpected response'}, 'target': 'DROP', 'conntrack': {'ctstate': 'NEW'}, 'u32': {'u32': '0x1c&0xf800=0x8000'}}}
 #            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|07|in-addr|04|arpa|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
 #            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Accept SOA record'}, 'string': {'hex-string': '|03|gwa|08|cesproto|05|re2ee|03|org|00|', 'algo': 'bm', 'to': '65535'}, 'target': 'RETURN'}}
 #            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'rule': {'comment': {'comment': 'Drop !SOA allowed records'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept Non-SLA traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Drop excess'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Best effort Greylist'}, 'hashlimit': {'hashlimit-upto': '25/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '50'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Drop excess in Greylist'}, 'target': 'DROP'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'SLA Whitelist'}, 'hashlimit': {'hashlimit-upto': '181/sec', 'hashlimit-mode': 'srcip', 'hashlimit-name': 'DnsWanWhite', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '200'}, 'target': 'ACCEPT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'Continue as WK-Greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Preferred WK-Greylist'}, 'hashlimit': {'hashlimit-upto': '75/sec', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '100'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
-            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Continue as Greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Accept Non-SLA traffic'}, 'hashlimit': {'hashlimit-upto': '200/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '300'}, 'target': 'ACCEPT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'rule': {'comment': {'comment': 'Drop excess'}, 'target': 'DROP'}}
+#           - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Best effort Greylist'}, 'hashlimit': {'hashlimit-upto': '25/sec', 'hashlimit-name': 'DnsWanGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '50'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GREYLIST',     'rule': {'comment': {'comment': 'Drop excess in Greylist'}, 'target': 'DROP'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'SLA Whitelist'}, 'hashlimit': {'hashlimit-upto': '181/sec', 'hashlimit-mode': 'srcip', 'hashlimit-name': 'DnsWanWhite', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '200'}, 'target': 'ACCEPT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WHITELIST',    'rule': {'comment': {'comment': 'Continue as WK-Greylist'}, 'target': 'POLICY_DNS_WAN_WKGREYLIST'}}
+#           - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Preferred WK-Greylist'}, 'hashlimit': {'hashlimit-upto': '75/sec', 'hashlimit-name': 'DnsWanWkGrey', 'hashlimit-htable-expire': '1100', 'hashlimit-burst': '100'}, 'target': 'POLICY_DNS_WAN_GLOBAL_LIMIT'}}
+#            - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'rule': {'comment': {'comment': 'Continue as Greylist'}, 'target': 'POLICY_DNS_WAN_GREYLIST'}}
 
     GUEST_SERVICES:
     # This policy includes the set of rules that should be accessible to unregistered users .e.g.: DHCP, DNS, HTTP.

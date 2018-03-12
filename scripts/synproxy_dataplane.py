@@ -132,6 +132,7 @@ class SYNProxyDataplane():
         self.nic_wanp = kwargs['nic_wanp']
         self.default_gw = kwargs['default_gw']
         self.secure_net = kwargs['secure_net']
+        self.ratelimit = kwargs['ratelimit']
         # Create a connection table to store the rules
         self.connectiontable = container3.Container(name='ConnectionTable')
         # Continue with bootstrapping actions
@@ -219,6 +220,16 @@ class SYNProxyDataplane():
         for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = True, silent = False)
 
+        ## Configure txqueuelen / default is 1000
+        MAX_QLEN=25000
+        to_exec = ['ip link set dev {}    qlen {}'.format(self.nic_wan, MAX_QLEN),
+                   'ip link set dev {}    qlen {}'.format(self.nic_wanp, MAX_QLEN),
+                   'ip link set dev mitm0 qlen {}'.format(MAX_QLEN),
+                   'ip link set dev mitm1 qlen {}'.format(MAX_QLEN),
+                   'ip link set dev br-synproxy qlen {}'.format(MAX_QLEN)]
+        for _ in to_exec:
+            self._do_subprocess_call(_, raise_exc = True, silent = False)
+
         ## Configure default gateway
         if self.default_gw:
             self._logger.info('Adding route to default gateway via mimt0')
@@ -235,37 +246,32 @@ class SYNProxyDataplane():
     def ovs_init_flows(self):
         self._logger.info('Initialize OpenvSwitch flows')
 
-        ## Create basic table architecture
-        to_exec = ['ovs-ofctl del-flows -O OpenFlow13 br-synproxy',
-                   ### Go to ARP MAC Learning table
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0806,           actions=goto_table:1"',
-                   ### Go to TCP Forwading table
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800,nw_proto=6 actions=goto_table:2"',
-                   ### Default flow
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                             actions=NORMAL"',
-                   ### ARP MAC Learning Learning table 1
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=1                             actions=NORMAL"',
-                   ### TCP Forwading table 2
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=1                             actions=goto_table:3"']
+        ## Initialize flow table
+        to_exec = [### Delete default flows
+                   'ovs-ofctl del-flows -O OpenFlow13 br-synproxy',
+                   ### Table 0: Traffic selector
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=100,dl_type=0x0800 actions=resubmit(,2)"',
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=0,priority=1                  actions=resubmit(,1)"',
+                   ### Table 1: Enable transparent L2-switching
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=100,in_port=1      actions=output:4"',
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=100,in_port=4      actions=output:1"',
+                   ### Table 2: Controls the packet pipelining
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=100                actions=resubmit(,10),resubmit(,11),resubmit(,12)"',
+                   ### Table 10: Load port values in NXM registry
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=10,priority=100               actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15]"',
+                   ### Table 11: Contains the learning flows
+                   # Learn new flows coming from WAN
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=11,priority=1,in_port=1,dl_type=0x0800                                                                                                                      \
+                           actions=learn(table=12,priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[] output:NXM_NX_REG0[0..15]), \
+                                   learn(table=12,priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[] output:NXM_NX_REG3[0..15])"',
+                   # Learn new flows coming from WAN_proxied
+                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=11,priority=1,in_port=4,dl_type=0x0800                                                                                                                      \
+                           actions=learn(table=12,priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[] output:NXM_NX_REG0[0..15]), \
+                                   learn(table=12,priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[] output:NXM_NX_REG3[0..15])"',
+                    ### Table 12: Contains the self-populated learned flows and the default forwarding flows
+                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=12,priority=1,in_port=1,      actions=load:0x000000aabbcc->NXM_OF_ETH_DST[], output:2"',
+                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=12,priority=1,in_port=4,      actions=load:0x000000ddeeff->NXM_OF_ETH_DST[], output:3"']
 
-        for _ in to_exec:
-            self._do_subprocess_call(_, raise_exc = True, silent = False)
-
-        ## Create TCP learning flows
-        #### Learn new flows coming from WAN
-        to_exec = ['ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=1,dl_type=0x0800 actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15],                                                                                                           \
-                learn(table=2,hard_timeout=30,priority=200,in_port=1,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_SRC[],NXM_OF_ETH_DST[]=NXM_OF_ETH_DST[],NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:0x000000aabbcc->NXM_OF_ETH_DST[], output:NXM_NX_REG1[0..15]), \
-                learn(table=2,                priority=200,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],                           output:NXM_NX_REG0[0..15]), \
-                learn(table=2,                priority=200,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_DST[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],                           output:NXM_NX_REG3[0..15]), \
-                learn(table=2,hard_timeout=30,priority=200,in_port=4,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_DST[],NXM_OF_ETH_DST[]=NXM_OF_ETH_SRC[],NXM_OF_IP_SRC[]=NXM_OF_IP_DST[] load:0x000000ddeeff->NXM_OF_ETH_DST[], output:NXM_NX_REG2[0..15]), \
-                resubmit(,2)"',
-                    #### Learn new flows coming from WAN_proxied
-                   'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=3,priority=1,in_port=4,dl_type=0x0800 actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15],                                                                                                           \
-                learn(table=2,hard_timeout=30,priority=100,in_port=1,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_DST[],NXM_OF_ETH_DST[]=NXM_OF_ETH_SRC[],NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:0x000000aabbcc->NXM_OF_ETH_DST[], output:NXM_NX_REG1[0..15]), \
-                learn(table=2,                priority=100,in_port=2,dl_type=0x0800,NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_SRC[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_DST[],                           output:NXM_NX_REG0[0..15]), \
-                learn(table=2,                priority=100,in_port=3,dl_type=0x0800,NXM_OF_IP_DST[]=NXM_OF_IP_SRC[] load:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],load:NXM_OF_ETH_DST[]->NXM_OF_ETH_SRC[],                           output:NXM_NX_REG3[0..15]), \
-                learn(table=2,hard_timeout=30,priority=100,in_port=4,dl_type=0x0800,NXM_OF_ETH_SRC[]=NXM_OF_ETH_SRC[],NXM_OF_ETH_DST[]=NXM_OF_ETH_DST[],NXM_OF_IP_SRC[]=NXM_OF_IP_SRC[] load:0x000000ddeeff->NXM_OF_ETH_DST[], output:NXM_NX_REG2[0..15]), \
-                resubmit(,2)"']
         for _ in to_exec:
             self._do_subprocess_call(_, raise_exc = True, silent = False)
 
@@ -286,6 +292,12 @@ class SYNProxyDataplane():
 
         # Populate chains with basic rules
         ## raw.PREROUTING
+        ### Add a rate limitation to raw.PREROUTING via hashlimit module
+        _above = '{}/sec'.format(self.ratelimit[0])
+        _burst = '{}'.format(self.ratelimit[1])
+        rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'tcp': {'tcp-flags': ['FIN,SYN,RST,ACK', 'SYN']}, 'target': 'DROP', 'hashlimit': {'hashlimit-above':_above, 'hashlimit-burst':_burst, 'hashlimit-name':'internet_syn', 'hashlimit-mode':'srcip', 'hashlimit-htable-size':'2097152', 'hashlimit-srcmask':'24', 'hashlimit-htable-expire':'1001'}}
+        iptc_helper3.add_rule('raw', 'PREROUTING', rule_d, position=0, ipv6=False)
+        ###
         rule_d = {'in-interface': 'mitm0', 'protocol': 'tcp', 'target': 'synproxy_chain'}
         iptc_helper3.add_rule('raw', 'PREROUTING', rule_d, position=0, ipv6=False)
         rule_d = {'in-interface': 'mitm1', 'protocol': 'tcp', 'target': 'synproxy_chain'}
@@ -507,10 +519,7 @@ class SYNProxyDataplaneEndpoint(asyncio.Protocol):
         self.raddr = transport.get_extra_info('peername')
         # Set TCP_NODELAY
         sock = transport.get_extra_info('socket')
-        try:
-            sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        except (OSError, NameError):
-            pass
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self._logger.info('Connected endpoint @{0}:{1}'.format(self.raddr[0], self.raddr[1]))
 
     def connection_lost(self, exc):
@@ -601,6 +610,10 @@ def parse_arguments():
                         help='Networks behind SYNPROXY in CIDR format e.g. 195.148.124.0/24 195.148.125.0/24')
     parser.add_argument('--default-gw', action='store_true',
                         help='Add default gateway route')
+    # Define hashlimit parameters for new connections
+    parser.add_argument('--ratelimit', type=int, nargs=2, default=(100, 100),
+                        metavar=('ABOVELIMIT', 'BURST'),
+                        help='Rate limit via iptables hashtable with srcip/24 and htable-size 2097152')
 
     args = parser.parse_args()
     validate_arguments(args)
@@ -624,7 +637,8 @@ if __name__ == '__main__':
                                      tcpsack = args.default_tcpsack,
                                      tcpwscale = args.default_tcpwscale,
                                      secure_net = args.secure_net,
-                                     default_gw = args.default_gw
+                                     default_gw = args.default_gw,
+                                     ratelimit = args.ratelimit
                                      )
     cb = synproxy_obj.process_message
     coro = loop.create_server(lambda: SYNProxyDataplaneEndpoint(cb = cb),
@@ -703,4 +717,3 @@ TESTS
 ./synproxy_controlplane.py --ipaddr 127.0.0.1 --port 12345 --mode flush --conn-dstaddr 0.0.0.0                                                                                        --benchmark --benchmark-seq 1 --benchmark-iter 1
 
 '''
-

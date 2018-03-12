@@ -44,6 +44,12 @@ class DNSCallbacks(object):
         self.registry = {}
         self.activequeries = {}
 
+    def shutdown(self):
+        self._logger.warning('Shutdown')
+        # Close registered sockets
+        for obj in self.get_object(None):
+            obj.connection_lost(None)
+
     def get_object(self, name=None):
         if name is None:
             return self.registry.values()
@@ -250,7 +256,7 @@ class DNSCallbacks(object):
     def dns_process_rgw_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
         # Forward or continue to DNS resolver
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
 
         self._logger.debug('LAN SOA: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
@@ -285,6 +291,13 @@ class DNSCallbacks(object):
         # Evaluate host and service
         if service_data['carriergrade'] is True:
             # Resolve via CarrierGrade
+
+            # Answer with empty records for other types not A
+            if rdtype != dns.rdatatype.A:
+                response = dnsutils.make_response_rcode(query, dns.rcode.NOERROR, recursion_available=True)
+                cback(query, addr, response)
+                return
+
             self._logger.debug('Process {} with CarrierGrade resolution'.format(fqdn))
             _rcode, _ipv4, _service_data = yield from self._dns_resolve_circularpool_carriergrade(host_obj, fqdn, addr, service_data)
             if not _ipv4:
@@ -353,7 +366,7 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """
-        fqdn = format(query.question[0].name)
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
 
         # Initialize to None to prevent AttributeError
@@ -387,10 +400,8 @@ class DNSCallbacks(object):
             cback(query, addr, response)
             return
 
-        #TODO: At this point we have the host object and the service_data.
-        # Maybe it's possible to centralize the PBRA from here instead?
-        # Load reputation metadata in DNS query?
-        response = self.pbra.pbra_dns_preprocess_rgw_wan_soa(query, addr, host_obj, service_data)
+        # Pre-process request with PBRA. Quick return response if pre-emptive actions are required due to policy
+        response = yield from self.pbra.pbra_dns_preprocess_rgw_wan_soa(query, addr, host_obj, service_data)
         if response is not None:
             self._logger.debug('Preprocessing DNS response\n{}'.format(response))
             cback(query, addr, response)
@@ -422,12 +433,24 @@ class DNSCallbacks(object):
             return
 
         # Use PBRA to allocate an address according to policy
-        allocated_ipv4 = self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
+        allocated_ipv4 = yield from self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
 
-        # Evaluate allocated address
-        if not allocated_ipv4:
+        if not allocated_ipv4 and query.transport == 'tcp':
+            # Failed to allocate an address - hold and reattempt after T ms to bridge the gap with UDP queries
+            rtx_t = 0.850
+            self._logger.warning('Failed to allocate an address for {} via TCP, reattempting in {} msec'.format(fqdn, rtx_t*1000))
+            yield from asyncio.sleep(rtx_t)
+            allocated_ipv4 = yield from self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
+
+        if not allocated_ipv4 and query.transport == 'tcp':
+            # Failed to allocate an address - Answer with empty records to avoid stalling the TCP transaction
+            self._logger.warning('Failed to allocate an address for {} via TCP'.format(fqdn))
+            response = dnsutils.make_response_rcode(query, rcode=dns.rcode.NOERROR, recursion_available=False)
+            cback(query, addr, response)
+            return
+
+        if not allocated_ipv4 and query.transport == 'udp':
             # Failed to allocate an address - Drop DNS Query to trigger reattempt
-            self._logger.warning('Failed to allocate an address for {}'.format(fqdn))
             return
 
         # Create DNS response based on received query type
@@ -484,7 +507,7 @@ class DNSCallbacks(object):
                     # Resolution succeeded
                     break
             except Exception as e:
-                self._logger.warning('Exception while performing CarrierGrade resolution: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipaddr))
+                self._logger.warning('Exception while performing CarrierGrade resolution: {} ({}) via {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipaddr, e))
 
         if not _ipv4:
             self._logger.warning('Failed CarrierGrade resolution: {} via {}'.format(fqdn, host_ipaddr))
@@ -505,14 +528,21 @@ class DNSCallbacks(object):
     @asyncio.coroutine
     def dns_process_rgw_wan_nosoa(self, query, addr, cback):
         """ Process DNS query from public network of a name not in a SOA zone """
-        fqdn = format(query.question[0].name)
+        '''
+        TODO: Here is a list with ideas related to mismatching queries
+            - If query comes in UDP, assess the posibility of spoofing ?
+            - If query is non-spoofed, quantify the effect of misconfigured DNS server ?
+            - Feed the PBRA anyhow ?
+        '''
+        fqdn = query.fqdn
         rdtype = query.question[0].rdtype
         self._logger.warning('Drop DNS query for non-SOA domain: {} ({}) from {}/{}'.format(fqdn, dns.rdatatype.to_text(rdtype), addr[0], query.transport))
-        # TODO: Feed this to the algorithm as untrusted events? What about misconfigured DNS servers?
         # Drop DNS Query
         return
 
         '''
+        # TODO: Uncomment these lines when CES support is added
+
     def dns_process_ces_lan_soa(self, query, addr, cback):
         """ Process DNS query from private network of a name in a SOA zone """
         pass
@@ -564,12 +594,6 @@ class PacketCallbacks(object):
                                                       packet_fields['proto'], packet_fields['ttl'])
 
     def packet_in_circularpool(self, packet):
-        # TODO: Improve lookup processing to also consider dns_bind flag of a waiting connection
-        #       > Match sending client with connection.query.reputation_resolver before claim
-        # TODO: We have modified in connection.py the way of creating the 3-tuple and 5-tuple match
-        #       > This would require up to 3 keys for the 5-tuple match, to include wildcards for remote_port and protocol
-        #       > However, we do not have any use for 5-tuple at this point, so it's probably best to remove it, as it won't be tested
-
         # Get IP data
         data = self.network.ipt_nfpacket_payload(packet)
         # Parse packet
@@ -593,7 +617,7 @@ class PacketCallbacks(object):
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
         key1 = (connection.KEY_RGW, dst)
-        # key2: Full fledged 5-tuple (not in use by the system, yet)
+        # key2: Full fledged 5-tuple (not in use by the system)
         #key2 = (connection.KEY_RGW, dst, dport, src, sport, proto)
         # key3: Semi-full fledged 3-tuple  (SFQDN+)
         key3 = (connection.KEY_RGW, dst, dport, proto)

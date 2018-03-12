@@ -1,0 +1,30 @@
+# YAML configuration file for Realm Gateway Traffic Test Suite v0.1
+## 100% FQDN traffic with TCP data
+
+# Total duration of the test (sec)
+duration: 60
+
+# Backoff time before scheduling tests (sec)
+backoff: 5
+
+# Global definitions for traffic tests, used if no test specific parameter is defined
+global_traffic:
+    dnsdata:
+        dns_laddr: [["0.0.0.0", 0, 17], ["1.1.1.1", 0, 17], ["1.1.1.2", 0, 17], ["1.1.1.3", 0, 17], ["1.1.1.4", 0, 17], ["1.1.1.5", 0, 17], ["1.1.1.6", 0, 17], ["1.1.1.7", 0, 17], ["1.1.1.8", 0, 17], ["1.1.1.9", 0, 17]]
+        dns_raddr: [["100.64.1.130", 53, 17]]
+
+        # Control TCP or UDP connections via data_laddr
+        data_laddr: [["0.0.0.0", 0, 6], ["1.1.1.1", 0, 6], ["1.1.1.2", 0, 6], ["1.1.1.3", 0, 6], ["1.1.1.4", 0, 6], ["1.1.1.5", 0, 6], ["1.1.1.6", 0, 6], ["1.1.1.7", 0, 6], ["1.1.1.8", 0, 6], ["1.1.1.9", 0, 6], ["0.0.0.0", 0, 17], ["1.1.1.1", 0, 17], ["1.1.1.2", 0, 17], ["1.1.1.3", 0, 17], ["1.1.1.4", 0, 17], ["1.1.1.5", 0, 17], ["1.1.1.6", 0, 17], ["1.1.1.7", 0, 17], ["1.1.1.8", 0, 17], ["1.1.1.9", 0, 17]]
+
+        ## 100% FQDN traffic with mixed UDP and TCP services - Technically 100% SFQDN but they are all the same service which yields FQDN-like allocations with known protocol
+        data_raddr: [["tcp2000.test200.gwa.demo", 2000, 6], ["tcp2000.test201.gwa.demo", 2000, 6], ["tcp2000.test202.gwa.demo", 2000, 6], ["tcp2000.test203.gwa.demo", 2000, 6], ["tcp2000.test204.gwa.demo", 2000, 6], ["tcp2000.test205.gwa.demo", 2000, 6], ["tcp2000.test206.gwa.demo", 2000, 6], ["tcp2000.test207.gwa.demo", 2000, 6], ["tcp2000.test208.gwa.demo", 2000, 6], ["tcp2000.test209.gwa.demo", 2000, 6], ["udp2000.test200.gwa.demo", 2000, 17], ["udp2000.test201.gwa.demo", 2000, 17], ["udp2000.test202.gwa.demo", 2000, 17], ["udp2000.test203.gwa.demo", 2000, 17], ["udp2000.test204.gwa.demo", 2000, 17], ["udp2000.test205.gwa.demo", 2000, 17], ["udp2000.test206.gwa.demo", 2000, 17], ["udp2000.test207.gwa.demo", 2000, 17], ["udp2000.test208.gwa.demo", 2000, 17], ["udp2000.test209.gwa.demo", 2000, 17]]
+
+        dns_timeouts: [1,5,5,5]
+        data_timeouts: [1]
+        data_delay: [0.000, 0.000]
+
+
+# This models all the test traffic
+traffic:
+    # Example of tests with global_traffic parameters
+    - {type: "dnsdata",   load: 60,  data_laddr: [["0.0.0.0", 0, 6], ["1.1.1.1", 0, 6], ["1.1.1.2", 0, 6], ["1.1.1.3", 0, 6], ["1.1.1.4", 0, 6], ["1.1.1.5", 0, 6], ["1.1.1.6", 0, 6], ["1.1.1.7", 0, 6], ["1.1.1.8", 0, 6], ["1.1.1.9", 0, 6]]}

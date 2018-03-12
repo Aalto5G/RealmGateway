@@ -1,4 +1,4 @@
-# Customer Edge Switching
+# Customer Edge Switching / Realm Gateway
 
 ## Requirements
 
@@ -66,7 +66,10 @@ Run as:
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
           --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/
+          --repository-policy-folder     gwa.policy.d/                       \
+          --repository-api-url  http://127.0.0.1:8082/                       \
+          --network-api-url     http://127.0.0.1:8081/                       \
+          --synproxy         172.31.255.14 12345
 ```
 
 
@@ -81,9 +84,9 @@ However, if we plan on making a new deployment there are a few things we need to
 Setting incorrect values on these fields may make debugging quite difficult as you might need to trace packets in iptables.
 
 * iptables.policy: This is one of the most critical files that needs editing. Please pay attention to the following:
-    
+
     NAT.rules: In mangle.CIRCULAR_POOL chain the targets NFQUEUE queue-num need to match the argument ```--ipt-cpool-queue``` passed to the python program.
-    
+
     NAT.rules: In nat.POSTROUTING chain we use 2 rules for SNAT target that match on a different packet mark.
 The most crucial is the one indicated as ```SNAT to available pool``` and it should include the available addresses in the Circular Pool for better efficiency of outgoing connections.
 
@@ -165,6 +168,115 @@ for i in $(seq 1 254); do
 	sed -i "s/358145000REPLACE_SEQ3/358145000$i3/g" ue$i3.gwa.cesproto.re2ee.org.yaml
 done
 ```
+
+## Considerations to performance testing of Realm Gateway
+
+Use the developed client to specifically control the IP addresses for DNS resolution and Data transfers.
+- You may need to add host-only addresses (/32) to an interface and configure the routing table accordingly.
+- Using several IP sources also enables more socket binding options, which is necesarry for high test loads.
+
+Use well defined (S)FQDN to test specifically UDP and TCP connections, as they may be subjected to different network delays due to the presence of an in-network TCP SYNPROXY.
+
+### Increase the number of file descriptors
+
+This is the workaround for the "too many files open" problem:
+
+- Add to /etc/sysctl.conf
+```
+# Custom extend number of files
+fs.file-max=2097152
+fs.inotify.max_queued_events=1048576
+fs.inotify.max_user_instances=1048576
+fs.inotify.max_user_watches=1048576
+```
+
+- Reload sysctl configuration
+```
+sysctl -p
+```
+
+- Add to /etc/security/limits.conf
+```
+# Added on 17/01/2017
+*         hard    nofile      500000
+*         soft    nofile      500000
+root      hard    nofile      500000
+root      soft    nofile      500000
+```
+
+- Check that /etc/ssh/sshd_config contains:
+```
+UsePAM=yes
+```
+
+- Check that /etc/pam.d/sshd contains
+```
+session    required   pam_limits.so
+```
+
+- Restart SSH service and reconnect
+
+
+### Configure the system for high traffic volume
+
+- Add to /etc/sysctl.conf
+```
+# Reduce TIME_WAIT socket connections
+net.ipv4.tcp_fin_timeout=1
+
+# Increase virtual memory areas
+vm.max_map_count=262144
+
+# Increase system IP port limits
+net.ipv4.ip_local_port_range=1024 65535
+
+
+# Increase conntrack size 1:16 bucket ratio for 4M connections
+
+## Increase bucket size: Verify input parameter with "modinfo nf_conntrack" / (expect_hashsize or hashsize)
+net.netfilter.nf_conntrack_buckets=262144
+### In recent kernels it might not be possible to modify this value on the fly, alternatively try one of the following:
+### Option 1: echo "options nf_conntrack expect_hashsize=262144" > /etc/modprobe.d/nf_conntrack.conf
+### Option 2: /sbin/modprobe nf_conntrack expect_hashsize=262144
+
+## Increase max number of connections
+net.netfilter.nf_conntrack_max=4194304
+
+### It is a good idea to reboot the system to ensure the kernel module is loaded with the appropriate configuration and reapplying the settings with "sysctl -p"
+### Verify the values are loaded correctly!
+```
+
+- Reload sysctl configuration
+```
+sysctl -p
+```
+
+
+### Rate limiting policies
+
+Disable iptables rules that may rate limit packet per second (hashlimit).
+
+
+### Network related considerations
+
+- Use tc/netem for network simulations on the interfaces of a Linux bridge
+```
+tc qdisc add    dev eth0 root netem delay 1000ms
+tc qdisc change dev eth0 root netem delay 1000ms 50ms
+tc qdisc del    dev eth0 root
+```
+
+- Increase the qlen size of your virtual adaptors. We have witnessed how veth pairs with qlen=1000 have resulted in packet loss when testing >2000 new TCP connections per second. Experimentally we have used the value qlen=25000.
+```
+ip link set dev eth0 qlen 25000
+```
+
+
+### Miscellaneous
+
+- Configure TCP SYNPROXY in default mode for all the required IP addresses and disable synchronization of Realm Gateway connections (add & delete)
+
+- Reduce console logging (WARNING level) and deactivate other file loggers.
 
 
 ## Other useful information
