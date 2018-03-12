@@ -173,7 +173,7 @@ class DNSCallbacks(object):
     def _do_resolve_carriergrade(self, query, host_addr, circular_pool = False):
         """ Resolve DNS query with host_addr. Return (dns_rcode, ipv4, service_data) """
         # Obtain FQDN from query
-        fqdn = query.fqdn
+        fqdn = format(query.question[0].name)
         # Obtain query type to determine resolution model
         rdtype = query.question[0].rdtype
         # Obtain timeouts for given query type
@@ -509,7 +509,7 @@ class DNSCallbacks(object):
                     # Resolution succeeded
                     break
             except Exception as e:
-                self._logger.warning('Exception while performing CarrierGrade resolution: {} ({}) via {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipaddr))
+                self._logger.warning('Exception while performing CarrierGrade resolution: {} ({}) via {} / {}'.format(fqdn, dns.rdatatype.to_text(rdtype), host_ipaddr, e))
 
         if not _ipv4:
             self._logger.warning('Failed CarrierGrade resolution: {} via {}'.format(fqdn, host_ipaddr))
