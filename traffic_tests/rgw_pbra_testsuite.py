@@ -88,6 +88,7 @@ Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:20
 
 import asyncio
 import argparse
+import base64
 import functools
 import json
 import logging
@@ -304,8 +305,7 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     else:
         raise Exception('Protocol <{}> not supported'.format(proto))
 
-    eth_pkt = Ether()/IP(src=src, dst=dst)/layer_4
-    return eth_pkt
+    return Ether()/IP(src=src, dst=dst)/layer_4
 
 _l2socket_cache = {}
 def _scapy_send_packet(packet, iface):
@@ -372,51 +372,83 @@ def add_result(name, success, metadata, ts_start, ts_end):
     RESULTS.append({'name':name, 'success':success, 'metadata': metadata, 'ts_start': ts_start, 'ts_end': ts_end, 'duration': ts_end - ts_start})
 
 
-class RealDNSDataTraffic(object):
-    def __init__(self, **kwargs):
-        '''
-        # Common parameters
-        duration: (int) test duration in seconds
-        ts_start: (float) absolute starting time to schedule events
-        results: (list) results list
-        '''
+class _TestTraffic(object):
+    ''' Define base class and implement these methods for traffic tests '''
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        pass
+
+    @asyncio.coroutine
+    def run(**kwargs):
+        pass
+
+
+class RealDNSDataTraffic(_TestTraffic):
+    ''' Use static classes just to access the specific method for the tests '''
+    logger = logging.getLogger('RealDNSDataTraffic')
+
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        ''' Return a list of schedule tasks in dictionary format for later spawning '''
         global TS_ZERO
         global TASK_NUMBER
 
-        self.reuseaddr = False
-        set_attributes(self, override=True, **kwargs)
-        self.logger = logging.getLogger('RealDNSDataTraffic')
 
+        # Use a list to store scheduled tasks parameters
+        scheduled_tasks = []
+        # Set default variables that might not be defined in configuration / Allow easy test of specific features
+        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
-        taskdelay = self.ts_start
-        iterations = int(self.load * self.duration)
+        taskdelay = kwargs['ts_start']
+        iterations = int(kwargs['load'] * kwargs['duration'])
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(self.load)
+            taskdelay += random.expovariate(kwargs['load'])
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
+            task_type = kwargs['type']
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
-            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
+            dns_laddr, dns_raddr   = _get_service_tuple(kwargs['dns_laddr'],  kwargs['dns_raddr'])
+            data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
             # Use timeout template(s) and data_delay
-            _dns_timeouts, _data_timeouts = self.dns_timeouts, self.data_timeouts
-            _data_delay = random.uniform(self.data_delay[0], self.data_delay[1])
-            # Schedule task
-            args = (task_nth, _dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr, _data_timeouts, _data_delay)
-            cb = functools.partial(asyncio.ensure_future, self.run(*args))
-            loop.call_at(taskdelay, cb)
-            args_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={} // Data {}:{}/{} => {}:{}/{} timeouts={} delay={:.4f}'.format(_dns_laddr[0], _dns_laddr[1], _dns_laddr[2],
-                                                                                                                           _dns_raddr[0], _dns_raddr[1], _dns_raddr[2],
-                                                                                                                           _dns_timeouts,
-                                                                                                                           _data_laddr[0], _data_laddr[1], _data_laddr[2],
-                                                                                                                           _data_raddr[0], _data_raddr[1], _data_raddr[2],
-                                                                                                                           _data_timeouts, _data_delay)
-            self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
+            dns_timeouts, data_timeouts = kwargs['dns_timeouts'], kwargs['data_timeouts']
+            data_delay = random.uniform(*kwargs['data_delay'])
+            # Log task parameters
+            task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={} // Data {}:{}/{} => {}:{}/{} timeouts={} delay={:.4f}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
+                                                                                                                           dns_raddr[0], dns_raddr[1], dns_raddr[2],
+                                                                                                                           dns_timeouts,
+                                                                                                                           data_laddr[0], data_laddr[1], data_laddr[2],
+                                                                                                                           data_raddr[0], data_raddr[1], data_raddr[2],
+                                                                                                                           data_timeouts, data_delay)
+            RealDNSDataTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
+            # Build dictionary with selected parameters for running the task
+            args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
+                      'dns_laddr': dns_laddr, 'dns_raddr': dns_raddr, 'dns_timeouts': dns_timeouts,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts, 'data_delay': data_delay,
+                      }
+            # Append the newly defined task with its parameters
+            scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
+
+        # Return list of scheduled tasks for later spawning
+        return scheduled_tasks
+
 
     @asyncio.coroutine
-    def run(self, task_nth, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr, data_timeouts, data_delay):
+    def run(**kwargs):
         global TS_ZERO
-        self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
+        # Get parameters
+        task_nth        = kwargs['task_nth']
+        task_type       = kwargs['task_type']
+        dns_laddr       = kwargs['dns_laddr']
+        dns_raddr       = kwargs['dns_raddr']
+        dns_timeouts    = kwargs['dns_timeouts']
+        data_laddr      = kwargs['data_laddr']
+        data_raddr      = kwargs['data_raddr']
+        data_timeouts   = kwargs['data_timeouts']
+        data_delay      = kwargs['data_delay']
+        reuseaddr       = kwargs['reuseaddr']
+
+        RealDNSDataTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
         metadata_d = {}
 
@@ -435,12 +467,14 @@ class RealDNSDataTraffic(object):
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
                                                                          timeouts=dns_timeouts, socktype=dns_sockettype,
-                                                                         reuseaddr=self.reuseaddr)
+                                                                         reuseaddr=reuseaddr)
 
         # Populate partial results
         ts_end = _now()
         metadata_d['dns_attempts'] = dns_attempts
         metadata_d['dns_duration'] = ts_end - ts_start
+        metadata_d['dns_start']    = ts_start
+        metadata_d['dns_end']      = ts_end
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
         metadata_d['dns_fqdn'] = data_fqdn
@@ -450,14 +484,14 @@ class RealDNSDataTraffic(object):
             sucess = False
             metadata_d['dns_success'] = False
             metadata_d['duration'] = ts_end - ts_start
-            add_result(self.type, sucess, metadata_d, ts_start, ts_end)
+            add_result(task_type, sucess, metadata_d, ts_start, ts_end)
             return
         else:
             metadata_d['dns_success'] = True
 
         # Await for data_delay
         if data_delay > 0:
-            self.logge.warning('RealDNSDataTraffic sleep({}) before sending data', data_delay)
+            RealDNSDataTraffic.logger.debug('RealDNSDataTraffic sleep {:.4f} sec before sending data'.format(data_delay))
             yield from asyncio.sleep(data_delay)
 
         ## Run data transfer
@@ -466,11 +500,13 @@ class RealDNSDataTraffic(object):
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
                                                         timeouts=data_timeouts, socktype=data_sockettype,
-                                                        reuseaddr=self.reuseaddr)
+                                                        reuseaddr=reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
         metadata_d['data_duration'] = ts_end - ts_start_data
+        metadata_d['data_start']    = ts_start_data
+        metadata_d['data_end']      = ts_end
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = (data_ripaddr, data_rport, data_rproto)
         metadata_d['duration'] = ts_end - ts_start
@@ -483,50 +519,67 @@ class RealDNSDataTraffic(object):
             sucess = True
             metadata_d['data_success'] = True
 
-        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
+        add_result(task_type, sucess, metadata_d, ts_start, ts_end)
 
 
-class RealDNSTraffic(object):
-    def __init__(self, **kwargs):
-        '''
-        # Common parameters
-        duration: (int) test duration in seconds
-        ts_start: (float) absolute starting time to schedule events
-        results: (list) results list
-        '''
+class RealDNSTraffic(_TestTraffic):
+    ''' Use static classes just to access the specific method for the tests '''
+    logger = logging.getLogger('RealDNSTraffic')
+
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        ''' Return a list of schedule tasks in dictionary format for later spawning '''
         global TS_ZERO
         global TASK_NUMBER
 
-        self.reuseaddr = False
-        set_attributes(self, override=True, **kwargs)
-        self.logger = logging.getLogger('RealDNSTraffic')
-
+        # Use a list to store scheduled tasks parameters
+        scheduled_tasks = []
+        # Set default variables that might not be defined in configuration / Allow easy test of specific features
+        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
-        taskdelay = self.ts_start
-        iterations = int(self.load * self.duration)
+        taskdelay = kwargs['ts_start']
+        iterations = int(kwargs['load'] * kwargs['duration'])
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(self.load)
+            taskdelay += random.expovariate(kwargs['load'])
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
+            task_type = kwargs['type']
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
-            _data_laddr, _data_raddr, = _get_service_tuple([], self.data_raddr)
+            dns_laddr, dns_raddr   = _get_service_tuple(kwargs['dns_laddr'],  kwargs['dns_raddr'])
+            data_laddr, data_raddr = _get_service_tuple([], kwargs['data_raddr'])
             # Use timeout template(s)
-            _dns_timeouts = self.dns_timeouts
-            # Schedule task
-            args = (task_nth, _dns_laddr, _dns_raddr, _dns_timeouts, _data_laddr, _data_raddr)
-            cb = functools.partial(asyncio.ensure_future, self.run(*args))
-            loop.call_at(taskdelay, cb)
-            args_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={}'.format(_dns_laddr[0], _dns_laddr[1], _dns_laddr[2],
-                                                                     _dns_raddr[0], _dns_raddr[1], _dns_raddr[2],
-                                                                     _dns_timeouts)
-            self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
+            dns_timeouts = kwargs['dns_timeouts']
+            # Log task parameters
+            task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
+                                                                     dns_raddr[0], dns_raddr[1], dns_raddr[2],
+                                                                     dns_timeouts)
+            RealDNSTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
+            # Build dictionary with selected parameters for running the task
+            args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
+                      'dns_laddr': dns_laddr, 'dns_raddr': dns_raddr, 'dns_timeouts': dns_timeouts,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr,
+                      }
+            # Append the newly defined task with its parameters
+            scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
+
+        # Return list of scheduled tasks for later spawning
+        return scheduled_tasks
 
     @asyncio.coroutine
-    def run(self, task_nth, dns_laddr, dns_raddr, dns_timeouts, data_laddr, data_raddr):
+    def run(**kwargs):
         global TS_ZERO
-        self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
+        # Get parameters
+        task_nth        = kwargs['task_nth']
+        task_type       = kwargs['task_type']
+        dns_laddr       = kwargs['dns_laddr']
+        dns_raddr       = kwargs['dns_raddr']
+        dns_timeouts    = kwargs['dns_timeouts']
+        data_laddr      = kwargs['data_laddr']
+        data_raddr      = kwargs['data_raddr']
+        reuseaddr       = kwargs['reuseaddr']
+
+        RealDNSTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
         metadata_d = {}
 
@@ -538,16 +591,17 @@ class RealDNSTraffic(object):
 
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
-
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
                                                                          timeouts=dns_timeouts, socktype=dns_sockettype,
-                                                                         reuseaddr=self.reuseaddr)
+                                                                         reuseaddr=reuseaddr)
 
         # Populate partial results
         ts_end = _now()
         metadata_d['dns_attempts'] = dns_attempts
         metadata_d['dns_duration'] = ts_end - ts_start
+        metadata_d['dns_start']    = ts_start
+        metadata_d['dns_end']      = ts_end
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
         metadata_d['dns_fqdn'] = data_fqdn
@@ -562,52 +616,65 @@ class RealDNSTraffic(object):
             sucess = True
             metadata_d['dns_success'] = True
 
-        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
+        add_result(task_type, sucess, metadata_d, ts_start, ts_end)
 
 
-class RealDataTraffic(object):
-    def __init__(self, **kwargs):
-        '''
-        # Common parameters
-        duration: (int) test duration in seconds
-        ts_start: (float) absolute starting time to schedule events
-        results: (list) results list
-        '''
+class RealDataTraffic(_TestTraffic):
+    ''' Use static classes just to access the specific method for the tests '''
+    logger = logging.getLogger('RealDataTraffic')
+
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        ''' Return a list of schedule tasks in dictionary format for later spawning '''
         global TS_ZERO
         global TASK_NUMBER
 
-        self.reuseaddr = False
-        set_attributes(self, override=True, **kwargs)
-        self.logger = logging.getLogger('RealDataTraffic')
-
+        # Use a list to store scheduled tasks parameters
+        scheduled_tasks = []
+        # Set default variables that might not be defined in configuration / Allow easy test of specific features
+        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
-        taskdelay = self.ts_start
-        iterations = int(self.load * self.duration)
+        taskdelay = kwargs['ts_start']
+        iterations = int(kwargs['load'] * kwargs['duration'])
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(self.load)
+            taskdelay += random.expovariate(kwargs['load'])
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
+            task_type = kwargs['type']
             # Select parameters randomly
-            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
+            data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'],  kwargs['data_raddr'])
             # Use timeout template(s)
-            _data_timeouts = self.data_timeouts
-            # Schedule task
-            args = (task_nth, _data_laddr, _data_raddr, _data_timeouts)
-            cb = functools.partial(asyncio.ensure_future, self.run(*args))
-            loop.call_at(taskdelay, cb)
-            args_str = 'Data {}:{}/{} => {}:{}/{} timeouts={}'.format(_data_laddr[0], _data_laddr[1], _data_laddr[2],
-                                                                      _data_raddr[0], _data_raddr[1], _data_raddr[2],
-                                                                      _data_timeouts)
-            self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
+            data_timeouts = kwargs['data_timeouts']
+            # Log task parameters
+            task_str = 'Data {}:{}/{} => {}:{}/{} timeouts={}'.format(data_laddr[0], data_laddr[1], data_laddr[2],
+                                                                      data_raddr[0], data_raddr[1], data_raddr[2],
+                                                                      data_timeouts)
+            RealDataTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
+            # Build dictionary with selected parameters for running the task
+            args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts,
+                      }
+            # Append the newly defined task with its parameters
+            scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
+
+        # Return list of scheduled tasks for later spawning
+        return scheduled_tasks
 
     @asyncio.coroutine
-    def run(self, task_nth, data_laddr, data_raddr, data_timeouts):
+    def run(**kwargs):
         global TS_ZERO
-        self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
+        # Get parameters
+        task_nth        = kwargs['task_nth']
+        task_type       = kwargs['task_type']
+        data_laddr      = kwargs['data_laddr']
+        data_raddr      = kwargs['data_raddr']
+        data_timeouts   = kwargs['data_timeouts']
+        reuseaddr       = kwargs['reuseaddr']
+
+        RealDataTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
         metadata_d = {}
-
         # Unpack Data related data
         data_ripaddr, data_rport, data_rproto = data_raddr
         data_lipaddr, data_lport, data_lproto = data_laddr
@@ -619,11 +686,13 @@ class RealDataTraffic(object):
         data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
                                                         timeouts=data_timeouts, socktype=data_sockettype,
-                                                        reuseaddr = self.reuseaddr)
+                                                        reuseaddr = reuseaddr)
         # Populate partial results
         ts_end = _now()
         metadata_d['data_attempts'] = data_attempts
         metadata_d['data_duration'] = ts_end - ts_start
+        metadata_d['data_start']    = ts_start
+        metadata_d['data_end']      = ts_end
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = data_raddr
         metadata_d['duration'] = ts_end - ts_start
@@ -636,125 +705,170 @@ class RealDataTraffic(object):
             sucess = True
             metadata_d['data_success'] = True
 
-        add_result(self.type, sucess, metadata_d, ts_start, ts_end)
+        add_result(task_type, sucess, metadata_d, ts_start, ts_end)
 
 
-class SpoofDNSTraffic(object):
-    def __init__(self, **kwargs):
-        '''
-        # Common parameters
-        duration: (int) test duration in seconds
-        ts_start: (float) absolute starting time to schedule events
-        results: (list) results list
-        '''
+class SpoofDNSTraffic(_TestTraffic):
+    ''' Use static classes just to access the specific method for the tests '''
+    logger = logging.getLogger('SpoofDNSTraffic')
+
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        ''' Return a list of schedule tasks in dictionary format for later spawning '''
         global TS_ZERO
         global TASK_NUMBER
 
-        self.interface = None
-        set_attributes(self, override=True, **kwargs)
-        self.logger = logging.getLogger('SpoofDNSTraffic')
-
+        # Use a list to store scheduled tasks parameters
+        scheduled_tasks = []
+        # Set default variables that might not be defined in configuration / Allow easy test of specific features
+        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
-        taskdelay = self.ts_start
-        iterations = int(self.load * self.duration)
+        taskdelay = kwargs['ts_start']
+        iterations = int(kwargs['load'] * kwargs['duration'])
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(self.load)
+            taskdelay += random.expovariate(kwargs['load'])
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
+            task_type = kwargs['type']
             # Select parameters randomly
-            _dns_laddr, _dns_raddr, = _get_service_tuple(self.dns_laddr, self.dns_raddr)
-            _data_laddr, _data_raddr, = _get_service_tuple([], self.data_raddr)
+            dns_laddr, dns_raddr   = _get_service_tuple(kwargs['dns_laddr'],  kwargs['dns_raddr'])
+            data_laddr, data_raddr = _get_service_tuple([], kwargs['data_raddr'])
             # Pre-compute packet build to avoid lagging due to Scapy.
             ## Build query message
-            _data_b = dns.message.make_query(_data_raddr[0], 1, 1).to_wire()
-            _eth_pkt = _scapy_build_packet(_dns_laddr[0], _dns_raddr[0], _dns_raddr[2], _dns_laddr[1], _dns_raddr[1], _data_b)
-            # Schedule task
-            args = (task_nth, _dns_laddr, _dns_raddr, _data_laddr, _data_raddr, bytes(_eth_pkt))
-            cb = functools.partial(asyncio.ensure_future, self.run(*args))
-            loop.call_at(taskdelay, cb)
-            args_str = 'SpoofDNS {}:{}/{} => {}:{}/{}'.format(_dns_laddr[0], _dns_laddr[1], _dns_laddr[2],
-                                                              _dns_raddr[0], _dns_raddr[1], _dns_raddr[2])
-            self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
+            interface = kwargs.get('interface', None)
+            data_b = dns.message.make_query(data_raddr[0], 1, 1).to_wire()
+            eth_pkt = _scapy_build_packet(dns_laddr[0], dns_raddr[0], dns_raddr[2], dns_laddr[1], dns_raddr[1], data_b)
+            ## Encode/decode to base64 for obtaning str representation / serializable
+            eth_pkt_str = base64.b64encode(bytes(eth_pkt)).decode('utf-8')
+            # Log task parameters
+            task_str = 'DNS {}:{}/{} => {}:{}/{}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
+                                                         dns_raddr[0], dns_raddr[1], dns_raddr[2],
+                                                         )
+            SpoofDNSTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
+            # Build dictionary with selected parameters for running the task
+            args_d = {'task_nth': task_nth, 'task_type': task_type,
+                      'dns_laddr': dns_laddr, 'dns_raddr': dns_raddr,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr,
+                      'eth_pkt': eth_pkt_str, 'interface': interface,
+                      }
+            # Append the newly defined task with its parameters
+            scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
+
+        # Return list of scheduled tasks for later spawning
+        return scheduled_tasks
 
     @asyncio.coroutine
-    def run(self, task_nth, dns_raddr, dns_laddr, data_laddr, data_raddr, eth_pkt):
+    def run(**kwargs):
         global TS_ZERO
-        self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
+        # Get parameters
+        task_nth        = kwargs['task_nth']
+        task_type       = kwargs['task_type']
+        dns_laddr       = kwargs['dns_laddr']
+        dns_raddr       = kwargs['dns_raddr']
+        data_laddr      = kwargs['data_laddr']
+        data_raddr      = kwargs['data_raddr']
+        eth_pkt         = kwargs['eth_pkt']
+        interface       = kwargs['interface']
+
+        SpoofDNSTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
         metadata_d = {}
-
         # Unpack DNS related data
         dns_ripaddr, dns_rport, dns_rproto = dns_raddr
         dns_lipaddr, dns_lport, dns_lproto = dns_laddr
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
         # Send the packet
-        success = _scapy_send_packet(eth_pkt, self.interface)
+        ## decode from base64 to obtain bytes representation
+        success = _scapy_send_packet(base64.b64decode(eth_pkt), interface)
         # Populate partial results
         ts_end = _now()
+        metadata_d['dns_duration'] = ts_end - ts_start
+        metadata_d['dns_start']    = ts_start
+        metadata_d['dns_end']      = ts_end
         metadata_d['dns_laddr'] = dns_laddr
         metadata_d['dns_raddr'] = dns_raddr
         metadata_d['dns_fqdn'] = data_fqdn
         # Add results
-        add_result(self.type, success, metadata_d, ts_start, ts_end)
+        add_result(task_type, success, metadata_d, ts_start, ts_end)
 
 
-class SpoofDataTraffic(object):
-    def __init__(self, **kwargs):
-        '''
-        # Common parameters
-        duration: (int) test duration in seconds
-        ts_start: (float) absolute starting time to schedule events
-        results: (list) results list
-        '''
+class SpoofDataTraffic(_TestTraffic):
+    ''' Use static classes just to access the specific method for the tests '''
+    logger = logging.getLogger('SpoofDataTraffic')
+
+    @staticmethod
+    def schedule_tasks(**kwargs):
+        ''' Return a list of schedule tasks in dictionary format for later spawning '''
         global TS_ZERO
         global TASK_NUMBER
 
-        self.interface = None
-        set_attributes(self, override=True, **kwargs)
-        self.logger = logging.getLogger('SpoofDataTraffic')
-
+        # Use a list to store scheduled tasks parameters
+        scheduled_tasks = []
+        # Set default variables that might not be defined in configuration / Allow easy test of specific features
+        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
-        taskdelay = self.ts_start
-        iterations = int(self.load * self.duration)
-
+        taskdelay = kwargs['ts_start']
+        iterations = int(kwargs['load'] * kwargs['duration'])
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(self.load)
+            taskdelay += random.expovariate(kwargs['load'])
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
+            task_type = kwargs['type']
             # Select parameters randomly
-            _data_laddr, _data_raddr, = _get_service_tuple(self.data_laddr, self.data_raddr)
-            # Pre-compute packet build to avoid lagging due to Scapy.
-            _data_b = '{}@{}'.format(_data_raddr[0], _data_raddr[0]).encode()
-            _eth_pkt = _scapy_build_packet(_data_laddr[0], _data_raddr[0], _data_raddr[2], _data_laddr[1], _data_raddr[1], _data_b)
-            # Schedule task
-            args = (task_nth, _data_laddr, _data_raddr, bytes(_eth_pkt))
-            cb = functools.partial(asyncio.ensure_future, self.run(*args))
-            loop.call_at(taskdelay, cb)
-            args_str = 'SpoofData {}:{}/{} => {}:{}/{}'.format(_data_laddr[0], _data_laddr[1], _data_laddr[2],
-                                                          _data_raddr[0], _data_raddr[1], _data_raddr[2])
-            self.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, self.type, taskdelay - TS_ZERO, args_str))
+            data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
+            # Pre-compute packet build to avoid lagging due to Scapy
+            interface = kwargs.get('interface', None)
+            data_b = '{}@{}'.format(data_raddr[0], data_raddr[0]).encode()
+            eth_pkt = _scapy_build_packet(data_laddr[0], data_raddr[0], data_raddr[2], data_laddr[1], data_raddr[1], data_b)
+            ## Encode/decode to base64 for obtaning str representation / serializable
+            eth_pkt_str = base64.b64encode(bytes(eth_pkt)).decode('utf-8')
+            # Log task parameters
+            task_str = 'SpoofData {}:{}/{} => {}:{}/{}'.format(data_laddr[0], data_laddr[1], data_laddr[2],
+                                                               data_raddr[0], data_raddr[1], data_raddr[2])
+            SpoofDataTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
+            # Build dictionary with selected parameters for running the task
+            args_d = {'task_nth': task_nth, 'task_type': task_type,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr,
+                      'eth_pkt': eth_pkt_str, 'interface': interface,
+                      }
+            # Append the newly defined task with its parameters
+            scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
+
+        # Return list of scheduled tasks for later spawning
+        return scheduled_tasks
 
     @asyncio.coroutine
-    def run(self, task_nth, data_laddr, data_raddr, eth_pkt):
+    def run(**kwargs):
         global TS_ZERO
-        self.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
+        # Get parameters
+        task_nth        = kwargs['task_nth']
+        task_type       = kwargs['task_type']
+        data_laddr      = kwargs['data_laddr']
+        data_raddr      = kwargs['data_raddr']
+        eth_pkt         = kwargs['eth_pkt']
+        interface       = kwargs['interface']
+
+        SpoofDataTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
         metadata_d = {}
-
         # Unpack Data related data
         data_ripaddr, data_rport, data_rproto = data_raddr
         data_lipaddr, data_lport, data_lproto = data_laddr
         # Send the packet
-        success = _scapy_send_packet(eth_pkt, self.interface)
+        ## decode from base64 to obtain bytes representation
+        success = _scapy_send_packet(base64.b64decode(eth_pkt), interface)
         # Populate partial results
         ts_end = _now()
+        metadata_d['data_duration'] = ts_end - ts_start
+        metadata_d['data_start']    = ts_start
+        metadata_d['data_end']      = ts_end
         metadata_d['data_laddr'] = data_laddr
         metadata_d['data_raddr'] = data_raddr
         # Add results
-        add_result(self.type, success, metadata_d, ts_start, ts_end)
+        add_result(task_type, success, metadata_d, ts_start, ts_end)
 
 
 
@@ -763,16 +877,30 @@ class MainTestClient(object):
         self.logger = logging.getLogger('MainTestClient')
         self.args = args
 
-        # Read configuration file
-        with open(self.args.config, 'r') as infile:
-            config_d = yaml.load(infile)
+        # Create list to store the schedule tasks
+        self.scheduled_tasks = []
 
-        # Schedule test intances
-        self._spawn_traffic_tests(config_d)
+        if self.args.config:
+            # Read YAML configuration file
+            with open(self.args.config, 'r') as infile:
+                config_d = yaml.load(infile)
+            # Populate self.scheduled_tasks with scheduled test instances
+            self._create_schedule_session(config_d)
+            # Dump tasks to json
+            self._dump_session_to_json(self.scheduled_tasks)
 
-    def _spawn_traffic_tests(self, config_d):
-        # TODO: Use parameters defined in globals as base, then overwrite with test specific?
+        elif self.args.session:
+            # Read JSON session schedule
+            with open(self.args.session, 'r') as infile:
+                self.scheduled_tasks = json.load(infile)
 
+        # Continue with ready session
+        # Spawn test session
+        self._spawn_test_session(self.scheduled_tasks)
+
+
+    def _create_schedule_session(self, config_d):
+        ''' Take config_d configuration as read from YAML. Populates self.scheduled_tasks list in the compatible format for later spawn. '''
         global TS_ZERO
         duration = config_d['duration']
         ts_backoff = config_d['backoff']
@@ -798,15 +926,38 @@ class MainTestClient(object):
             ts_start_test = item_d.setdefault('ts_start', 0)
             item_d['ts_start'] = ts_start + ts_start_test
 
+            # Use global settings if test-specific are not defined
+            # TODO: Do this automatically! Iterate globals and setdefault the parameters
             for p in parameters:
-                # Use global settings if test-specific are not enabled
                 global_param_d = _get_data_dict(config_d, ['global_traffic',item_d['type'], p], [])
                 item_d.setdefault(p, global_param_d)
 
-            # Create object
-            obj = cls(**item_d)
+            # Append scheduled tasks to local list
+            self.scheduled_tasks += cls.schedule_tasks(**item_d)
 
-        self.logger.warning('({:.3f}) Terminated task generation!'.format(_now(TS_ZERO)))
+        self.logger.warning('({:.3f}) Terminated generation of {} tasks'.format(_now(TS_ZERO), len(self.scheduled_tasks)))
+
+    def _spawn_test_session(self, session_d):
+        # TODO: Use parameters defined in globals as base, then overwrite with test specific?
+        global TS_ZERO
+        ts_start = _now()
+
+        # Define test test specific parameters
+        type2cls = {'dnsdata':   RealDNSDataTraffic,
+                    'dns':       RealDNSTraffic,
+                    'data':      RealDataTraffic,
+                    'dnsspoof':  SpoofDNSTraffic,
+                    'dataspoof': SpoofDataTraffic,
+                    }
+
+        for entry in session_d:
+            # Obtain parameters from entry
+            offset = entry['offset']
+            cls    = type2cls[entry['cls']]
+            kwargs = entry['kwargs']
+            taskdelay = TS_ZERO + offset
+            cb = functools.partial(asyncio.ensure_future, cls.run(**kwargs))
+            loop.call_at(taskdelay, cb)
 
     @asyncio.coroutine
     def monitor_pending_tasks(self, watchdog = WATCHDOG):
@@ -879,7 +1030,7 @@ class MainTestClient(object):
 
         # Create list of lines to save result statistics
         lines = []
-        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_duration,data_success,data_attempts,data_duration'
+        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_start,dns_end,dns_duration,data_success,data_attempts,data_start,data_end,data_duration'
         lines.append(header_fmt)
 
         for result_d in RESULTS:
@@ -891,13 +1042,19 @@ class MainTestClient(object):
             metadata_d    = result_d.setdefault('metadata', {})
             dns_success   = metadata_d.get('dns_success', '')
             dns_attempts  = metadata_d.get('dns_attempts', '')
+            dns_start     = metadata_d.get('dns_start', '')
+            dns_end       = metadata_d.get('dns_end', '')
             dns_duration  = metadata_d.get('dns_duration', '')
             data_success  = metadata_d.get('data_success', '')
             data_attempts = metadata_d.get('data_attempts', '')
+            data_start    = metadata_d.get('data_start', '')
+            data_end      = metadata_d.get('data_end', '')
             data_duration = metadata_d.get('data_duration', '')
-            line = '{},{},{},{},{},{},{},{},{},{},{}'.format(name,success,ts_start,ts_end,duration,
-                                                             dns_success,dns_attempts,dns_duration,
-                                                             data_success,data_attempts,data_duration)
+            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,success,ts_start,ts_end,duration,
+                                                                         dns_success,dns_attempts,
+                                                                         dns_start,dns_end,dns_duration,
+                                                                         data_success,data_attempts,
+                                                                         data_start,data_end,data_duration)
             lines.append(line)
 
         # Save results to file in csv
@@ -916,7 +1073,12 @@ class MainTestClient(object):
             with open(filename, 'w') as outfile:
                 json.dump(RESULTS, outfile)
 
-
+    def _dump_session_to_json(self, tasks):
+        # Save scheduled session tasks to file in json
+        filename = self.args.config + '.session.json'
+        self.logger.warning('Writing session tasks to file <{}>'.format(filename))
+        with open(filename, 'w') as outfile:
+            json.dump(tasks, outfile)
 
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -935,11 +1097,17 @@ def setup_logging_yaml(default_path='logging.yaml',
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Realm Gateway Traffic Test Suite v0.1')
-    parser.add_argument('--config', type=str, required=True,
+    parser.add_argument('--config', type=str, default=None, required=False,
                         help='Input configuration file (yaml)')
+    parser.add_argument('--session', type=str, default=None, required=False,
+                        help='Input session file (json)')
     parser.add_argument('--results', type=str, required=False,
                         help='Output results file (json)')
-    return parser.parse_args()
+    args = parser.parse_args()
+    # Validate args
+    assert (args.config or args.session)
+    return args
+
 
 if __name__ == '__main__':
     # Use function to configure logging from file
@@ -1017,7 +1185,7 @@ traffic:
 
     ## Example of tests with specific values
     ## dnsdata: Specific duration and starting time
-    - {"type": "dnsdata",   "load": 2, "ts_start": 10, "duration": 10}
+    #- {"type": "dnsdata",   "load": 2, "ts_start": 10, "duration": 10}
     ## dnsdata: TCP based data & TCP based resolution
     #- {"type": "dnsdata",  "load": 1, dns_laddr:[["0.0.0.0", 0, 6]], dns_raddr:[["8.8.8.8", 53, 6]], data_laddr: [["0.0.0.0", 0, 6]],  data_raddr: [["google.es", 2000, 6]]}
     ## dnsdata: UDP based data & UDP based resolution
