@@ -126,6 +126,19 @@ loop = asyncio.get_event_loop()
 TS_ZERO = loop.time()
 TASK_NUMBER = 0
 
+
+LAST_UDP_PORT = 47000
+LAST_TCP_PORT = 47000
+def get_deterministic_port(proto):
+    if proto in ['tcp', 6, socket.SOCK_STREAM]:
+        global LAST_TCP_PORT
+        LAST_TCP_PORT += 1
+        return LAST_TCP_PORT
+    elif proto in ['udp', 17, socket.SOCK_DGRAM]:
+        global LAST_UDP_PORT
+        LAST_UDP_PORT += 1
+        return LAST_UDP_PORT
+
 def set_attributes(obj, override=False, **kwargs):
     """Set attributes in object from a dictionary"""
     for k,v in kwargs.items():
@@ -150,20 +163,37 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
     if reuseaddr:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if not laddr:
-        laddr=('0.0.0.0', 0)
+        laddr = ('0.0.0.0', 0)
     if type == socket.SOCK_STREAM:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 0, 0))
+        #sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 0, 0))
 
-    sock.bind(laddr)
-    sock.setblocking(False)
-    try:
-        yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
-        return sock
-    except Exception as e:
-        #logger = logging.getLogger('_socket_connect')
-        #logger.exception(e)
-        return None
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2*1024*1024)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2*1024*1024)
+
+    # Check local port selection and use deterministic approach if not selected
+    _local_addr, _local_port = laddr[0], laddr[1]
+    if _local_port == 0:
+        _local_port = get_deterministic_port(type)
+
+    # Try to bind a port up to 2 times. Get a new deterministic port if the first choice fails.
+    for i in range(2):
+        try:
+            sock.bind((_local_addr, _local_port))
+            sock.setblocking(False)
+
+            yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
+            return sock
+        except OSError as e:
+            logger = logging.getLogger('_socket_connect')
+            logger.error('{} @ {}:{} [{}]'.format(e, _local_addr, _local_port, type))
+            _local_port = get_deterministic_port(type)
+            continue
+        except Exception as e:
+            #logger = logging.getLogger('_socket_connect')
+            #logger.exception(e)
+            return None
+    return None
 
 @asyncio.coroutine
 def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
@@ -287,7 +317,7 @@ def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False)
             recvdata = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
             break
         except asyncio.TimeoutError:
-            logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype))
+            logger.warning('#{} timeout expired ({:.4f} sec): {}:{} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype))
             continue
         except ConnectionRefusedError:
             logger.debug('Socket failed to connect: {}:{} ({}) / echoing {}'.format(raddr[0], raddr[1], socktype, data))
@@ -1161,6 +1191,9 @@ if __name__ == '__main__':
     #logger.warning('All tasks completed!')
     loop.stop()
     main.process_results()
+
+    print('LAST_UDP_PORT {}'.format(LAST_UDP_PORT))
+    print('LAST_TCP_PORT {}'.format(LAST_TCP_PORT))
     sys.exit(0)
 
 
