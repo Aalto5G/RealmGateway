@@ -86,6 +86,10 @@ Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:20
 """
 
 
+# Disable garbage collector
+import gc
+gc.disable()
+
 import asyncio
 import argparse
 import base64
@@ -401,9 +405,14 @@ class RealDNSDataTraffic(_TestTraffic):
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
+        distribution = kwargs.setdefault('distribution', 'exp')
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(kwargs['load'])
+            if distribution == 'exp':
+                taskdelay += random.expovariate(kwargs['load'])
+            elif distribution == 'uni':
+                taskdelay += 1 / kwargs['load']
+
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
             task_type = kwargs['type']
@@ -539,9 +548,14 @@ class RealDNSTraffic(_TestTraffic):
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
+        distribution = kwargs.setdefault('distribution', 'exp')
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(kwargs['load'])
+            if distribution == 'exp':
+                taskdelay += random.expovariate(kwargs['load'])
+            elif distribution == 'uni':
+                taskdelay += 1 / kwargs['load']
+
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
             task_type = kwargs['type']
@@ -636,9 +650,14 @@ class RealDataTraffic(_TestTraffic):
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
+        distribution = kwargs.setdefault('distribution', 'exp')
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(kwargs['load'])
+            if distribution == 'exp':
+                taskdelay += random.expovariate(kwargs['load'])
+            elif distribution == 'uni':
+                taskdelay += 1 / kwargs['load']
+
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
             task_type = kwargs['type']
@@ -725,9 +744,14 @@ class SpoofDNSTraffic(_TestTraffic):
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
+        distribution = kwargs.setdefault('distribution', 'exp')
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(kwargs['load'])
+            if distribution == 'exp':
+                taskdelay += random.expovariate(kwargs['load'])
+            elif distribution == 'uni':
+                taskdelay += 1 / kwargs['load']
+
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
             task_type = kwargs['type']
@@ -811,9 +835,14 @@ class SpoofDataTraffic(_TestTraffic):
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
+        distribution = kwargs.setdefault('distribution', 'exp')
         for i in range(0, iterations):
             # Set starting time for task
-            taskdelay += random.expovariate(kwargs['load'])
+            if distribution == 'exp':
+                taskdelay += random.expovariate(kwargs['load'])
+            elif distribution == 'uni':
+                taskdelay += 1 / kwargs['load']
+
             TASK_NUMBER += 1
             task_nth = TASK_NUMBER
             task_type = kwargs['type']
@@ -1178,8 +1207,8 @@ global_traffic:
 traffic:
     # Example of tests with global_traffic parameters
     - {"type": "dnsdata",   "load": 2}
-    - {"type": "dns",       "load": 2}
-    - {"type": "data",      "load": 2}
+    - {"type": "dns",       "load": 2, distribution: "exp"}
+    - {"type": "data",      "load": 2, distribution: "uni"}
     - {"type": "dataspoof", "load": 2, interface: "ens18"}
     - {"type": "dnsspoof",  "load": 2, interface: "ens18"}
 

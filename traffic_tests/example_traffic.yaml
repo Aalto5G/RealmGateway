@@ -40,8 +40,8 @@ global_traffic:
 traffic:
     # Example of tests with global_traffic parameters
     - {"type": "dnsdata",   "load": 2}
-    - {"type": "dns",       "load": 2}
-    - {"type": "data",      "load": 2}
+    - {"type": "dns",       "load": 2, distribution: "exp"}
+    - {"type": "data",      "load": 2, distribution: "uni"}
     - {"type": "dataspoof", "load": 2, interface: "ens18"}
     - {"type": "dnsspoof",  "load": 2, interface: "ens18"}
 
