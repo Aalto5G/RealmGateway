@@ -175,7 +175,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
     """
     global TS_ZERO
     logger = logging.getLogger('gethostbyname')
-    logger.debug('Resolving to {} with timeouts {}'.format(raddr, timeouts))
+    logger.debug('Resolving {} to {} with timeouts {}'.format(fqdn, raddr, timeouts))
     rdtype = dns.rdatatype.A
     rdclass = dns.rdataclass.IN
     ipaddr = None
@@ -232,8 +232,11 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
                     if rdata.rdtype == dns.rdatatype.CNAME:
                         target = rdata.to_text()
                         logger.debug('[{:.3f}] {} @ {} via {}'.format(_now(TS_ZERO), fqdn, target, raddr[0]))
+                        sock.close()
                         _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(target, raddr, laddr, timeouts, socktype='udp')
                         return (_data_ripaddr, _query_id, _dns_attempts)
+            # break if no valid answer was obtained
+            break
 
         except asyncio.TimeoutError:
             logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
@@ -246,9 +249,9 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
             _laddr = sock.getsockname()
             logger.exception('Wrong message id: {}!={} / {} ({}) / {}:{}'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype), _laddr[0], _laddr[1]))
             break
-        except KeyError:
-            logger.exception('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
-            break
+        #except KeyError:
+        #    logger.exception('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
+        #    break
         except Exception as e:
             logger.warning('Exception {}: {}:{} ({}) / {} ({})'.format(e, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
             break
