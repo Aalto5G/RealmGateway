@@ -437,8 +437,8 @@ class DNSCallbacks(object):
 
         if not allocated_ipv4 and query.transport == 'tcp':
             # Failed to allocate an address - hold and reattempt after T ms to bridge the gap with UDP queries
-            rtx_t = 0.850
-            self._logger.warning('Failed to allocate an address for {} via TCP, reattempting in {} msec'.format(fqdn, rtx_t*1000))
+            rtx_t = 0.50
+            self._logger.debug('Failed to allocate an address for {} via TCP, reattempting in {} msec'.format(fqdn, rtx_t*1000))
             yield from asyncio.sleep(rtx_t)
             allocated_ipv4 = yield from self.pbra.pbra_dns_process_rgw_wan_soa(query, addr, host_obj, _service_data, _ipv4)
 
