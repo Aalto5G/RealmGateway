@@ -5,6 +5,8 @@ from customdns.dnsutils import *
 import struct
 from socket import IPPROTO_TCP, TCP_NODELAY
 
+loop = asyncio.get_event_loop()
+TIMESTAMP_THRESHOLD = 0.850 #sec
 
 class DNSProxy(asyncio.DatagramProtocol):
     def __init__(self, soa_list = [], cb_soa = None, cb_nosoa = None):
@@ -24,6 +26,7 @@ class DNSProxy(asyncio.DatagramProtocol):
         try:
             self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
             query = dns.message.from_wire(data)
+            query.timestamp = loop.time()
             query.transport = 'udp'
             query.fqdn = format(query.question[0].name).lower()
             cb_f = self.callback_send
@@ -35,6 +38,9 @@ class DNSProxy(asyncio.DatagramProtocol):
             self._logger.error('Failed to process DNS message: {}\n{}'.format(e, data))
 
     def callback_send(self, query, addr, response=None):
+        t_elapsed = loop.time() - query.timestamp
+        if t_elapsed >= TIMESTAMP_THRESHOLD:
+            self._logger.critical('Timestamp threshold expired: {:.3f} / {:.3f} (sec) / {} @ {}:{}'.format(t_elapsed, TIMESTAMP_THRESHOLD, query.fqdn, addr[0], addr[1]))
         if response is None:
             self._send_error(query, addr, dns.rcode.REFUSED)
         else:
@@ -85,6 +91,7 @@ class DNSTCPProxy(asyncio.Protocol):
             addr = self.raddr
             self._logger.debug('Data received from {}"'.format(debug_data_addr(data, addr)))
             query = dns.message.from_wire(data[2:])
+            query.timestamp = loop.time()
             query.transport = 'tcp'
             query.fqdn = format(query.question[0].name).lower()
             cb_f = self.callback_send
@@ -96,6 +103,9 @@ class DNSTCPProxy(asyncio.Protocol):
             self._logger.error('Failed to process DNS message: {}\n{}'.format(e, data))
 
     def callback_send(self, query, addr, response=None):
+        t_elapsed = loop.time() - query.timestamp
+        if t_elapsed >= TIMESTAMP_THRESHOLD:
+            self._logger.critical('Timestamp threshold expired: {:.3f} / {:.3f} (sec) / {} @ {}:{}'.format(t_elapsed, TIMESTAMP_THRESHOLD, query.fqdn, addr[0], addr[1]))
         if response is None:
             self._send_error(query, addr, dns.rcode.REFUSED)
         else:
