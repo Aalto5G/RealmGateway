@@ -150,15 +150,13 @@ def _now(ref = 0):
     """ Return current time based on event loop """
     return loop.time() - ref
 
-@asyncio.coroutine
-def _timeit(coro, scale = 1):
+async def _timeit(coro, scale = 1):
     """ Execute a coroutine and return the time consumed in second scale """
     t0 = _now()
-    r = yield from coro
+    r = await coro
     return (_now(t0)*scale, r)
 
-@asyncio.coroutine
-def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM, reuseaddr=True, timeout=1):
+async def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM, reuseaddr=True, timeout=1):
     sock = socket.socket(family, type)
     if reuseaddr:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -182,7 +180,7 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
             sock.bind((_local_addr, _local_port))
             sock.setblocking(False)
 
-            yield from asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
+            await asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
             return sock
         except OSError as e:
             logger = logging.getLogger('_socket_connect')
@@ -195,8 +193,46 @@ def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM,
             return None
     return None
 
-@asyncio.coroutine
-def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
+async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
+    """
+    data: Data to send
+    raddr: Remote tuple information
+    laddr: Source tuple information
+    timeouts: List with retransmission timeout scheme
+    socktype: L4 protocol ['udp', 'tcp']
+    """
+    logger = logging.getLogger('sendrecv')
+    logger.debug('Echoing to {}:{} ({}) with timeouts {}'.format(raddr[0], raddr[1], socktype, timeouts))
+    recvdata = None
+    attempt = 0
+
+    # Connect socket or fail early
+    _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
+    sock = await _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
+    if sock is None:
+        logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+        return (recvdata, attempt)
+
+    for tout in timeouts:
+        attempt += 1
+        try:
+            await loop.sock_sendall(sock, data)
+            recvdata = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
+            break
+        except asyncio.TimeoutError:
+            logger.warning('#{} timeout expired ({:.4f} sec): {}:{} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype))
+            continue
+        except ConnectionRefusedError:
+            logger.debug('Socket failed to connect: {}:{} ({}) / echoing {}'.format(raddr[0], raddr[1], socktype, data))
+            break
+        except Exception as e:
+            logger.warning('Exception {}: {}:{} ({}) / echoing {}'.format(e, raddr[0], raddr[1], socktype, data))
+            break
+
+    sock.close()
+    return (recvdata, attempt)
+
+async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
     """
     fqdn: Domain name to be resolved
     raddr: Remote tuple information
@@ -217,7 +253,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
 
     # Connect socket or fail early
     _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
+    sock = await _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
         logger.warning('Socket failed to connect: {}:{} > {}:{} ({}) / {} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
         return (ipaddr, query.id, attempt)
@@ -227,19 +263,19 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
         try:
             if socktype == 'udp':
                 _data = query.to_wire()
-                yield from loop.sock_sendall(sock, _data)
-                dataresponse = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
+                await loop.sock_sendall(sock, _data)
+                dataresponse = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
                 response = dns.message.from_wire(dataresponse)
                 # Check if response is truncated and retry in TCP with a recursive call
                 if (response.flags & dns.flags.TC == dns.flags.TC):
-                    _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
+                    _data_ripaddr, _query_id, _dns_attempts = await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
                     return (_data_ripaddr, _query_id, _dns_attempts)
 
             elif socktype == 'tcp':
                 _data = query.to_wire()
                 _data = struct.pack('!H', len(_data)) + _data
-                yield from loop.sock_sendall(sock, _data)
-                dataresponse = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
+                await loop.sock_sendall(sock, _data)
+                dataresponse = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
                 _len = struct.unpack('!H', dataresponse[:2])[0]
                 dataresponse = dataresponse[2:2+_len]
 
@@ -263,7 +299,7 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
                         target = rdata.to_text()
                         logger.debug('[{:.3f}] {} @ {} via {}'.format(_now(TS_ZERO), fqdn, target, raddr[0]))
                         sock.close()
-                        _data_ripaddr, _query_id, _dns_attempts = yield from _gethostbyname(target, raddr, laddr, timeouts, socktype='udp')
+                        _data_ripaddr, _query_id, _dns_attempts = await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp')
                         return (_data_ripaddr, _query_id, _dns_attempts)
             # break if no valid answer was obtained
             break
@@ -288,46 +324,6 @@ def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=F
 
     sock.close()
     return (ipaddr, query.id, attempt)
-
-@asyncio.coroutine
-def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
-    """
-    data: Data to send
-    raddr: Remote tuple information
-    laddr: Source tuple information
-    timeouts: List with retransmission timeout scheme
-    socktype: L4 protocol ['udp', 'tcp']
-    """
-    logger = logging.getLogger('sendrecv')
-    logger.debug('Echoing to {}:{} ({}) with timeouts {}'.format(raddr[0], raddr[1], socktype, timeouts))
-    recvdata = None
-    attempt = 0
-
-    # Connect socket or fail early
-    _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = yield from _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
-    if sock is None:
-        logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
-        return (recvdata, attempt)
-
-    for tout in timeouts:
-        attempt += 1
-        try:
-            yield from loop.sock_sendall(sock, data)
-            recvdata = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
-            break
-        except asyncio.TimeoutError:
-            logger.warning('#{} timeout expired ({:.4f} sec): {}:{} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype))
-            continue
-        except ConnectionRefusedError:
-            logger.debug('Socket failed to connect: {}:{} ({}) / echoing {}'.format(raddr[0], raddr[1], socktype, data))
-            break
-        except Exception as e:
-            logger.warning('Exception {}: {}:{} ({}) / echoing {}'.format(e, raddr[0], raddr[1], socktype, data))
-            break
-
-    sock.close()
-    return (recvdata, attempt)
 
 
 def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
@@ -415,8 +411,7 @@ class _TestTraffic(object):
     def schedule_tasks(**kwargs):
         pass
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         pass
 
 
@@ -475,8 +470,7 @@ class RealDNSDataTraffic(_TestTraffic):
         return scheduled_tasks
 
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         global TS_ZERO
         # Get parameters
         task_nth        = kwargs['task_nth']
@@ -507,7 +501,7 @@ class RealDNSDataTraffic(_TestTraffic):
         data_sockettype = 'tcp' if data_rproto == 6 else 'udp'
 
         ## Run DNS resolution
-        data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
+        data_ripaddr, query_id, dns_attempts = await _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
                                                                          timeouts=dns_timeouts, socktype=dns_sockettype,
                                                                          reuseaddr=reuseaddr)
 
@@ -534,12 +528,12 @@ class RealDNSDataTraffic(_TestTraffic):
         # Await for data_delay
         if data_delay > 0:
             RealDNSDataTraffic.logger.debug('RealDNSDataTraffic sleep {:.4f} sec before sending data'.format(data_delay))
-            yield from asyncio.sleep(data_delay)
+            await asyncio.sleep(data_delay)
 
         ## Run data transfer
         ts_start_data = _now()
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
-        data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+        data_recv, data_attempts = await _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
                                                         timeouts=data_timeouts, socktype=data_sockettype,
                                                         reuseaddr=reuseaddr)
@@ -613,8 +607,7 @@ class RealDNSTraffic(_TestTraffic):
         # Return list of scheduled tasks for later spawning
         return scheduled_tasks
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         global TS_ZERO
         # Get parameters
         task_nth        = kwargs['task_nth']
@@ -639,7 +632,7 @@ class RealDNSTraffic(_TestTraffic):
         # Unpack Data related data
         data_fqdn, data_rport, data_rproto = data_raddr
         ## Run DNS resolution
-        data_ripaddr, query_id, dns_attempts = yield from _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
+        data_ripaddr, query_id, dns_attempts = await _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
                                                                          timeouts=dns_timeouts, socktype=dns_sockettype,
                                                                          reuseaddr=reuseaddr)
 
@@ -713,8 +706,7 @@ class RealDataTraffic(_TestTraffic):
         # Return list of scheduled tasks for later spawning
         return scheduled_tasks
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         global TS_ZERO
         # Get parameters
         task_nth        = kwargs['task_nth']
@@ -735,7 +727,7 @@ class RealDataTraffic(_TestTraffic):
 
         ## Run data transfer
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
-        data_recv, data_attempts = yield from _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
+        data_recv, data_attempts = await _sendrecv(data_b.encode(), (data_ripaddr, data_rport),
                                                        (data_lipaddr, data_lport),
                                                         timeouts=data_timeouts, socktype=data_sockettype,
                                                         reuseaddr = reuseaddr)
@@ -815,8 +807,7 @@ class SpoofDNSTraffic(_TestTraffic):
         # Return list of scheduled tasks for later spawning
         return scheduled_tasks
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         global TS_ZERO
         # Get parameters
         task_nth        = kwargs['task_nth']
@@ -902,8 +893,7 @@ class SpoofDataTraffic(_TestTraffic):
         # Return list of scheduled tasks for later spawning
         return scheduled_tasks
 
-    @asyncio.coroutine
-    def run(**kwargs):
+    async def run(**kwargs):
         global TS_ZERO
         # Get parameters
         task_nth        = kwargs['task_nth']
@@ -1021,15 +1011,14 @@ class MainTestClient(object):
             cb = functools.partial(asyncio.ensure_future, cls.run(**kwargs))
             loop.call_at(taskdelay, cb)
 
-    @asyncio.coroutine
-    def monitor_pending_tasks(self, watchdog = WATCHDOG):
+    async def monitor_pending_tasks(self, watchdog = WATCHDOG):
         # Monitor number of remaining tasks and exit when done
         i = 0
         global TS_ZERO
         while len(loop._scheduled):
             i += 1 # Counter of iterations
             self.logger.warning('({:.3f}) [{}] Pending tasks: {}'.format(_now(TS_ZERO), i, len(loop._scheduled)))
-            yield from asyncio.sleep(watchdog)
+            await asyncio.sleep(watchdog)
         self.logger.warning('({:.3f}) [{}] All tasks completed!'.format(_now(TS_ZERO), i))
         return loop.time()
 
