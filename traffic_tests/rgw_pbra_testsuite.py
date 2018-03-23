@@ -118,6 +118,9 @@ from scapy.all import *
 from scapy.layers.inet import *
 from scapy.layers.inet6 import *
 
+# Global message counter
+MSG_SENT = 0
+MSG_RECV = 0
 
 WATCHDOG = 1.0 #Sleep 1 second before displaying loop stats
 RESULTS = []   #List to store TestResult objects
@@ -126,18 +129,45 @@ loop = asyncio.get_event_loop()
 TS_ZERO = loop.time()
 TASK_NUMBER = 0
 
+DETERMINISTIC_ALLOCATION = True
 
-LAST_UDP_PORT = 47000
-LAST_TCP_PORT = 47000
+LAST_UDP_PORT = 30000
+LAST_TCP_PORT = 30000
+LAST_QUERY_ID = 30000
+UDP_PORT_RANGE = (20000, 65535)
+TCP_PORT_RANGE = (20000, 65535)
+QUERY_ID_RANGE = (20000, 65535)
+
 def get_deterministic_port(proto):
     if proto in ['tcp', 6, socket.SOCK_STREAM]:
         global LAST_TCP_PORT
         LAST_TCP_PORT += 1
-        return LAST_TCP_PORT
+        # Further logic to port allocation
+        if LAST_TCP_PORT > TCP_PORT_RANGE[1]:
+            LAST_TCP_PORT = TCP_PORT_RANGE[0]
+        port = LAST_TCP_PORT
     elif proto in ['udp', 17, socket.SOCK_DGRAM]:
         global LAST_UDP_PORT
         LAST_UDP_PORT += 1
-        return LAST_UDP_PORT
+        # Further logic to port allocation
+        if LAST_UDP_PORT > UDP_PORT_RANGE[1]:
+            LAST_UDP_PORT = UDP_PORT_RANGE[0]
+        port = LAST_UDP_PORT
+    return port
+
+def get_deterministic_queryid():
+    global LAST_QUERY_ID
+    LAST_QUERY_ID += 1
+    # Further logic to port allocation
+    if LAST_QUERY_ID > QUERY_ID_RANGE[1]:
+        LAST_QUERY_ID = QUERY_ID_RANGE[0]
+    queryid = LAST_QUERY_ID
+    return queryid
+
+if DETERMINISTIC_ALLOCATION is False:
+    get_deterministic_port = lambda x: random.randrange(1025, 65536)
+    get_deterministic_queryid = lambda : random.randrange(1025, 65536)
+
 
 def set_attributes(obj, override=False, **kwargs):
     """Set attributes in object from a dictionary"""
@@ -156,18 +186,30 @@ async def _timeit(coro, scale = 1):
     r = await coro
     return (_now(t0)*scale, r)
 
-async def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_DGRAM, reuseaddr=True, timeout=1):
-    sock = socket.socket(family, type)
+async def _socket_connect(raddr, laddr, family, type, reuseaddr=True, timeout=0):
+    # Set socket family
+    if family in ['ipv4', 0x0800]:
+        socketfamily = socket.AF_INET
+    elif family in ['ipv6', 0x86dd]:
+        socketfamily = socket.AF_INET6
+    # Set socket type
+    if type in ['tcp', 6]:
+        sockettype = socket.SOCK_STREAM
+    elif type in ['udp', 17]:
+        sockettype = socket.SOCK_DGRAM
+
+    # Create socket object
+    sock = socket.socket(socketfamily, sockettype)
+    # Sanitize connect timeout value
+    timeout = 0 if timeout is None else int(timeout)
+    # Enable address reuse
     if reuseaddr:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if not laddr:
         laddr = ('0.0.0.0', 0)
-    if type == socket.SOCK_STREAM:
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        #sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 0, 0))
 
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2*1024*1024)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2*1024*1024)
+    if sockettype == socket.SOCK_STREAM:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
     # Check local port selection and use deterministic approach if not selected
     _local_addr, _local_port = laddr[0], laddr[1]
@@ -177,62 +219,89 @@ async def _socket_connect(raddr, laddr, family=socket.AF_INET, type=socket.SOCK_
     # Try to bind a port up to 2 times. Get a new deterministic port if the first choice fails.
     for i in range(2):
         try:
-            sock.bind((_local_addr, _local_port))
             sock.setblocking(False)
-
-            await asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout)
+            sock.bind((_local_addr, _local_port))
+            await asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout, loop=loop)
             return sock
         except OSError as e:
             logger = logging.getLogger('_socket_connect')
-            logger.error('{} @ {}:{} [{}]'.format(e, _local_addr, _local_port, type))
+            logger.error('{} @ {}:{} [{}] - reattempt'.format(e, _local_addr, _local_port, type))
             _local_port = get_deterministic_port(type)
             continue
         except Exception as e:
-            #logger = logging.getLogger('_socket_connect')
-            #logger.exception(e)
+            logger = logging.getLogger('_socket_connect')
+            logger.error('{} @ {}:{} [{}]'.format(e, _local_addr, _local_port, type))
             return None
     return None
 
-async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
+
+async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
     """
     data: Data to send
     raddr: Remote tuple information
     laddr: Source tuple information
     timeouts: List with retransmission timeout scheme
     socktype: L4 protocol ['udp', 'tcp']
+
+    There seem to be issues with iterating over asyncio.wait_for(loop.sock_recv())
     """
+    global MSG_SENT
+    global MSG_RECV
+
     logger = logging.getLogger('sendrecv')
-    logger.debug('Echoing to {}:{} ({}) with timeouts {}'.format(raddr[0], raddr[1], socktype, timeouts))
+    #logger.debug('{}:{} > {}:{} ({}) with timeouts {}'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, timeouts))
     recvdata = None
     attempt = 0
 
     # Connect socket or fail early
-    _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = await _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
+    sock = await _socket_connect(raddr, laddr, family='ipv4', type=socktype, reuseaddr=reuseaddr, timeout=2)
     if sock is None:
         logger.warning('Socket failed to connect: {}:{} > {}:{} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+        return (None, 0)
+
+    _laddr = sock.getsockname()
+    logger.debug('Socket succeeded to connect: {}:{} > {}:{} ({})'.format(_laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
+
+    # Callback function to send with logging
+    def _rtx(sock, data, socktype, seq, tout, logger, rtx_l):
+        global MSG_SENT
+        # Get real local connected address
+        _laddr = sock.getsockname()
+        logger.debug('#{} timeout expired ({:.4f} sec): {}:{} > {}:{} ({})'.format(seq, tout, _laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
+        sock.sendall(data)
+        MSG_SENT += 1
+        rtx_l.append(True)
+
+    # New approach due to possible loop.sock_recv bug
+    ## Schedule future retransmission tasks and cancel them if socket has data
+    _tdelay = 0
+    _rtx_handles = []
+    _rtx_runs = []
+    for i, tout in enumerate(timeouts):
+        _tdelay += tout
+        _handle = loop.call_later(_tdelay, _rtx, sock, data, socktype, i+1, tout, logger, _rtx_runs)
+        _rtx_handles.append(_handle)
+
+    try:
+        await loop.sock_sendall(sock, data)
+        MSG_SENT += 1
+        recvdata = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=sum(timeouts))
+        MSG_RECV += 1
+        logger.debug('Received response: {}:{} > {}:{} ({}) / {}'.format(_laddr[0], _laddr[1], raddr[0], raddr[1], socktype, recvdata))
+    except asyncio.TimeoutError:
+        logger.info('TimeoutError ({:.4f} sec): {}:{} > {}:{} ({}) / {}'.format(sum(timeouts), _laddr[0], _laddr[1], raddr[0], raddr[1], socktype, data))
+        recvdata = None
+    finally:
+        sock.close()
+        # Cancel all retransmission tasks
+        for _handle in _rtx_handles:
+            _handle.cancel()
+        # Count number of queries sent
+        attempt = len(_rtx_runs) + 1
         return (recvdata, attempt)
 
-    for tout in timeouts:
-        attempt += 1
-        try:
-            await loop.sock_sendall(sock, data)
-            recvdata = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
-            break
-        except asyncio.TimeoutError:
-            logger.warning('#{} timeout expired ({:.4f} sec): {}:{} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype))
-            continue
-        except ConnectionRefusedError:
-            logger.debug('Socket failed to connect: {}:{} ({}) / echoing {}'.format(raddr[0], raddr[1], socktype, data))
-            break
-        except Exception as e:
-            logger.warning('Exception {}: {}:{} ({}) / echoing {}'.format(e, raddr[0], raddr[1], socktype, data))
-            break
 
-    sock.close()
-    return (recvdata, attempt)
-
-async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=False):
+async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
     """
     fqdn: Domain name to be resolved
     raddr: Remote tuple information
@@ -241,7 +310,7 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
     """
     global TS_ZERO
     logger = logging.getLogger('gethostbyname')
-    logger.debug('Resolving {} to {} with timeouts {}'.format(fqdn, raddr, timeouts))
+    logger.debug('Resolving {} via {}:{} > {}:{} ({}) with timeouts {}'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype, timeouts))
     rdtype = dns.rdatatype.A
     rdclass = dns.rdataclass.IN
     ipaddr = None
@@ -250,80 +319,57 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
 
     # Build query message
     query = dns.message.make_query(fqdn, rdtype, rdclass)
+    query.id = get_deterministic_queryid()
 
-    # Connect socket or fail early
-    _socktype = socket.SOCK_STREAM if socktype == 'tcp' else socket.SOCK_DGRAM
-    sock = await _socket_connect(raddr, laddr, family=socket.AF_INET, type=_socktype, reuseaddr=reuseaddr, timeout=2)
-    if sock is None:
-        logger.warning('Socket failed to connect: {}:{} > {}:{} ({}) / {} ({})'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
-        return (ipaddr, query.id, attempt)
+    if socktype == 'udp':
+        data = query.to_wire()
+        # Send query and await for response with retransmission template
+        data_recv, data_attempts = await _sendrecv(data, raddr, laddr, timeouts, socktype, reuseaddr)
+        # Resolution did not succeed
+        if data_recv is None:
+            logger.debug('Resolution failed: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+            return (None, query.id, data_attempts)
+        response = dns.message.from_wire(data_recv)
+        assert(response.id == query.id)
+        # Check if response is truncated and retry in TCP with a recursive call
+        if (response.flags & dns.flags.TC == dns.flags.TC):
+            logger.debug('Truncated response, reattempt via TCP: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+            return await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
 
-    for tout in timeouts:
-        attempt += 1
-        try:
-            if socktype == 'udp':
-                _data = query.to_wire()
-                await loop.sock_sendall(sock, _data)
-                dataresponse = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
-                response = dns.message.from_wire(dataresponse)
-                # Check if response is truncated and retry in TCP with a recursive call
-                if (response.flags & dns.flags.TC == dns.flags.TC):
-                    _data_ripaddr, _query_id, _dns_attempts = await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
-                    return (_data_ripaddr, _query_id, _dns_attempts)
+    elif socktype == 'tcp':
+        _data = query.to_wire()
+        data = struct.pack('!H', len(_data)) + _data
+        # Send query and await for response with retransmission template
+        data_recv, data_attempts = await _sendrecv(data, raddr, laddr, timeouts, socktype, reuseaddr)
+        # Resolution did not succeed
+        if data_recv is None:
+            logger.debug('Resolution failed: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+            return (None, query.id, data_attempts)
+        _len = struct.unpack('!H', data_recv[:2])[0]
+        response = dns.message.from_wire(data_recv[2:2+_len])
+        assert(response.id == query.id)
 
-            elif socktype == 'tcp':
-                _data = query.to_wire()
-                _data = struct.pack('!H', len(_data)) + _data
-                await loop.sock_sendall(sock, _data)
-                dataresponse = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=tout)
-                _len = struct.unpack('!H', dataresponse[:2])[0]
-                dataresponse = dataresponse[2:2+_len]
+    # Parsing result
+    ## With new PBRA DNS design, we might receive a CNAME instead of an A record, so we have to follow up with a new query to the given domain
+    ## First try to obtain the A record and return if successful
+    for rrset in response.answer:
+        for rdata in rrset:
+            if rdata.rdtype == dns.rdatatype.A:
+                ipaddr = rdata.address
+                logger.debug('Resolution succeeded: {} via {}:{} > {}:{} ({}) yielded {}'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype, ipaddr))
+                return (ipaddr, query.id, data_attempts)
 
-            response = dns.message.from_wire(dataresponse)
-            assert(response.id == query.id)
+    ## Alternatively, try to follow-up through the CNAME record and with a recursive call
+    for rrset in response.answer:
+        for rdata in rrset:
+            if rdata.rdtype == dns.rdatatype.CNAME:
+                target = rdata.to_text()
+                logger.debug('Resolution continues: {} via {}:{} > {}:{} ({}) yielded {}'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype, target))
+                return await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp', reuseaddr=reuseaddr)
 
-            # Parsing result
-            ## With new PBRA DNS design, we might receive a CNAME instead of an A record, so we have to follow up with a new query to the given domain
-            ## First try to obtain the A record and return if successful
-            for rrset in response.answer:
-                for rdata in rrset:
-                    if rdata.rdtype == dns.rdatatype.A:
-                        ipaddr = rdata.address
-                        logger.debug('[{:.3f}] {} @ {} via {}'.format(_now(TS_ZERO), fqdn, ipaddr, raddr[0]))
-                        sock.close()
-                        return (ipaddr, query.id, attempt)
-            ## Alternatively, try to follow-up through the CNAME record and with a recursive call
-            for rrset in response.answer:
-                for rdata in rrset:
-                    if rdata.rdtype == dns.rdatatype.CNAME:
-                        target = rdata.to_text()
-                        logger.debug('[{:.3f}] {} @ {} via {}'.format(_now(TS_ZERO), fqdn, target, raddr[0]))
-                        sock.close()
-                        _data_ripaddr, _query_id, _dns_attempts = await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp')
-                        return (_data_ripaddr, _query_id, _dns_attempts)
-            # break if no valid answer was obtained
-            break
-
-        except asyncio.TimeoutError:
-            logger.info('#{} timeout expired ({:.4f} sec): {}:{} ({}) / {} ({})'.format(attempt, tout, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
-            continue
-        except ConnectionRefusedError:
-            logger.exception('Socket failed to connect: {}:{} ({}) / {} ({})'.format(raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
-            break
-        except AssertionError:
-            # This may happen if we have many sockets open
-            _laddr = sock.getsockname()
-            logger.exception('Wrong message id: {}!={} / {} ({}) / {}:{}'.format(query.id, response.id, fqdn, dns.rdatatype.to_text(rdtype), _laddr[0], _laddr[1]))
-            break
-        #except KeyError:
-        #    logger.exception('Resource records not found: {} ({})'.format(fqdn, dns.rdatatype.to_text(rdtype)))
-        #    break
-        except Exception as e:
-            logger.warning('Exception {}: {}:{} ({}) / {} ({})'.format(e, raddr[0], raddr[1], socktype, fqdn, dns.rdatatype.to_text(rdtype)))
-            break
-
-    sock.close()
-    return (ipaddr, query.id, attempt)
+    # Resolution did not succeed
+    logger.debug('Resolution failed: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
+    return (None, query.id, data_attempts)
 
 
 def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
@@ -429,7 +475,7 @@ class RealDNSDataTraffic(_TestTraffic):
         # Use a list to store scheduled tasks parameters
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
-        reuseaddr = kwargs.setdefault('reuseaddr', False)
+        reuseaddr = kwargs.setdefault('reuseaddr', True)
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -571,7 +617,7 @@ class RealDNSTraffic(_TestTraffic):
         # Use a list to store scheduled tasks parameters
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
-        reuseaddr = kwargs.setdefault('reuseaddr', False)
+        reuseaddr = kwargs.setdefault('reuseaddr', True)
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -672,7 +718,7 @@ class RealDataTraffic(_TestTraffic):
         # Use a list to store scheduled tasks parameters
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
-        reuseaddr = kwargs.setdefault('reuseaddr', False)
+        reuseaddr = kwargs.setdefault('reuseaddr', True)
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -764,8 +810,6 @@ class SpoofDNSTraffic(_TestTraffic):
 
         # Use a list to store scheduled tasks parameters
         scheduled_tasks = []
-        # Set default variables that might not be defined in configuration / Allow easy test of specific features
-        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -786,7 +830,9 @@ class SpoofDNSTraffic(_TestTraffic):
             # Pre-compute packet build to avoid lagging due to Scapy.
             ## Build query message
             interface = kwargs.get('interface', None)
-            data_b = dns.message.make_query(data_raddr[0], 1, 1).to_wire()
+            query = dns.message.make_query(data_raddr[0], 1, 1)
+            query.id = get_deterministic_queryid()
+            data_b = query.to_wire()
             eth_pkt = _scapy_build_packet(dns_laddr[0], dns_raddr[0], dns_raddr[2], dns_laddr[1], dns_raddr[1], data_b)
             ## Encode/decode to base64 for obtaning str representation / serializable
             eth_pkt_str = base64.b64encode(bytes(eth_pkt)).decode('utf-8')
@@ -854,8 +900,6 @@ class SpoofDataTraffic(_TestTraffic):
 
         # Use a list to store scheduled tasks parameters
         scheduled_tasks = []
-        # Set default variables that might not be defined in configuration / Allow easy test of specific features
-        reuseaddr = kwargs.setdefault('reuseaddr', False)
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -1081,7 +1125,7 @@ class MainTestClient(object):
 
         # Create list of lines to save result statistics
         lines = []
-        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_start,dns_end,dns_duration,data_success,data_attempts,data_start,data_end,data_duration'
+        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_start,dns_end,dns_duration,data_success,data_attempts,data_start,data_end,data_duration,debug'
         lines.append(header_fmt)
 
         for result_d in RESULTS:
@@ -1101,11 +1145,12 @@ class MainTestClient(object):
             data_start    = metadata_d.get('data_start', '')
             data_end      = metadata_d.get('data_end', '')
             data_duration = metadata_d.get('data_duration', '')
-            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,success,ts_start,ts_end,duration,
-                                                                         dns_success,dns_attempts,
-                                                                         dns_start,dns_end,dns_duration,
-                                                                         data_success,data_attempts,
-                                                                         data_start,data_end,data_duration)
+            debug         = 'dns_laddr={}'.format(metadata_d.get('dns_laddr', ''))
+            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(
+                     name,success,ts_start,ts_end,duration,
+                     dns_success,dns_attempts,dns_start,dns_end,dns_duration,
+                     data_success,data_attempts,data_start,data_end,data_duration,
+                     debug)
             lines.append(line)
 
         # Save results to file in csv
@@ -1144,7 +1189,8 @@ def setup_logging_yaml(default_path='logging.yaml',
             config = yaml.safe_load(f.read())
         logging.config.dictConfig(config)
     else:
-        logging.basicConfig(level=level)
+        #logging.basicConfig(level=level)
+        logging.basicConfig(level=level, format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Realm Gateway Traffic Test Suite v0.1')
@@ -1181,6 +1227,8 @@ if __name__ == '__main__':
     loop.stop()
     main.process_results()
 
+    print('MSG_SENT      {}'.format(MSG_SENT))
+    print('MSG_RECV      {}'.format(MSG_RECV))
     print('LAST_UDP_PORT {}'.format(LAST_UDP_PORT))
     print('LAST_TCP_PORT {}'.format(LAST_TCP_PORT))
     sys.exit(0)
