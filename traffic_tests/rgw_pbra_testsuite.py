@@ -85,11 +85,6 @@ Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:20
 
 """
 
-
-# Disable garbage collector
-import gc
-gc.disable()
-
 import asyncio
 import argparse
 import base64
@@ -219,8 +214,8 @@ async def _socket_connect(raddr, laddr, family, type, reuseaddr=True, timeout=0)
     # Try to bind a port up to 2 times. Get a new deterministic port if the first choice fails.
     for i in range(2):
         try:
-            sock.setblocking(False)
             sock.bind((_local_addr, _local_port))
+            sock.setblocking(False)
             await asyncio.wait_for(loop.sock_connect(sock, raddr), timeout=timeout, loop=loop)
             return sock
         except OSError as e:
@@ -233,6 +228,41 @@ async def _socket_connect(raddr, laddr, family, type, reuseaddr=True, timeout=0)
             logger.error('{} @ {}:{} [{}]'.format(e, _local_addr, _local_port, type))
             return None
     return None
+
+class _asyncSocket(object):
+    """
+    This class attempts to solve the bug found with loop.sock_recv() used via asyncio.wait_for()
+    It uses a simple internal asyncio.Queue() for synchronization
+    """
+    def __init__(self, sock, loop):
+        self.sock = sock
+        self.loop = loop
+        self.queue = asyncio.Queue()
+        # Register reader in loop
+        self.sock.setblocking(False)
+        self.loop.add_reader(self.sock.fileno(), self._recv)
+        #import sys
+        #print('_asyncSocket fd={} laddr={} raddr={}'.format(sock.fileno(), sock.getsockname(), sock.getpeername()), file=sys.stderr)
+
+    def _recv(self):
+        # Socket is read-ready
+        data = self.sock.recv(1024)
+        self.queue.put_nowait(data)
+
+    async def recv(self):
+        data = await self.queue.get()
+        self.queue.task_done()
+        return data
+
+    async def sendall(self, data):
+        await self.loop.sock_sendall(self.sock, data)
+
+    def close(self):
+        # Deregister reader in loop
+        self.loop.remove_reader(self.sock.fileno())
+        self.sock.close()
+        del self.sock
+        del self.queue
 
 
 async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
@@ -249,9 +279,6 @@ async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=
     global MSG_RECV
 
     logger = logging.getLogger('sendrecv')
-    #logger.debug('{}:{} > {}:{} ({}) with timeouts {}'.format(laddr[0], laddr[1], raddr[0], raddr[1], socktype, timeouts))
-    recvdata = None
-    attempt = 0
 
     # Connect socket or fail early
     sock = await _socket_connect(raddr, laddr, family='ipv4', type=socktype, reuseaddr=reuseaddr, timeout=2)
@@ -262,43 +289,29 @@ async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=
     _laddr = sock.getsockname()
     logger.debug('Socket succeeded to connect: {}:{} > {}:{} ({})'.format(_laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
 
-    # Callback function to send with logging
-    def _rtx(sock, data, socktype, seq, tout, logger, rtx_l):
-        global MSG_SENT
-        # Get real local connected address
-        _laddr = sock.getsockname()
-        logger.debug('#{} timeout expired ({:.4f} sec): {}:{} > {}:{} ({})'.format(seq, tout, _laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
-        sock.sendall(data)
-        MSG_SENT += 1
-        rtx_l.append(True)
+    # Create async socket wrapper object
+    asock = _asyncSocket(sock, loop)
 
-    # New approach due to possible loop.sock_recv bug
-    ## Schedule future retransmission tasks and cancel them if socket has data
-    _tdelay = 0
-    _rtx_handles = []
-    _rtx_runs = []
     for i, tout in enumerate(timeouts):
-        _tdelay += tout
-        _handle = loop.call_later(_tdelay, _rtx, sock, data, socktype, i+1, tout, logger, _rtx_runs)
-        _rtx_handles.append(_handle)
+        try:
+            await asock.sendall(data)
+            MSG_SENT += 1
+            recvdata = await asyncio.wait_for(asock.recv(), timeout=tout)
+            MSG_RECV += 1
+            logger.debug('[#{}] Received response: {}:{} > {}:{} ({}) / {}'.format(i+1, _laddr[0], _laddr[1], raddr[0], raddr[1], socktype, recvdata))
+            break
+        except asyncio.TimeoutError:
+            logger.debug('#{} timeout expired ({:.4f} sec): {}:{} > {}:{} ({})'.format(i+1, tout, _laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
+            recvdata = None
+            continue
+        except Exception as e:
+            logger.exception('Exception <{}>: {}:{} > {}:{} ({}) / {}'.format(e, _laddr[0], _laddr[1], raddr[0], raddr[1], socktype, data))
+            recvdata = None
+            break
 
-    try:
-        await loop.sock_sendall(sock, data)
-        MSG_SENT += 1
-        recvdata = await asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=sum(timeouts))
-        MSG_RECV += 1
-        logger.debug('Received response: {}:{} > {}:{} ({}) / {}'.format(_laddr[0], _laddr[1], raddr[0], raddr[1], socktype, recvdata))
-    except asyncio.TimeoutError:
-        logger.info('TimeoutError ({:.4f} sec): {}:{} > {}:{} ({}) / {}'.format(sum(timeouts), _laddr[0], _laddr[1], raddr[0], raddr[1], socktype, data))
-        recvdata = None
-    finally:
-        sock.close()
-        # Cancel all retransmission tasks
-        for _handle in _rtx_handles:
-            _handle.cancel()
-        # Count number of queries sent
-        attempt = len(_rtx_runs) + 1
-        return (recvdata, attempt)
+    attempt = i+1
+    asock.close()
+    return (recvdata, attempt)
 
 
 async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
