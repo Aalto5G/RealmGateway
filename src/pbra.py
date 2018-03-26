@@ -1068,7 +1068,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         if conn.hasexpired():
             # Connection expired
-            self._logger.warning('Connection expired: {} in {:.3f} msec '.format(conn, conn.age*1000))
+            self._logger.warning('Connection expired: {} in {:.3f} msec (id {})'.format(conn, conn.age*1000, conn.query.id))
             # Blame attribution to DNS resolver and requestor
             self._logger.debug('  >> Blame attribution!')
             # Register a nok event
