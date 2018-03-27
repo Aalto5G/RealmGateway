@@ -65,9 +65,51 @@ cd /customer_edge_switching_v2/src
 ```
 
 
-## Caveats and pitfalls
+## What are all these folders?
 
-There are two ways of running automated enviroment for Realm Gateway, either using the LXC container orchestration or via the bash script with Linux network namespaces.
+This is the current view of the root folder
+
+```
+.
+├── config.d
+├── docs
+├── iptables_devel
+├── logs
+├── orchestration
+├── scripts
+├── src
+├── traffic_tests
+├── AUTHORS
+├── DOCUMENTATION.md
+├── LICENSE
+├── LICENSE.header
+├── README.md
+├── run_gwa.sh
+└── TODO
+```
+
+A brief description of what to find:
+
+- config.d: Realm Gateway and subcriber policies we have used in the past.
+- docs: Assorted documentation.
+- iptables_devel: Userspace and kernel modules for MARKDNAT iptables module.
+- logs: Storage for runtime logging.
+- orchestration: Necessary scripts for quick deployment of test environments.
+- scripts: Assorted script files that have been of some use at some point.
+- src: The holy grail of our code.
+- traffic_tests: Test related scripts from functional and performance perspective.
+- AUTHORS
+- DOCUMENTATION.md
+- LICENSE
+- LICENSE.header
+- README.md
+- run_gwa.sh: Quickest way to start the code of a netns enviroment
+- TODO
+
+
+## Configuring a deployment
+
+There are two ways of running automated enviroments for Realm Gateway, either using the LXC container orchestration or via the bash script with Linux network namespaces.
 In both cases, the Realm Gateway uses the "router" node as default gateway.
 Additionally, the "router" node is configured to send all default traffic to 100.64.0.254 IP address, which is installed on the host machine running the virtual environment.
 
@@ -76,10 +118,6 @@ If Internet connectivity is desired on the virtual environment, one can enable N
 ```
 iptables -t nat -I POSTROUTING -o interfaceWithInternetAccess -j MASQUERADE
 ```
-
-
-
-## Configuring a deployment
 
 
 ### LXC deployment
