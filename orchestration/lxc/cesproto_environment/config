@@ -1,0 +1,49 @@
+ctbase:
+  config: ctbase/config
+  rootfs: ctbase/rootfs
+  disabled_services: [apt-daily.timer, apt-daily-upgrade.timer, bind9, dnsmasq, isc-dhcp-server, vsftpd, nginx, openvswitch-switch]
+  enabled_services: [runatstartup]
+  apt_packages: [sudo, iptables, ipset, ulogd2, conntrack, openssh-server, sshfs, nano, tmux, dnsutils, htop, psmisc, tree, bash-completion, locate, python3, ipython3, python3-pip, python3-dev, iperf, iperf3, nmap, ftp, vsftpd, curl, wget, lynx, ethtool, tcpdump, bmon, traceroute, iputils-arping, hping3, bind9, dnsmasq, isc-dhcp-server, nginx-core, php-fpm, openvswitch-switch, tnftp, udhcpc, lksctp-tools, build-essential, git, flex, bison, libnetfilter-queue-dev]
+  pip3_packages: [ipython, dnspython, aiohttp, scapy-python3, pyyaml, NetfilterQueue, ryu, python-iptables, pyroute2, pip-review]
+
+#public:
+#  config: public/config
+#  rootfs: public/rootfs
+#  apt_packages: []
+#  disabled_services: []
+#  enabled_services: [vsftpd, nginx]
+
+proxya:
+  config: proxya/config
+  rootfs: proxya/rootfs
+  apt_packages: []
+  disabled_services: []
+  enabled_services: [openvswitch-switch, synproxy_kernel]
+
+gwa:
+  config: gwa/config
+  rootfs: gwa/rootfs
+  apt_packages: []
+  disabled_services: []
+  enabled_services: [nginx, dnsmasq, isc-dhcp-server, openvswitch-switch]
+
+test_gwa:
+  config: test_gwa/config
+  rootfs: test_gwa/rootfs
+  apt_packages: []
+  disabled_services: []
+  enabled_services: [vsftpd, nginx]
+
+nest_gwa:
+  config: nest_gwa/config
+  rootfs: nest_gwa/rootfs
+  apt_packages: []
+  disabled_services: []
+  enabled_services: [nginx, dnsmasq, isc-dhcp-server, openvswitch-switch]
+
+test_ngwa:
+  config: test_ngwa/config
+  rootfs: test_ngwa/rootfs
+  apt_packages: []
+  disabled_services: []
+  enabled_services: [vsftpd, nginx]

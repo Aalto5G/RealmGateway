@@ -1,0 +1,13 @@
+[Unit]
+Description=run synproxy kernel dataplane
+After=openvswitch-switch.service
+
+[Service]
+WorkingDirectory=/home/ubuntu
+ExecStartPre=/usr/bin/ovs-vsctl --if-exists del-br br-synproxy
+ExecStart=/usr/bin/env python3 ./synproxy_dataplane.py --nic-wan wan0 --nic-wanp wan0p --ipaddr 172.31.255.15 --port 12345 --standalone --default-tcpmss 1460 --default-tcpsack 1 --default-tcpwscale 7 --secure-net 100.64.2.130/32 100.64.2.131/32 100.64.2.132/32 100.64.2.133/32 100.64.2.134/32 100.64.2.135/32 100.64.2.136/32 100.64.2.137/32 100.64.2.138/32 100.64.2.139/32 100.64.2.140/32 100.64.2.141/32 100.64.2.142 --default-gw --ratelimit 100 100
+ExecStopPost=/usr/bin/ovs-vsctl del-br br-synproxy
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

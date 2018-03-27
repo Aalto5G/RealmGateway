@@ -1,0 +1,26 @@
+# Network configuration
+##
+lxc.network.type = veth
+lxc.network.veth.pair = gwa_mgt0
+lxc.network.link = lxcmgt0
+lxc.network.flags = up
+lxc.network.ipv4 = 172.31.255.11/24
+lxc.network.name = mgt0
+##
+lxc.network.type = veth
+lxc.network.veth.pair = gwa_lan0
+lxc.network.link = br-lan0a
+lxc.network.flags = up
+lxc.network.ipv4 = 192.168.0.1/24
+lxc.network.name = lan0
+## Inline SYN proxy for 195.148.125.201-195.148.125.204
+lxc.network.type = veth
+lxc.network.veth.pair = gwa_wan0p
+lxc.network.link = br-wan1p
+lxc.network.flags = up
+lxc.network.ipv4 = 195.148.125.201/24
+lxc.network.ipv4 = 195.148.125.202/24
+lxc.network.ipv4 = 195.148.125.203/24
+lxc.network.ipv4 = 195.148.125.204/24
+lxc.network.ipv4.gateway = 195.148.125.1
+lxc.network.name = wan0

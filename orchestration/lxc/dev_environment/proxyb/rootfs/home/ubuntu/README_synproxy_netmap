@@ -1,0 +1,30 @@
+Juha-Matti Tilli has developed a Layer-2 transparent SYNPROXY implementation via Netmap.
+The script is available under the name ```synproxy_netmap.sh```
+
+The service has been demonized and can be also started via ```systemctl start synproxy_netmap```.
+It can also be run manually via ```/home/YOURUSERNAME/synproxy/synproxy/nmsynproxy netmap:wan0p netmap:wan0```.
+
+
+Installation guide
+
+Download the Netmap repository
+```git clone https://github.com/luigirizzo/netmap --recursive```
+
+Download the Netmap Synproxy repository
+```git clone https://github.com/jmtilli/nmsynproxy --recursive```
+
+Edit the file ```nmsynproxy/opts.mk``` to include:
+```
+WITH_NETMAP=yes
+NETMAP_INCDIR=/home/YOURUSERNAME/netmap/sys
+```
+
+Compile the sources via ```make```.
+
+Modify the conf.txt file to include:
+```
+port = 12345;
+mssmode = commanded;
+sackmode = commanded;
+wscalemode = commanded;
+```

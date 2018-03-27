@@ -1,0 +1,14 @@
+This is a fully functional deployment connected to the real Internet, with a transparent inline SYNPROXY.
+
+The Internet connection is provided by Comnet at VLAN 3247.
+
+The allocated addressing for RealmGateway-A is 195.148.125.201-204.
+
+The FQDN registered is gwa.cesproto.re2ee.org
+
+The environment is comprised of 5 hosts:
+172.31.255.11       gwa
+172.31.255.14       proxya
+172.31.255.16       test_gwa
+172.31.255.21       nest_gwa
+172.31.255.26       test_ngwa

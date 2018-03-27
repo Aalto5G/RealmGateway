@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Run a bash instance inside a network namespace with modified prompt
+# Place the file in /sbin/nsbash and give +x permissions
+## Usage:  sudo nsbash ns1
+## Result: ns1# 
+
+ip netns exec $1 /bin/bash  --rcfile <(echo "PS1=\"$1# \"")
+

@@ -1,0 +1,14 @@
+[Unit]
+Description=run synproxy netmap dataplane
+After=openvswitch-switch.service
+
+[Service]
+WorkingDirectory=/home/ubuntu
+# Create Netmap file / See host's mounting point! "ls -lah /dev/netmap"
+ExecStartPre=/bin/bash -c "/bin/mknod /dev/netmap c 10 55 || true"
+ExecStartPre=/usr/bin/ovs-vsctl --if-exists del-br br-synproxy
+ExecStart=/home/ubuntu/nmsynproxy/nmsynproxy netmap:wan0p netmap:wan0
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

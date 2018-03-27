@@ -1,0 +1,18 @@
+# Disable confinement for creating network namespaces
+lxc.aa_profile = unconfined
+# Network configuration
+##
+lxc.network.type = veth
+lxc.network.veth.pair = test_gwa_mgt0
+lxc.network.link = lxcmgt0
+lxc.network.flags = up
+lxc.network.ipv4 = 172.31.255.16/24
+lxc.network.name = mgt0
+##
+lxc.network.type = veth
+lxc.network.veth.pair = test_gwa_lan0
+lxc.network.link = br-lan0a
+lxc.network.flags = up
+lxc.network.ipv4 = 192.168.0.100/24
+lxc.network.ipv4.gateway = 192.168.0.1
+lxc.network.name = lan0
