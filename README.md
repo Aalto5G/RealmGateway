@@ -1,11 +1,11 @@
-# Customer Edge Switching / Realm Gateway
+# Realm Gateway
 
 ## Requirements
 
-This version of Customer Edge Switching v2.0 has been developed under
-Ubuntu 16.04 and python3 for asynchronous calls.
+This version of Realm Gateway has been developed under Ubuntu 16.04 with python3 for asynchronous operations.
 
-This repository contains a submodule. Clone with ```git clone ssh://git@gitlab.cloud.mobilesdn.org:60022/CES/customer_edge_switching_v2.git --recursive```
+This repository contains submodules.
+Clone with ```git clone $REPOSITORY_URL --recursive```
 
 ## Install package dependencies
 
@@ -25,34 +25,26 @@ $ pip3 install --upgrade pip setuptools
 $ pip3 install --upgrade ipython dnspython aiohttp scapy-python3 pyyaml NetfilterQueue ryu python-iptables pyroute2 --user
 ```
 
-## Caveats and pitfalls
-
-There are two ways of running automated enviroment for CES/RealmGateway, either using the LXC container orchestration or via the bash script with Linux network namespaces.
-In both cases, the CES/RealmGateway uses the "router" node as default gateway, which also provides SYNPROXY protection to its stub network. Similarly, the "router" node
-is configured to send all default traffic to 100.64.0.254 IP address, which is installed on the host machine running the virtual environment.
-
-If Internet connectivity is desired on the virtual environment, one can enable NATting via MASQUERADE as follows:
-
-```
-iptables -t nat -I POSTROUTING -o interfaceWithInternetAccess -j MASQUERADE
-```
 
 ## How to run a Realm Gateway
 
-The configuration file has been discontinued. Now all parameters are passed as arguments to the program, i.e.:
+The main configuration file has been discontinued. Now all parameters are passed as arguments to the program, i.e.:
 
 ```
 Run as:
-./rgw.py  --name gwa.demo                                                    \
-          --dns-soa gwa.demo. 0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa. \
+cd /customer_edge_switching_v2/src
+./rgw.py  --name             gwa.demo                                        \
+          --dns-soa          gwa.demo. cname-gwa.demo.                       \
+                             0.168.192.in-addr.arpa. 1.64.100.in-addr.arpa.  \
+          --dns-cname-soa    cname-gwa.demo.                                 \
           --dns-server-local 127.0.0.1 53                                    \
           --dns-server-lan   192.168.0.1 53                                  \
           --dns-server-wan   100.64.1.130 53                                 \
           --dns-resolver     127.0.0.1 54                                    \
           --ddns-server      127.0.0.2 53                                    \
-          --dns-timeout      0.010 0.100 0.200                               \
+          --dns-timeout      0.25 0.25 0.25                                  \
           --pool-serviceip   100.64.1.130/32                                 \
-          --pool-cpoolip     100.64.1.133/32 100.64.1.134/32 100.64.1.135/32 \
+          --pool-cpoolip     100.64.1.131/32 100.64.1.132/32 100.64.1.133/32 \
           --ipt-cpool-queue  1                                               \
           --ipt-cpool-chain  CIRCULAR_POOL                                   \
           --ipt-host-chain   CUSTOMER_POLICY                                 \
@@ -65,17 +57,52 @@ Run as:
           --ips-hosts        IPS_SUBSCRIBERS                                 \
           --ipt-markdnat                                                     \
           --ipt-flush                                                        \
-          --repository-subscriber-folder gwa.subscriber.d/                   \
-          --repository-policy-folder     gwa.policy.d/                       \
+          --repository-subscriber-folder ../config.d/gwa.demo.subscriber.d/  \
+          --repository-policy-folder     ../config.d/gwa.demo.policy.d/      \
           --repository-api-url  http://127.0.0.1:8082/                       \
           --network-api-url     http://127.0.0.1:8081/                       \
           --synproxy         172.31.255.14 12345
 ```
 
 
+## Caveats and pitfalls
+
+There are two ways of running automated enviroment for Realm Gateway, either using the LXC container orchestration or via the bash script with Linux network namespaces.
+In both cases, the Realm Gateway uses the "router" node as default gateway.
+Additionally, the "router" node is configured to send all default traffic to 100.64.0.254 IP address, which is installed on the host machine running the virtual environment.
+
+If Internet connectivity is desired on the virtual environment, one can enable NATting via MASQUERADE as follows:
+
+```
+iptables -t nat -I POSTROUTING -o interfaceWithInternetAccess -j MASQUERADE
+```
+
+
+
 ## Configuring a deployment
 
+
+### LXC deployment
+
+Originally developed as a separate project for quick orchestration and replication of environments, it has now been added to the main repository.
+
+Check the documentation inside the ```orchestration\lxc``` folder to quickly spawn the ready-made test environment ```dev_environment```.
+
+
+### Network namespaces deployment
+
+Originally devised as the quickest way to virtualize hosts with a minimal overhead.
+Isolation is mainly related to the network stack, local modifications to the file system are allowed, but discouraged.
+
+Check the documentation inside the ```orchestration\netns``` folder to quickly spawn the ready-made test environment.
+
+
+### Policy information
+
 The current repository ships with a set of policies and subscriber information for basic testing.
+
+Depending on the deployment option, LXC or netns, a transparent TCP SYNPROXY may be available.
+
 However, if we plan on making a new deployment there are a few things we need to take into account:
 
 * circularpool.policy: Set a sensible maximum level according the size of the Circular Pool.
@@ -171,7 +198,8 @@ done
 
 ## Considerations to performance testing of Realm Gateway
 
-Use the developed client to specifically control the IP addresses for DNS resolution and Data transfers.
+Use the developed client to specifically control the IP addresses for DNS resolution and Data transfers:
+
 - You may need to add host-only addresses (/32) to an interface and configure the routing table accordingly.
 - Using several IP sources also enables more socket binding options, which is necesarry for high test loads.
 
@@ -220,6 +248,7 @@ session    required   pam_limits.so
 ### Configure the system for high traffic volume
 
 - Add to /etc/sysctl.conf
+
 ```
 # Reduce TIME_WAIT socket connections
 net.ipv4.tcp_fin_timeout=1
@@ -233,7 +262,7 @@ net.ipv4.ip_local_port_range=1024 65535
 
 # Increase conntrack size 1:16 bucket ratio for 4M connections
 
-## Increase bucket size: Verify input parameter with "modinfo nf_conntrack" / (expect_hashsize or hashsize)
+Increase bucket size: Verify input parameter with "modinfo nf_conntrack" / (expect_hashsize or hashsize)
 net.netfilter.nf_conntrack_buckets=262144
 ### In recent kernels it might not be possible to modify this value on the fly, alternatively try one of the following:
 ### Option 1: echo "options nf_conntrack expect_hashsize=262144" > /etc/modprobe.d/nf_conntrack.conf
