@@ -229,40 +229,39 @@ async def _socket_connect(raddr, laddr, family, type, reuseaddr=True, timeout=0)
             return None
     return None
 
-class _asyncSocket(object):
+
+from asyncio import Queue
+class AsyncSocketQueue(object):
     """
     This class attempts to solve the bug found with loop.sock_recv() used via asyncio.wait_for()
-    It uses a simple internal asyncio.Queue() for synchronization
+    It uses a simple internal asyncio.Queue() to store the received messages of a *connected socket*
     """
-    def __init__(self, sock, loop):
-        self.sock = sock
-        self.loop = loop
-        self.queue = asyncio.Queue()
+    def __init__(self, sock, loop, queuesize=0, msgsize=1024):
+        self._sock = sock
+        self._loop = loop
+        self._queue = Queue(maxsize=queuesize, loop=loop)
         # Register reader in loop
-        self.sock.setblocking(False)
-        self.loop.add_reader(self.sock.fileno(), self._recv)
-        #import sys
-        #print('_asyncSocket fd={} laddr={} raddr={}'.format(sock.fileno(), sock.getsockname(), sock.getpeername()), file=sys.stderr)
+        self._sock.setblocking(False)
+        self._loop.add_reader(self._sock.fileno(), AsyncSocketQueue._recv_callback, self._sock, self._queue, msgsize)
 
-    def _recv(self):
+    def _recv_callback(sock, queue, msgsize):
         # Socket is read-ready
-        data = self.sock.recv(1024)
-        self.queue.put_nowait(data)
+        queue.put_nowait(sock.recv(msgsize))
 
     async def recv(self):
-        data = await self.queue.get()
-        self.queue.task_done()
+        data = await self._queue.get()
+        self._queue.task_done()
         return data
 
     async def sendall(self, data):
-        await self.loop.sock_sendall(self.sock, data)
+        await self._loop.sock_sendall(self._sock, data)
 
     def close(self):
         # Deregister reader in loop
-        self.loop.remove_reader(self.sock.fileno())
-        self.sock.close()
-        del self.sock
-        del self.queue
+        self._loop.remove_reader(self._sock.fileno())
+        self._sock.close()
+        del self._sock
+        del self._queue
 
 
 async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
@@ -290,7 +289,7 @@ async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=
     logger.debug('Socket succeeded to connect: {}:{} > {}:{} ({})'.format(_laddr[0], _laddr[1], raddr[0], raddr[1], socktype))
 
     # Create async socket wrapper object
-    asock = _asyncSocket(sock, loop)
+    asock = AsyncSocketQueue(sock, loop)
 
     for i, tout in enumerate(timeouts):
         try:
