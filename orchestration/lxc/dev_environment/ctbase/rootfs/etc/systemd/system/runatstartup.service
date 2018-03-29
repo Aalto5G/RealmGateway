@@ -1,0 +1,10 @@
+[Unit]
+Description=run script at startup
+
+[Service]
+WorkingDirectory=/
+ExecStart=/bin/bash runatstartup
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+$TTL 30    ; 30 seconds
+demo.        IN    SOA    ns1.demo. admin.demo. (
+                2017031201 ; serial
+                10800      ; refresh (3 hours)
+                3600       ; retry (1 hour)
+                604800     ; expire (1 week)
+                3600       ; minimum (1 hour)
+                )
+
+; Name servers
+demo.                 IN    NS    ns1.demo.
+gwa.demo.             IN    NS    ns1.gwa.demo.
+gwb.demo.             IN    NS    ns1.gwb.demo.
+
+; Addresses
+ns1.demo.             IN    A     100.64.0.1
+ns1.gwa.demo.         IN    A     100.64.1.130
+ns1.gwb.demo.         IN    A     100.64.2.130
+public.demo.          IN    A     100.64.0.100
+
+
+;; CNAME SOA zones
+cname-gwa.demo.       IN    NS    ns1.cname-gwa.demo.
+cname-gwb.demo.       IN    NS    ns1.cname-gwb.demo.
+ns1.cname-gwa.demo.   IN    A     100.64.1.130
+ns1.cname-gwb.demo.   IN    A     100.64.2.130

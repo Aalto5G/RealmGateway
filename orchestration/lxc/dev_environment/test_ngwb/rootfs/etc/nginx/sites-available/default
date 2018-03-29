@@ -1,0 +1,36 @@
+server {
+    # Listen on ports 80 and 443
+    listen 80;
+    listen 443 ssl;
+    # Listen on secondary ports 8080 and 8443
+    listen 8080;
+    listen 8443 ssl;
+
+    # Set the server name matching the SSL certificate
+    server_name  *.gwb.demo;
+
+    # Log file
+    access_log  /var/log/nginx/proxy.access.log;
+
+    # Enable SSL
+    ssl_certificate           /etc/nginx/ssl/nginx.gwb.demo.crt;
+    ssl_certificate_key       /etc/nginx/ssl/nginx.gwb.demo.key;
+    ssl_session_timeout       5m;
+    ssl_protocols             TLSv1.2 TLSv1.1 TLSv1;
+    ssl_ciphers               ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv3:+EXP;
+    ssl_prefer_server_ciphers on;
+
+    root /var/www/html;
+
+    # Add index.php to the list if you are using PHP
+    index index.php index.html index.htm index.nginx-debian.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+    }
+}

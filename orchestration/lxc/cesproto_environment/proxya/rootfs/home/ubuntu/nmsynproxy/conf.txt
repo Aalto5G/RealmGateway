@@ -1,0 +1,30 @@
+synproxyconf = {
+  port = 12345;
+  mssmode = commanded;
+  sackmode = commanded;
+  wscalemode = commanded;
+
+  user = "root";
+  group = 0;
+  sackconflict = remove;
+  threadcount = 1;
+  learnhashsize = 131072;
+  conntablesize = 131072;
+  halfopen_cache_max = 0;
+  mss = {216, 1200, 1400, 1460};
+  wscale = {0, 2, 4, 7};
+  tsmss = {216, 344, 536, 712, 940, 1360, 1440, 1452};
+  tswscale = {0, 1, 3, 5, 6, 8, 9, 10};
+  ts_bits = 5;
+  own_mss = 1460;
+  own_wscale = 7;
+  own_sack = enable;
+  mss_clamp = 1460;
+  ratehash = {
+    size = 131072;
+    timer_period_usec = 1000000;
+    timer_add = 100;
+    initial_tokens = 100;
+    network_prefix = 24;
+  };
+};

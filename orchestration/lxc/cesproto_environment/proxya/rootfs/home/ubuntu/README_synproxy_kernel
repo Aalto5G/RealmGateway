@@ -1,0 +1,4 @@
+We have developed a Layer-2 transparent SYNPROXY implementation via OpenvSwitch and iptables rules.
+The script is available under the name ```synproxy_kernel.sh```
+
+The service has been demonized and can be also started via ```systemctl start synproxy_kernel```.

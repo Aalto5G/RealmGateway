@@ -1,0 +1,20 @@
+This is a deployment where the ROUTER is NOT acting as SYNPROXY, instead, there is a SYNPROXY inline node for each network.
+
+The SYNPROXY is transparent to the CES/RGW nodes and relays IP traffic between the 2 networks it connects.
+
+The CES/RGW nodes receive TCP/SYN filtered traffic via their corresponding wan0 NIC.
+
+
+The environment is comprised of 12 hosts:
+172.31.255.10       router
+172.31.255.11       gwa
+172.31.255.12       gwb
+172.31.255.13       public
+172.31.255.14       proxya
+172.31.255.15       proxyb
+172.31.255.16       test_gwa
+172.31.255.17       test_gwb
+172.31.255.21       nest_gwa
+172.31.255.22       nest_gwb
+172.31.255.26       test_ngwa
+172.31.255.27       test_ngwb

@@ -1,0 +1,6 @@
+# To do list
+
+DONE: Create pre-up.sh and post-up.sh scripts in deployment folder to adequate the environment to the actual deployment.
+DONE: This includes creating the supporting virtual network architecture with Linux Bridges, NATting and such.
+
+Move from dictionary to list, so we can predict the order of creation of containers -> routing dependencies

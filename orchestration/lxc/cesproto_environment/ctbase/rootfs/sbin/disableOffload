@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ "$EUID" -ne 0 ]; then
+    echo "This script uses functionality which requires root privileges"
+    exit 1
+fi
+
+ETHTOOL="/sbin/ethtool"
+DEV=$1
+
+echo "Disabling offload in $1"
+$ETHTOOL -K $DEV rx off
+$ETHTOOL -K $DEV tx off
+$ETHTOOL -K $DEV sg off
+$ETHTOOL -K $DEV tso off
+$ETHTOOL -K $DEV ufo off
+$ETHTOOL -K $DEV gso off
+$ETHTOOL -K $DEV gro off
+$ETHTOOL -K $DEV lro off
+$ETHTOOL -K $DEV rxvlan off
+$ETHTOOL -K $DEV txvlan off
+$ETHTOOL -K $DEV ntuple off
+$ETHTOOL -K $DEV rxhash off
+$ETHTOOL -K $DEV highdma off
+$ETHTOOL -K $DEV tx-nocache-copy off
+$ETHTOOL -K $DEV tx-vlan-stag-hw-insert  off
+$ETHTOOL -K $DEV rx-vlan-stag-hw-parse   off
+$ETHTOOL -K $DEV tx-gre-segmentation     off
+$ETHTOOL -K $DEV tx-ipip-segmentation    off
+$ETHTOOL -K $DEV tx-sit-segmentation     off
+$ETHTOOL -K $DEV tx-udp_tnl-segmentation off
+exit 0

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ "$EUID" -ne 0 ]; then
+    echo "This script uses functionality which requires root privileges"
+    exit 1
+fi
+
+ETHTOOL="/sbin/ethtool"
+DEV=$1
+
+echo "Enabling onload in $1"
+$ETHTOOL -K $DEV rx on
+$ETHTOOL -K $DEV tx on
+$ETHTOOL -K $DEV sg on
+$ETHTOOL -K $DEV tso on
+$ETHTOOL -K $DEV ufo on
+$ETHTOOL -K $DEV gso on
+$ETHTOOL -K $DEV gro on
+$ETHTOOL -K $DEV lro on
+$ETHTOOL -K $DEV rxvlan on
+$ETHTOOL -K $DEV txvlan on
+$ETHTOOL -K $DEV ntuple on
+$ETHTOOL -K $DEV rxhash on
+$ETHTOOL -K $DEV highdma on
+$ETHTOOL -K $DEV tx-nocache-copy on
+$ETHTOOL -K $DEV tx-vlan-stag-hw-insert  on
+$ETHTOOL -K $DEV rx-vlan-stag-hw-parse   on
+$ETHTOOL -K $DEV tx-gre-segmentation     on
+$ETHTOOL -K $DEV tx-ipip-segmentation    on
+$ETHTOOL -K $DEV tx-sit-segmentation     on
+$ETHTOOL -K $DEV tx-udp_tnl-segmentation on
+exit 0
