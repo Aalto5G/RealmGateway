@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 BSD 3-Clause License
 
@@ -29,8 +31,6 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-
-#!/usr/bin/env python3
 
 #TODO: Add logic to register several DNS resolvers and round robin or avoid using unreachable one
 #TODO: Define better transition from CUSTOMER_POLICY towards ADMIN_POLICY in filter.FORWARD - Use ipt-host-unknown ?
