@@ -37,7 +37,12 @@ import pprint
 from helpers_n_wrappers import container3
 from helpers_n_wrappers import utils3
 
-KEY_RGW = 0
+KEY_RGW            = 'KEY_RGW'
+KEY_RGW_FQDN       = 'KEY_RGW_FQDN'
+KEY_RGW_PRIVATE_IP = 'KEY_RGW_PRIVATE_IP'
+KEY_RGW_PUBLIC_IP  = 'KEY_RGW_PUBLIC_IP'
+KEY_RGW_3TUPLE     = 'KEY_RGW_3TUPLE'
+KEY_RGW_5TUPLE     = 'KEY_RGW_5TUPLE'
 
 class ConnectionTable(container3.Container):
     def __init__(self, name='ConnectionTable'):
@@ -132,18 +137,18 @@ class ConnectionLegacy(container3.ContainerNode):
         # Basic indexing
         self._built_lookupkeys.append((KEY_RGW, False))
         # Host FQDN based indexing
-        self._built_lookupkeys.append(((KEY_RGW, self.host_fqdn), False))
+        self._built_lookupkeys.append(((KEY_RGW_FQDN, self.host_fqdn), False))
         # Private IP-based indexing
-        #self._built_lookupkeys.append(((KEY_RGW, self.private_ip), False))
+        #self._built_lookupkeys.append(((KEY_RGW_PRIVATE_IP, self.private_ip), False))
         # Outbound IP-based indexing
-        self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip), False))
+        self._built_lookupkeys.append(((KEY_RGW_PUBLIC_IP, self.outbound_ip), False))
         ## The type of unique key come determined by the parameters available
         if not self.remote_ip and not self.remote_port:
             # 3-tuple semi-fledged based indexing
-            self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip, self.outbound_port, self.protocol), True))
+            self._built_lookupkeys.append(((KEY_RGW_3TUPLE, self.outbound_ip, self.outbound_port, self.protocol), True))
         else:
             # 5-tuple full-fledged based indexing
-            self._built_lookupkeys.append(((KEY_RGW, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True))
+            self._built_lookupkeys.append(((KEY_RGW_5TUPLE, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True))
 
 
     def lookupkeys(self):
@@ -177,8 +182,9 @@ class ConnectionLegacy(container3.ContainerNode):
             # Bind connection to 5-tuple match
             self.remote_ip, self.remote_port = remote_ip, remote_port
             self._built_lookupkeys = [(KEY_RGW, False),
-                                      ((KEY_RGW, self.outbound_ip), False),
-                                      ((KEY_RGW, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True)]
+                                      ((KEY_RGW_FQDN, self.host_fqdn), False),
+                                      ((KEY_RGW_PUBLIC_IP, self.outbound_ip), False),
+                                      ((KEY_RGW_5TUPLE, self.outbound_ip, self.outbound_port, self.remote_ip, self.remote_port, self.protocol), True)]
             # Update keys in connection table
             connection_table.updatekeys(self)
             # Set autobind flag to True

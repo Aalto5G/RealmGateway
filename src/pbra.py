@@ -923,7 +923,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Get host usage stats of the pool - lookup because there could be none
         rgw_conns = self.connectiontable.stats(connection.KEY_RGW)
-        host_conns = self.connectiontable.stats((connection.KEY_RGW, host_obj.fqdn)) # Use host fqdn as connection id
+        host_conns = self.connectiontable.stats((connection.KEY_RGW_FQDN, host_obj.fqdn)) # Use host fqdn as connection id
 
         # Evaluate host policy for quick exit
         if host_conns >= host_policy['max']:
@@ -1039,6 +1039,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         elif pool_available > 0:
             # Allocate a new address from the pool
             allocated_ipv4 = ap_cpool.allocate()
+            self._logger.debug('Allocated address from CircularPool: {} / allocated={} available={}'.format(allocated_ipv4, ap_cpool.get_allocated(), ap_cpool.get_available()))
         else:
             self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn_alias))
             return None
@@ -1094,9 +1095,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     @asyncio.coroutine
     def _cb_connection_deleted(self, conn):
-        # Get Circular Pool address pool
-        ap_cpool = self.pooltable.get('circularpool')
-        ipaddr = conn.outbound_ip
+        self._logger.debug('Delete callback for node {}'.format(conn))
 
         if conn.hasexpired():
             # Connection expired
@@ -1119,6 +1118,29 @@ class PolicyBasedResourceAllocation(container3.Container):
             if conn.query.reputation_requestor is not None:
                 conn.query.reputation_requestor.event_ok()
 
+        """
+        This function is now called as a coroutine. Under heavy load, these callbacks may be executed after several connection have been deleted.
+        In that case, the callbacks will attempt to release the allocated public IP address if no other connection is registered in the connection table.
+        Now we include additional checks to verify if the address has been already released to the pool.
+        """
+        # Get RealmGateway connections
+        ap_cpool = self.pooltable.get('circularpool')
+        ipaddr = conn.outbound_ip
+        try:
+            if self.connectiontable.has((connection.KEY_RGW_PUBLIC_IP, ipaddr)):
+                rgw_conns = self.connectiontable.get((connection.KEY_RGW_PUBLIC_IP, ipaddr))
+                self._logger.debug('Cannot release IP address to Circular Pool: {} connection(s) still pending @ {}'.format(len(rgw_conns), ipaddr))
+                self._logger.debug('  >> Existing connections @{}\n{}'.format(ipaddr, utils3.repr_iterable_index(rgw_conns)))
+            else:
+                # Attempt to release the IP address back to the pool
+                self._logger.info('Releasing IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
+                ap_cpool.release(ipaddr)
+        except ValueError:
+            self._logger.debug('Failed to release IP address to Circular Pool: {}'.format(ipaddr))
+        finally:
+            self._logger.debug('  >> Current CircularPool: allocated={} available={}'.format(ap_cpool.get_allocated(), ap_cpool.get_available()))
+
+
         # Synchronize connection with SYNPROXY module
         if (conn.outbound_port, conn.protocol) == (0 ,0):
             # This is an FQDN connection -> Reset TCP default options in SYNPROXY connection!
@@ -1128,13 +1150,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             # This is an (S)FQDN connection -> Remove from SYNPROXY!
             yield from self.network.synproxy_del_connection(conn.outbound_ip, conn.outbound_port, conn.protocol)
 
-        # Get RealmGateway connections
-        if self.connectiontable.has((connection.KEY_RGW, ipaddr)):
-            self._logger.debug('Cannot release IP address to Circular Pool: {} @ {} still in use for {:.3f} msec'.format(conn.fqdn, ipaddr, conn.age*1000))
-            return
-
-        ap_cpool.release(ipaddr)
-        self._logger.info('Released IP address to Circular Pool: {} @ {} in {:.3f} msec'.format(ipaddr, conn.fqdn, conn.age*1000))
 
     def _describe_service_data(self, service_data, partial_reuse=True):
         """ Return fqdn, sfqdn_reuse booleans according to service_data definition """
@@ -1156,38 +1171,48 @@ class PolicyBasedResourceAllocation(container3.Container):
         """ Returns a list of IPv4 address that can be overloaded """
         port, protocol = service_data['port'], service_data['protocol']
         self._logger.debug('Attempt to overload connection for {}:{}'.format(port, protocol))
-        # List of available addresses for reuse
+
+        # Create lists of addresses for comparison
         available = []
+        unavailable = []
 
         if not self.connectiontable.has(connection.KEY_RGW):
             return available
 
         # Iterate all RealmGateway connections and try to reuse existing allocated IP addresses
         rgw_conns = self.connectiontable.get(connection.KEY_RGW)
+        self._logger.debug('>> Existing connections \n{}'.format(utils3.repr_iterable_index(rgw_conns)))
         for conn in rgw_conns:
             ipaddr = conn.outbound_ip
             c_port, c_proto = conn.outbound_port, conn.protocol
             s_port, s_proto = port, protocol
 
-            # Do not iterate already available addresses
-            if ipaddr in available:
+            # Do not iterate already unavailable addresses
+            if ipaddr in unavailable:
                 continue
 
             self._logger.debug('Comparing {} vs {} @{}'.format((c_port, c_proto),(s_port, s_proto), ipaddr))
             # The following statements match when IP overloading cannot be performed
-            if (c_port == 0 and c_proto == 0) or (s_port == 0 and s_proto == 0):
+            if (c_port, c_proto) == (0, 0) or (s_port, s_proto) == (0, 0) or (c_port, c_proto) == (s_port, s_proto):
                 self._logger.debug('0. Port & Protocol blocked')
+                unavailable.append(ipaddr)
                 continue
             elif (c_port == s_port) and (c_proto == s_proto or c_proto == 0 or s_proto == 0):
                 self._logger.debug('1. Port blocked')
+                unavailable.append(ipaddr)
                 continue
             elif (c_proto == s_proto) and (c_port == 0 or s_port == 0):
                 self._logger.debug('2. Port blocked')
+                unavailable.append(ipaddr)
                 continue
 
-            available.append(ipaddr)
-        # Return list of available IP addresses for overload
-        return available
+            # The IP address could be used / Add only once
+            if ipaddr not in available:
+                self._logger.debug('Adding {} to overloading pool {}'.format(ipaddr, available))
+                available.append(ipaddr)
+
+        # Return available IP addresses that are not in the unavailable list
+        return [x for x in available if x not in unavailable]
 
     def _register_host_alias(self, host_obj, service_data, original_fqdn, alias_fqdn):
         # Add alias as SFQDN host service

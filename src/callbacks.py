@@ -648,17 +648,17 @@ class PacketCallbacks(object):
 
         # Build connection lookup keys
         # key1: Basic IP destination for early drop
-        key1 = (connection.KEY_RGW, dst)
+        key1 = (connection.KEY_RGW_PUBLIC_IP, dst)
         # key2: Full fledged 5-tuple (not in use by the system)
-        #key2 = (connection.KEY_RGW, dst, dport, src, sport, proto)
+        #key2 = (connection.KEY_RGW_5TUPLE, dst, dport, src, sport, proto)
         # key3: Semi-full fledged 3-tuple  (SFQDN+)
-        key3 = (connection.KEY_RGW, dst, dport, proto)
+        key3 = (connection.KEY_RGW_3TUPLE, dst, dport, proto)
         # key4: Basic 3-tuple with wildcards (SFQDN-)
-        key4 = (connection.KEY_RGW, dst, dport, 0)
+        key4 = (connection.KEY_RGW_3TUPLE, dst, dport, 0)
         # key5: Basic 3-tuple with wildcards (SFQDN-)
-        key5 = (connection.KEY_RGW, dst, 0, proto)
+        key5 = (connection.KEY_RGW_3TUPLE, dst, 0, proto)
         # key6: Basic 3-tuple with wildcards (FQDN)
-        key6 = (connection.KEY_RGW, dst, 0, 0)
+        key6 = (connection.KEY_RGW_3TUPLE, dst, 0, 0)
 
         # Lookup connection in table with basic key for for early drop
         if not self.connectiontable.has(key1):
