@@ -246,7 +246,12 @@ class AsyncSocketQueue(object):
 
     def _recv_callback(sock, queue, msgsize):
         # Socket is read-ready
-        queue.put_nowait(sock.recv(msgsize))
+        try:
+            data = sock.recv(msgsize)
+        except ConnectionRefusedError:
+            data = None
+        finally:
+            queue.put_nowait(data)
 
     async def recv(self):
         data = await self._queue.get()
