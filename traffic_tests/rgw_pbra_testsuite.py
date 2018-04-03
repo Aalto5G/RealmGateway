@@ -646,13 +646,14 @@ class RealDNSTraffic(_TestTraffic):
             task_type = kwargs['type']
             # Select parameters randomly
             dns_laddr, dns_raddr   = _get_service_tuple(kwargs['dns_laddr'],  kwargs['dns_raddr'])
-            data_laddr, data_raddr = _get_service_tuple([], kwargs['data_raddr'])
+            data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
             # Use timeout template(s)
             dns_timeouts = kwargs['dns_timeouts']
             # Log task parameters
-            task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
-                                                                     dns_raddr[0], dns_raddr[1], dns_raddr[2],
-                                                                     dns_timeouts)
+            task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={} // Data {}:{}/{}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
+                                                                                      dns_raddr[0], dns_raddr[1], dns_raddr[2],
+                                                                                      dns_timeouts,
+                                                                                      data_raddr[0], data_raddr[1], data_raddr[2])
             RealDNSTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
             # Build dictionary with selected parameters for running the task
             args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
@@ -838,7 +839,7 @@ class SpoofDNSTraffic(_TestTraffic):
             task_type = kwargs['type']
             # Select parameters randomly
             dns_laddr, dns_raddr   = _get_service_tuple(kwargs['dns_laddr'],  kwargs['dns_raddr'])
-            data_laddr, data_raddr = _get_service_tuple([], kwargs['data_raddr'])
+            data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
             # Pre-compute packet build to avoid lagging due to Scapy.
             ## Build query message
             interface = kwargs.get('interface', None)
@@ -849,9 +850,10 @@ class SpoofDNSTraffic(_TestTraffic):
             ## Encode/decode to base64 for obtaning str representation / serializable
             eth_pkt_str = base64.b64encode(bytes(eth_pkt)).decode('utf-8')
             # Log task parameters
-            task_str = 'DNS {}:{}/{} => {}:{}/{}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
-                                                         dns_raddr[0], dns_raddr[1], dns_raddr[2],
-                                                         )
+            task_str = 'SpoofDNS {}:{}/{} => {}:{}/{} // Data {}:{}/{} // via {}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
+                                                                                         dns_raddr[0], dns_raddr[1], dns_raddr[2],
+                                                                                         data_raddr[0], data_raddr[1], data_raddr[2],
+                                                                                         interface)
             SpoofDNSTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
             # Build dictionary with selected parameters for running the task
             args_d = {'task_nth': task_nth, 'task_type': task_type,
@@ -935,8 +937,9 @@ class SpoofDataTraffic(_TestTraffic):
             ## Encode/decode to base64 for obtaning str representation / serializable
             eth_pkt_str = base64.b64encode(bytes(eth_pkt)).decode('utf-8')
             # Log task parameters
-            task_str = 'SpoofData {}:{}/{} => {}:{}/{}'.format(data_laddr[0], data_laddr[1], data_laddr[2],
-                                                               data_raddr[0], data_raddr[1], data_raddr[2])
+            task_str = 'SpoofData {}:{}/{} => {}:{}/{} // via {}'.format(data_laddr[0], data_laddr[1], data_laddr[2],
+                                                                         data_raddr[0], data_raddr[1], data_raddr[2],
+                                                                         interface)
             SpoofDataTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
             # Build dictionary with selected parameters for running the task
             args_d = {'task_nth': task_nth, 'task_type': task_type,
@@ -1019,9 +1022,9 @@ class MainTestClient(object):
 
         # Define test test specific parameters
         type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts', 'data_delay']),
-                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_raddr', 'dns_timeouts']),
+                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts']),
                        'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
-                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_raddr', 'interface']),
+                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'interface']),
                        'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr', 'interface']),
                        }
 
