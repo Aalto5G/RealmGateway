@@ -528,7 +528,7 @@ class PolicyBasedResourceAllocation(container3.Container):
     * PBRA_DNS_POLICY_TCP establishes that incoming first queries must be carried via TCP
     * PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
         These two policies can be enabled or disabled independently
-    * PBRA_DNS_LOG_UNTRUSTED enables logging all untrsuted UDP DNS query attempts
+    * PBRA_DNS_LOG_UNTRUSTED enables logging all untrusted UDP DNS query attempts
     * PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
 
     # Load levels in 100% (Use -1 value in threshold parameter to disable step)
@@ -941,6 +941,28 @@ class PolicyBasedResourceAllocation(container3.Container):
         allocated_ipv4 = yield from self._unified_policy_circularpool(query, addr, host_obj, service_data, host_ipv4, sysload)
         return allocated_ipv4
 
+    def _normalize_reputation_values(self, a, b):
+        """
+        Return normalized values based on current reputation values.
+
+        The normalization problem arises because the policy ranges are defined in [0,1] interval.
+        It could be that our best reputation ~0.75 is not enough to meet the policy because of the [0,1] interval.
+        This would create an under-utilization of resources during high load intervals.
+
+        We opt to normalize the reputation in a new interval [0, max_reputation] to unlock resource access to the best reputed nodes.
+        """
+        # Get list of nodes
+        nodes = self.lookup(KEY_DNS_REPUTATION, update=False, check_expire=False)
+
+        # Obtain the highest reputation of the existing nodes
+        max_reputation = max(nodes, key=lambda node: node.reputation).reputation
+
+        ## Scale normalized [0,1] value to new range [x, y]
+        normalized_f = lambda value, x, y: (value * (y - x)) + x
+        a_norm = normalized_f(a, 0, max_reputation)
+        b_norm = normalized_f(b, 0, max_reputation)
+        return (a_norm, b_norm)
+
     def _policy_get_query_reputation(self, query, math):
         """ Return the maximum reputation value among DNS resolver and requestor """
         r_resolver = 0
@@ -948,7 +970,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         if query.reputation_resolver:
             r_resolver = query.reputation_resolver.reputation
         if query.reputation_requestor:
-            r_resolver = query.reputation_requestor.reputation
+            r_requestor = query.reputation_requestor.reputation
+
+        # Normalize reputation values
+        r_resolver, r_requestor = self._normalize_reputation_values(r_resolver, r_requestor)
+
         # Validate choice for math operation
         assert math in ('max', 'min', 'avg')
         if math == 'max':
