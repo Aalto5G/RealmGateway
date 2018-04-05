@@ -172,7 +172,7 @@ class uReputation(object):
 
 
 class uDNSQueryTimer(container3.ContainerNode):
-    TIMEOUT = 8.0
+    TIMEOUT = 5.0
 
     def __init__(self, query, ipaddr, service, alias_service, timeout=0):
         """ Initialize as a ContainerNode """
@@ -882,13 +882,8 @@ class PolicyBasedResourceAllocation(container3.Container):
         if timer_obj is None:
             # PBRA_DNS_POLICY_CNAME must not be enabled...
             return None
-        if rdtype not in timer_obj.cache:
-            # A record has not been allocated
-            return None
-
-        # Return cached record
-        allocated_ipv4 = timer_obj.cache[rdtype]
-        return allocated_ipv4
+        # Return cached record or None
+        return timer_obj.cache.get(rdtype, None)
 
     def _rgw_cache_set(self, fqdn, rdtype, rdata):
         """ Create a cached rdata for an fqdn/rdtype """
@@ -1264,15 +1259,22 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Update reputation values based on timer_obj utilization. DNS group must exists
         dnsgroup_obj = self.get((KEY_DNSGROUP_IPADDR, timer_obj.ipaddr))
         if not timer_obj.active:
+            """
+            This means that a CNAME service was allocated but never followed-through.
+            It could be due to a lost DNS response or else.
+            Also, if PBRA_DNS_POLICY_TCP is not set, we cannot ensure spoof free communications,
+            therefore attributing blame on someone could lead to badmouthing.
+            """
             # Timer could not be used. Do not blame any party
             self._logger.info('[--] Timer expired {}'.format(timer_obj))
-            pass
-        elif len(timer_obj.cache):
+        else:
+            """
+            This means that a CNAME service was allocated and resolved.
+            Whether or not the internal cache had any record should not matter to establish any
+            penalty on the reputation. If the CNAME was resolved, we deem this as an ok_event.
+            """
             self._logger.debug('[OK] Timer expired {}'.format(timer_obj))
             dnsgroup_obj.event_ok()
-        else:
-            self._logger.warning('[KO] Timer expired {}'.format(timer_obj))
-            dnsgroup_obj.event_nok()
 
         # Remove alias FQDN service from host
         host_obj.remove_service(KEY_SERVICE_SFQDN, timer_obj.alias_service)
