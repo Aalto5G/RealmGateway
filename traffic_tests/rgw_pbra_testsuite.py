@@ -393,7 +393,7 @@ def _scapy_build_packet(src, dst, proto, sport, dport, payload=b''):
     if sport == 0:
         sport = random.randint(1,65535)
     if dport == 0:
-        dport = random.randint(1,65535)
+        dport = get_deterministic_port(proto)
     if proto == 6:
         layer_4 = TCP(sport=sport, dport=dport, seq=random.randint(1,2**32-1))
     elif proto == 17:
