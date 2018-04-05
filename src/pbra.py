@@ -681,6 +681,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Collect metadata from DNS query related to requestor based on DNS options (EDNS0)
         dnshost_obj = None
         meta_ipaddr = None
+        meta_mask = None
         meta_ncid = None
         meta_flag = False
 
@@ -1100,22 +1101,27 @@ class PolicyBasedResourceAllocation(container3.Container):
         if conn.hasexpired():
             # Connection expired
             self._logger.warning('Connection expired: {} in {:.3f} msec (id {})'.format(conn, conn.age*1000, conn.query.id))
-            # Blame attribution to DNS resolver and requestor
-            self._logger.debug('  >> Blame attribution!')
-            # Register a nok event
-            if conn.query.reputation_resolver is not None:
-                conn.query.reputation_resolver.event_nok()
-            if conn.query.reputation_requestor is not None:
+            # Blame attribution to DNS resolver and requestor - register a nok event
+            """
+            If the DNS server is SLA and there exists DNS client information -> conn.dns_bind is True, penalize only the DNS client.
+            If the DNS server is not SLA, cannot be trusted about the DNS client information, penalize only the DNS server.
+            Penalizing only the DNS server creates incentives towards SLA-agreements.
+            """
+            if conn.dns_bind and conn.query.reputation_requestor is not None:
+                self._logger.warning('  >> Blame DNS client!')
                 conn.query.reputation_requestor.event_nok()
+            elif conn.query.reputation_resolver is not None:
+                self._logger.warning('  >> Blame DNS server!')
+                conn.query.reputation_resolver.event_nok()
         else:
             # Connection was used
             self._logger.debug('Connection used: {} in {:.3f} msec '.format(conn, conn.age*1000))
-            # Success attribution to DNS resolver and requestor
-            self._logger.debug('  >> Success attribution!')
-            ## Register an ok event
+            # Success attribution to DNS resolver and requestor - register an ok event
             if conn.query.reputation_resolver is not None:
+                self._logger.debug('  >> Success DNS server!')
                 conn.query.reputation_resolver.event_ok()
             if conn.query.reputation_requestor is not None:
+                self._logger.debug('  >> Success DNS client!')
                 conn.query.reputation_requestor.event_ok()
 
         """
