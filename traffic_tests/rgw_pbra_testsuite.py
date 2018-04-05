@@ -104,6 +104,7 @@ import yaml
 import dns
 import dns.message
 import dns.edns
+import dns.inet
 import dns.rdataclass
 import dns.rdatatype
 
@@ -268,6 +269,83 @@ class AsyncSocketQueue(object):
         del self._sock
         del self._queue
 
+# Currently copied from official Github repo until included in the next release
+ECS = 8
+class EDNS0_ECSOption(dns.edns.Option):
+    """EDNS Client Subnet (ECS, RFC7871)"""
+
+    def __init__(self, address, srclen=None, scopelen=0):
+        """*address*, a ``text``, is the client address information.
+        *srclen*, an ``int``, the source prefix length, which is the
+        leftmost number of bits of the address to be used for the
+        lookup.  The default is 24 for IPv4 and 56 for IPv6.
+        *scopelen*, an ``int``, the scope prefix length.  This value
+        must be 0 in queries, and should be set in responses.
+        """
+
+        super(EDNS0_ECSOption, self).__init__(ECS)
+        af = dns.inet.af_for_address(address)
+
+        if af == dns.inet.AF_INET6:
+            self.family = 2
+            if srclen is None:
+                srclen = 56
+        elif af == dns.inet.AF_INET:
+            self.family = 1
+            if srclen is None:
+                srclen = 24
+        else:
+            raise ValueError('Bad ip family')
+
+        self.address = address.decode() if type(address) is bytes else address
+        self.srclen = srclen
+        self.scopelen = scopelen
+
+        addrdata = dns.inet.inet_pton(af, address)
+        nbytes = int(math.ceil(srclen/8.0))
+
+        # Truncate to srclen and pad to the end of the last octet needed
+        # See RFC section 6
+        self.addrdata = addrdata[:nbytes]
+        nbits = srclen % 8
+        if nbits != 0:
+            last = struct.pack('B', ord(self.addrdata[-1:]) & (0xff << nbits))
+            self.addrdata = self.addrdata[:-1] + last
+
+    def to_text(self):
+        return 'ECS {}/{} scope/{}'.format(self.address, self.srclen, self.scopelen)
+
+    def to_wire(self, file):
+        file.write(struct.pack('!H', self.family))
+        file.write(struct.pack('!BB', self.srclen, self.scopelen))
+        file.write(self.addrdata)
+
+    @classmethod
+    def from_wire(cls, otype, wire, cur, olen):
+        family, src, scope = struct.unpack('!HBB', wire[cur:cur+4])
+        cur += 4
+
+        addrlen = int(math.ceil(src/8.0))
+
+        if family == 1:
+            af = dns.inet.AF_INET
+            pad = 4 - addrlen
+        elif family == 2:
+            af = dns.inet.AF_INET6
+            pad = 16 - addrlen
+        else:
+            raise ValueError('unsupported family')
+
+        addr = dns.inet.inet_ntop(af, wire[cur:cur+addrlen] + b'\x00' * pad)
+        return cls(addr, src, scope)
+
+    def _cmp(self, other):
+        if self.addrdata == other.addrdata:
+            return 0
+        if self.addrdata > other.addrdata:
+            return 1
+        return -1
+
 
 async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
     """
@@ -318,7 +396,7 @@ async def _sendrecv(data, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=
     return (recvdata, attempt)
 
 
-async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True):
+async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuseaddr=True, client_addr=None, client_mask=None):
     """
     fqdn: Domain name to be resolved
     raddr: Remote tuple information
@@ -335,7 +413,10 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
     response = None
 
     # Build query message
-    query = dns.message.make_query(fqdn, rdtype, rdclass)
+    options = []
+    if client_addr is not None:
+        options.append(EDNS0_ECSOption(client_addr, srclen=client_mask, scopelen=0))
+    query = dns.message.make_query(fqdn, rdtype, rdclass, options=options)
     query.id = get_deterministic_queryid()
 
     if socktype == 'udp':
@@ -351,7 +432,7 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
         # Check if response is truncated and retry in TCP with a recursive call
         if (response.flags & dns.flags.TC == dns.flags.TC):
             logger.debug('Truncated response, reattempt via TCP: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
-            return await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr)
+            return await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr, client_addr=None, client_mask=None)
 
     elif socktype == 'tcp':
         _data = query.to_wire()
@@ -382,7 +463,7 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
             if rdata.rdtype == dns.rdatatype.CNAME:
                 target = rdata.to_text()
                 logger.debug('Resolution continues: {} via {}:{} > {}:{} ({}) yielded {}'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype, target))
-                return await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp', reuseaddr=reuseaddr)
+                return await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp', reuseaddr=reuseaddr, client_addr=None, client_mask=None)
 
     # Resolution did not succeed
     logger.debug('Resolution failed: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
@@ -565,8 +646,8 @@ class RealDNSDataTraffic(_TestTraffic):
 
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = await _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
-                                                                         reuseaddr=reuseaddr)
+                                                                    timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                    reuseaddr=reuseaddr, client_addr=data_lipaddr, client_mask=24)
 
         # Populate partial results
         ts_end = _now()
@@ -694,11 +775,12 @@ class RealDNSTraffic(_TestTraffic):
         dns_sockettype = 'tcp' if dns_rproto == 6 else 'udp'
 
         # Unpack Data related data
-        data_fqdn, data_rport, data_rproto = data_raddr
+        data_fqdn,    data_rport, data_rproto = data_raddr
+        data_lipaddr, data_lport, data_lproto = data_laddr
         ## Run DNS resolution
         data_ripaddr, query_id, dns_attempts = await _gethostbyname(data_fqdn, (dns_ripaddr, dns_rport), (dns_lipaddr, dns_lport),
-                                                                         timeouts=dns_timeouts, socktype=dns_sockettype,
-                                                                         reuseaddr=reuseaddr)
+                                                                    timeouts=dns_timeouts, socktype=dns_sockettype,
+                                                                    reuseaddr=reuseaddr, client_addr=data_lipaddr, client_mask=24)
 
         # Populate partial results
         ts_end = _now()
