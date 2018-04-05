@@ -432,7 +432,7 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
         # Check if response is truncated and retry in TCP with a recursive call
         if (response.flags & dns.flags.TC == dns.flags.TC):
             logger.debug('Truncated response, reattempt via TCP: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
-            return await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr, client_addr=None, client_mask=None)
+            return await _gethostbyname(fqdn, raddr, laddr, timeouts, socktype='tcp', reuseaddr=reuseaddr, client_addr=client_addr, client_mask=client_mask)
 
     elif socktype == 'tcp':
         _data = query.to_wire()
@@ -463,7 +463,7 @@ async def _gethostbyname(fqdn, raddr, laddr, timeouts=[0], socktype='udp', reuse
             if rdata.rdtype == dns.rdatatype.CNAME:
                 target = rdata.to_text()
                 logger.debug('Resolution continues: {} via {}:{} > {}:{} ({}) yielded {}'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype, target))
-                return await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp', reuseaddr=reuseaddr, client_addr=None, client_mask=None)
+                return await _gethostbyname(target, raddr, laddr, timeouts, socktype='udp', reuseaddr=reuseaddr, client_addr=client_addr, client_mask=client_mask)
 
     # Resolution did not succeed
     logger.debug('Resolution failed: {} via {}:{} > {}:{} ({})'.format(fqdn, laddr[0], laddr[1], raddr[0], raddr[1], socktype))
