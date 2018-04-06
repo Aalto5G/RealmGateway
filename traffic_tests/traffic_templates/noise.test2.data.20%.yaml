@@ -36,6 +36,6 @@ global_traffic:
 
 # This models all the test traffic
 traffic:
-    - {type: "dnsdata",   load: 30,  distribution: "exp"}
+    #- {type: "dnsdata",   load: 30,  distribution: "exp"}
     # 20% noise level
     - {type: "data",      load: 6.0, distribution: "exp"}
