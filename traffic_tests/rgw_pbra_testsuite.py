@@ -1078,19 +1078,28 @@ class MainTestClient(object):
         # Create list to store the schedule tasks
         self.scheduled_tasks = []
 
-        if self.args.config:
+        # Iterate configuration file(s) and add to scheduled tasks
+        for filename in self.args.config:
             # Read YAML configuration file
-            with open(self.args.config, 'r') as infile:
+            with open(filename, 'r') as infile:
                 config_d = yaml.load(infile)
-            # Populate self.scheduled_tasks with scheduled test instances
-            self._create_schedule_session(config_d)
-            # Dump tasks to json
-            self._dump_session_to_json(self.scheduled_tasks)
+            # Return a list of tasks with scheduled test instances
+            task_list = self._create_schedule_session(config_d)
+            self.logger.warning('Scheduled {} task(s) from config file {}'.format(len(task_list), filename))
+            self.scheduled_tasks += task_list
 
-        elif self.args.session:
+        # Iterate session file(s) and add to scheduled tasks
+        for filename in self.args.session:
             # Read JSON session schedule
-            with open(self.args.session, 'r') as infile:
-                self.scheduled_tasks = json.load(infile)
+            with open(filename, 'r') as infile:
+                task_list = json.load(infile)
+            self.logger.warning('Scheduled {} task(s) from session file {}'.format(len(task_list), filename))
+            self.scheduled_tasks += task_list
+
+        self.logger.warning('Processing {} task(s) in total!'.format(len(self.scheduled_tasks)))
+
+        # Dump session tasks to json
+        self._dump_session_to_json(self.scheduled_tasks)
 
         # Continue with ready session
         # Spawn test session
@@ -1103,6 +1112,7 @@ class MainTestClient(object):
         duration = config_d['duration']
         ts_backoff = config_d['backoff']
         ts_start = _now() + ts_backoff
+        task_list = []
 
         self.logger.warning('({:.3f}) Starting task generation!'.format(_now(TS_ZERO)))
         self.logger.warning('({:.3f}) Scheduling first task @{}!'.format(_now(TS_ZERO), ts_backoff))
@@ -1131,11 +1141,12 @@ class MainTestClient(object):
                 item_d.setdefault(p, global_param_d)
 
             # Append scheduled tasks to local list
-            self.scheduled_tasks += cls.schedule_tasks(**item_d)
+            task_list += cls.schedule_tasks(**item_d)
 
-        self.logger.warning('({:.3f}) Terminated generation of {} tasks'.format(_now(TS_ZERO), len(self.scheduled_tasks)))
+        self.logger.warning('({:.3f}) Terminated generation of {} tasks'.format(_now(TS_ZERO), len(task_list)))
+        return task_list
 
-    def _spawn_test_session(self, session_d):
+    def _spawn_test_session(self, tasks):
         # TODO: Use parameters defined in globals as base, then overwrite with test specific?
         global TS_ZERO
         ts_start = _now()
@@ -1148,7 +1159,7 @@ class MainTestClient(object):
                     'dataspoof': SpoofDataTraffic,
                     }
 
-        for entry in session_d:
+        for entry in tasks:
             # Obtain parameters from entry
             offset = entry['offset']
             cls    = type2cls[entry['cls']]
@@ -1205,18 +1216,20 @@ class MainTestClient(object):
             dns_3 = len([1 for _ in data_l if _get_data_dict(_,['metadata','dns_success'],False) == True and _get_data_dict(_,['metadata','dns_attempts'],0) == 3])
             dns_4 = len([1 for _ in data_l if _get_data_dict(_,['metadata','dns_success'],False) == True and _get_data_dict(_,['metadata','dns_attempts'],0) == 4])
             dns_5 = len([1 for _ in data_l if _get_data_dict(_,['metadata','dns_success'],False) == True and _get_data_dict(_,['metadata','dns_attempts'],0) == 5])
+            #
+            filename = '{}.csv'.format(self.args.results)
             # Create comma separated line matching header_fmt
             line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,total,success,failure,
-                                                                   dns_success,dns_failure,
-                                                                   dns_1,dns_2,dns_3,dns_4,dns_5,
-                                                                   data_success,data_failure,
-                                                                   self.args.results+'.csv')
+                                                                      dns_success,dns_failure,
+                                                                      dns_1,dns_2,dns_3,dns_4,dns_5,
+                                                                      data_success,data_failure,
+                                                                      filename)
             lines.append(line)
             # Log via console
             self.logger.warning('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
         # Add extra line for file merge
         lines.append('')
-        # Save results to file in csv
+        # Save results to file in CSV
         if self.args.results:
             filename = self.args.results + '.summary.csv'
             self.logger.warning('Writing results to file <{}>'.format(filename))
@@ -1274,10 +1287,11 @@ class MainTestClient(object):
 
     def _dump_session_to_json(self, tasks):
         # Save scheduled session tasks to file in json
-        filename = self.args.config + '.session.json'
-        self.logger.warning('Writing session tasks to file <{}>'.format(filename))
-        with open(filename, 'w') as outfile:
-            json.dump(tasks, outfile)
+        if self.args.session_name:
+            filename = self.args.session_name
+            self.logger.warning('Writing session tasks to file <{}>'.format(filename))
+            with open(filename, 'w') as outfile:
+                json.dump(tasks, outfile)
 
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -1297,11 +1311,13 @@ def setup_logging_yaml(default_path='logging.yaml',
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Realm Gateway Traffic Test Suite v0.1')
-    parser.add_argument('--config', type=str, default=None, required=False,
-                        help='Input configuration file (yaml)')
-    parser.add_argument('--session', type=str, default=None, required=False,
-                        help='Input session file (json)')
-    parser.add_argument('--results', type=str, required=False,
+    parser.add_argument('--config', type=str, nargs='*', default=[],
+                        help='Input configuration file(s) (yaml)')
+    parser.add_argument('--session', type=str, nargs='*', default=[],
+                        help='Input session file(s) (json)')
+    parser.add_argument('--session-name', type=str,
+                        help='Output session file (json)')
+    parser.add_argument('--results', type=str,
                         help='Output results file (json)')
     args = parser.parse_args()
     # Validate args
