@@ -1101,6 +1101,10 @@ class MainTestClient(object):
         # Dump session tasks to json
         self._dump_session_to_json(self.scheduled_tasks)
 
+        if self.args.dry_run:
+            self.logger.warning('Executing in dry-run mode!')
+            return
+
         # Continue with ready session
         # Spawn test session
         self._spawn_test_session(self.scheduled_tasks)
@@ -1143,8 +1147,31 @@ class MainTestClient(object):
             # Append scheduled tasks to local list
             task_list += cls.schedule_tasks(**item_d)
 
+        # Normalize task offset according to test duration
+        self._normalize_tasklist(task_list, duration + ts_backoff)
+
         self.logger.warning('({:.3f}) Terminated generation of {} tasks'.format(_now(TS_ZERO), len(task_list)))
         return task_list
+
+    def _normalize_tasklist(self, tasks, duration):
+        """ Normalize scheduled task list up to duration """
+        # Define lambda functions
+        sort_key = lambda x:x['offset']
+        norm_01  = lambda _data,_min,_range: (_data - _min) / _range
+        norm_xy  = lambda _data,_min,_max:   (_data * (_max - _min)) + _min
+
+        # Normalize values to [0 ,1]
+        _min = sort_key(min(tasks, key=sort_key))
+        _max = sort_key(max(tasks, key=sort_key))
+        _range = _max - _min;
+
+        for t in tasks:
+            offset = t['offset']
+            offset_01 = norm_01(offset, _min, _range)
+            offset_xy = norm_xy(offset_01, _min, duration)
+            t['offset'] = offset_xy
+
+        self.logger.warning('Normalized scheduled events to test duration. Corrected from {:.3f} to {:.3f} ({:.3f}%)'.format(_max, duration, (duration/_max*100)-100))
 
     def _spawn_test_session(self, tasks):
         # TODO: Use parameters defined in globals as base, then overwrite with test specific?
@@ -1319,6 +1346,8 @@ def parse_arguments():
                         help='Output session file (json)')
     parser.add_argument('--results', type=str,
                         help='Output results file (json)')
+    parser.add_argument('--dry-run', dest='dry_run', action='store_true',
+                        help='Execute in dry run mode')
     args = parser.parse_args()
     # Validate args
     assert (args.config or args.session)
