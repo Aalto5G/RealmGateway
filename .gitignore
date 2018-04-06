@@ -1,3 +1,6 @@
+# Custom folders
+traffic_tests/traffic_results
+
 # Windows files
 images/Thumbs.db
 
