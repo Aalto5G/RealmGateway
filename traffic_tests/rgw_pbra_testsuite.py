@@ -1187,7 +1187,7 @@ class MainTestClient(object):
 
         # Create list of lines to save result statistics
         lines = []
-        header_fmt = 'name,total,success,failure,dns_success,dns_failure,dns_1,dns_2,dns_3,dns_4,dns_5,data_success,data_failure'
+        header_fmt = 'name,total,success,failure,dns_success,dns_failure,dns_1,dns_2,dns_3,dns_4,dns_5,data_success,data_failure,file'
         lines.append(header_fmt)
 
         for data_key, data_l in results_d.items():
@@ -1206,14 +1206,16 @@ class MainTestClient(object):
             dns_4 = len([1 for _ in data_l if _get_data_dict(_,['metadata','dns_success'],False) == True and _get_data_dict(_,['metadata','dns_attempts'],0) == 4])
             dns_5 = len([1 for _ in data_l if _get_data_dict(_,['metadata','dns_success'],False) == True and _get_data_dict(_,['metadata','dns_attempts'],0) == 5])
             # Create comma separated line matching header_fmt
-            line = '{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,total,success,failure,
+            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(name,total,success,failure,
                                                                    dns_success,dns_failure,
                                                                    dns_1,dns_2,dns_3,dns_4,dns_5,
-                                                                   data_success,data_failure)
+                                                                   data_success,data_failure,
+                                                                   self.args.results+'.csv')
             lines.append(line)
             # Log via console
             self.logger.warning('{0: <10}\tsuccess={1}\tfailure={2}\tdns_success={3}\tdns_failure={4}\tdns_rtx={5}'.format(name, success, failure, dns_success, dns_failure, (dns_1,dns_2,dns_3,dns_4,dns_5)))
-
+        # Add extra line for file merge
+        lines.append('')
         # Save results to file in csv
         if self.args.results:
             filename = self.args.results + '.summary.csv'
@@ -1227,7 +1229,7 @@ class MainTestClient(object):
 
         # Create list of lines to save result statistics
         lines = []
-        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_start,dns_end,dns_duration,data_success,data_attempts,data_start,data_end,data_duration,debug'
+        header_fmt = 'name,success,ts_start,ts_end,duration,dns_success,dns_attempts,dns_start,dns_end,dns_duration,data_success,data_attempts,data_start,data_end,data_duration'
         lines.append(header_fmt)
 
         for result_d in RESULTS:
@@ -1247,14 +1249,13 @@ class MainTestClient(object):
             data_start    = metadata_d.get('data_start', '')
             data_end      = metadata_d.get('data_end', '')
             data_duration = metadata_d.get('data_duration', '')
-            debug         = 'dns_laddr={}'.format(metadata_d.get('dns_laddr', ''))
-            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(
+            line = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}'.format(
                      name,success,ts_start,ts_end,duration,
                      dns_success,dns_attempts,dns_start,dns_end,dns_duration,
-                     data_success,data_attempts,data_start,data_end,data_duration,
-                     debug)
+                     data_success,data_attempts,data_start,data_end,data_duration)
             lines.append(line)
-
+        # Add extra line for file merge
+        lines.append('')
         # Save results to file in csv
         if self.args.results:
             filename = self.args.results + '.csv'
