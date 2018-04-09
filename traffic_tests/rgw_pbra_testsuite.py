@@ -1056,7 +1056,7 @@ class SpoofDNSTraffic(_TestTraffic):
             ## Build query message
             interface = kwargs.get('interface', None)
             edns_options = kwargs.get('edns_options', [])
-            query = _make_query(fqdn, dns.rdatatype.A, dns.rdataclass.IN, 'udp', dns_laddr[0], 24, edns_options)
+            query = _make_query(data_raddr[0], dns.rdatatype.A, dns.rdataclass.IN, 'udp', dns_laddr[0], 24, edns_options)
             data_b = query.to_wire()
             eth_pkt = _scapy_build_packet(dns_laddr[0], dns_raddr[0], dns_raddr[2], dns_laddr[1], dns_raddr[1], data_b)
             ## Encode/decode to base64 for obtaning str representation / serializable
