@@ -1247,27 +1247,28 @@ class MainTestClient(object):
         self.logger.warning('({:.3f}) Scheduling first task @{}!'.format(_now(TS_ZERO), ts_backoff))
 
         # Define test test specific parameters
-        type2config = {'dnsdata':   (RealDNSDataTraffic, ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts', 'data_timeouts', 'data_delay']),
-                       'dns':       (RealDNSTraffic,     ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'dns_timeouts']),
-                       'data':      (RealDataTraffic,    ['data_laddr', 'data_raddr', 'data_timeouts']),
-                       'dnsspoof':  (SpoofDNSTraffic,    ['dns_laddr', 'dns_raddr', 'data_laddr', 'data_raddr', 'interface']),
-                       'dataspoof': (SpoofDataTraffic,   ['data_laddr', 'data_raddr', 'interface']),
+        type2config = {'dnsdata':   RealDNSDataTraffic,
+                       'dns':       RealDNSTraffic,
+                       'data':      RealDataTraffic,
+                       'dnsspoof':  SpoofDNSTraffic,
+                       'dataspoof': SpoofDataTraffic,
                        }
 
         for item_d in config_d['traffic']:
-            # Get class and config parameters
-            cls, parameters = type2config[item_d['type']]
+            # Get global parameters for given traffic type
+            traffic_type = item_d['type']
+            global_traffic_d = config_d.get('global_traffic', {})
+            global_item_d    = global_traffic_d.get(traffic_type, {})
+            # Set global parameters if not defined in test
+            for k, v in global_item_d.items():
+                item_d.setdefault(k, v)
 
-            # Add globals to parameter dictionary if test specific are not defined
+            # Set specific parameters if not defined in the test
+            item_d['ts_start'] = ts_start + item_d.setdefault('ts_start', 0)
             item_d.setdefault('duration', duration)
-            ts_start_test = item_d.setdefault('ts_start', 0)
-            item_d['ts_start'] = ts_start + ts_start_test
 
-            # Use global settings if test-specific are not defined
-            # TODO: Do this automatically! Iterate globals and setdefault the parameters
-            for p in parameters:
-                global_param_d = _get_data_dict(config_d, ['global_traffic',item_d['type'], p], [])
-                item_d.setdefault(p, global_param_d)
+            # Get class and config parameters
+            cls = type2config[traffic_type]
 
             # Append scheduled tasks to local list
             task_list += cls.schedule_tasks(**item_d)
