@@ -239,7 +239,7 @@ class uStateDNSHost(container3.ContainerNode):
         keys = []
         # Typical keys of an advertised DNS host and data host
         keys.append(((KEY_DNSHOST_IPADDR, self.ipaddr), True))
-        keys.append(((KEY_DNSHOST_NCID, self.ncid), True))
+        #keys.append(((KEY_DNSHOST_NCID, self.ncid), True))
         # Common key for indexing all reputation objects
         keys.append((KEY_DNS_REPUTATION, False))
         return keys
