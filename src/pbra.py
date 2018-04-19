@@ -723,6 +723,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             dnshost_obj = uStateDNSHost(ipaddr = meta_ipaddr, ipaddr_mask = meta_mask)
             self.add(dnshost_obj)
 
+        '''
         # Needs to be tested
         elif self.has((KEY_DNSHOST_NCID, ncid_lookupkey)):
             # Get existing object
@@ -733,7 +734,7 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.info('Create uStateDNSHost for requestor ncid={}@{}'.format(meta_ncid, addr[0]))
             dnshost_obj = uStateDNSHost(ncid = ncid_lookupkey)
             self.add(dnshost_obj)
-
+        '''
         # Add reputation to the DNS query
         query.reputation_requestor = dnshost_obj
 
@@ -769,7 +770,8 @@ class PolicyBasedResourceAllocation(container3.Container):
 
         # Load available reputation metadata in query object
         self._load_metadata_resolver(query, addr, create=self.PBRA_DNS_LOG_UNTRUSTED)
-        self._load_metadata_requestor(query, addr, create=False)
+        # Create always reputation information (it will be used depending on the policy)
+        self._load_metadata_requestor(query, addr, create=True)
 
         # Log untrusted requests
         self._dns_preprocess_rgw_wan_soa_event_logging(query, alias)
@@ -825,9 +827,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             self._logger.debug('Create CNAME response / {}'.format(alias_service_data))
             # Return CNAME response
             return response
-
-        # Query is trusted, load/create metadata related to requestor
-        self._load_metadata_requestor(query, addr, create=True)
 
         # Evaluate seen IP addresses for current FQDN
         timer_obj = self.get((KEY_TIMER_FQDN, fqdn))
