@@ -573,8 +573,6 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Set all existing values of the policy
         kwargs = cpool_policy['CONTROL_VARIABLES']
         utils3.set_attributes(self, override=True, **kwargs)
-        # Reverse sort SYSTEM_LOAD levels for sanity
-        self.SYSTEM_LOAD = sorted(self.SYSTEM_LOAD, key=lambda entry: entry['threshold'], reverse=True)
 
         # Show running control variables
         self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_TCPCNAME', self.PBRA_DNS_POLICY_TCPCNAME))
@@ -951,18 +949,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         b_norm = normalized_f(b, 0, max_reputation)
         return (a_norm, b_norm)
 
-    def _policy_get_query_reputation(self, query, math):
-        """ Return the maximum reputation value among DNS resolver and requestor """
-        r_resolver = 0
-        r_requestor = 0
-        if query.reputation_resolver:
-            r_resolver = query.reputation_resolver.reputation
-        if query.reputation_requestor:
-            r_requestor = query.reputation_requestor.reputation
-
-        # Normalize reputation values
-        r_resolver, r_requestor = self._normalize_reputation_values(r_resolver, r_requestor)
-
+    def _compute_policy_math_reputation(self, r_resolver, r_requestor, math):
         # Validate choice for math operation
         assert math in ('max', 'min', 'avg')
         if math == 'max':
@@ -989,20 +976,41 @@ class PolicyBasedResourceAllocation(container3.Container):
         fqdn, sfqdn_reuse = self._describe_service_data(service_data, partial_reuse=False)
         sfqdn = not fqdn
 
+        # Calculate normalized reputations for a query
+        r_resolver = 0
+        r_requestor = 0
+        if query.reputation_resolver:
+            r_resolver = query.reputation_resolver.reputation
+        if query.reputation_requestor:
+            r_requestor = query.reputation_requestor.reputation
+
+        # Normalize reputation values
+        r_resolver, r_requestor = self._normalize_reputation_values(r_resolver, r_requestor)
+
+        # Define allocation service for easy logging
+        if fqdn:
+            service_alloc = 'fqdn_new'
+        elif sfqdn and not sfqdn_reuse:
+            service_alloc = 'sfqdn_new'
+        elif sfqdn and sfqdn_reuse:
+            service_alloc = 'sfqdn_reuse'
+        else:
+            raise Exception('Programming error')
+
         # Obtain load policy parameters
         if self.PBRA_DNS_LOAD_POLICING is False:
             # Use best effort policy all the way
             load_policies = [{'threshold': -1, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'}]
             self._logger.debug('System load at {:.2f}%% / Best effort allocation'.format(sysload))
         else:
-            load_policies = [entry for entry in self.SYSTEM_LOAD if sysload>=entry['threshold']]
+            load_policies = [entry for entry in self.SYSTEM_LOAD if entry['threshold'] >= sysload]
             self._logger.debug('System load at {:.2f}%% / Attempting match of {} policy(ies)'.format(sysload, len(load_policies)))
 
         for i, policy in enumerate(load_policies):
-            self._logger.warning('[{}/{}] Testing policy / {}'.format(i+1, len(load_policies), policy))
+            self._logger.debug('[{}/{}] Testing policy / {}'.format(i+1, len(load_policies), policy))
 
-            # Calculate values for policy match
-            reputation = self._policy_get_query_reputation(query, policy['math'])
+            # Calculate values for policy math
+            reputation = self._compute_policy_math_reputation(r_resolver, r_requestor, policy['math'])
 
             # 1. Minimum reputation is required for allocating a new IP address for an FQDN service
             if fqdn and reputation >= policy['fqdn_new']:
@@ -1023,35 +1031,10 @@ class PolicyBasedResourceAllocation(container3.Container):
                 return allocated_ipv4
 
             # Fine-grained logging of policy violation
-            elif fqdn:
-                self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'fqdn_new', reputation, policy['fqdn_new']))
-            elif sfqdn and not sfqdn_reuse:
-                self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_new', reputation, policy['sfqdn_new']))
-            elif sfqdn and sfqdn_reuse:
-                self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_reuse', reputation, policy['sfqdn_reuse']))
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, service_alloc, reputation, policy[service_alloc]))
 
         # No policy could be executed
         return None
-
-    def _policy_get_max_reputation(self, query):
-        """ Return the maximum reputation value among DNS resolver and requestor """
-        r_resolver = 0
-        r_requestor = 0
-        if query.reputation_resolver:
-            r_resolver = query.reputation_resolver.reputation
-        if query.reputation_requestor:
-            r_resolver = query.reputation_requestor.reputation
-        return max(r_resolver, r_requestor)
-
-    def _policy_get_min_reputation(self, query):
-        """ Return the minimum reputation value among DNS resolver and requestor """
-        r_resolver = 0
-        r_requestor = 0
-        if query.reputation_resolver:
-            r_resolver = query.reputation_resolver.reputation
-        if query.reputation_requestor:
-            r_resolver = query.reputation_requestor.reputation
-        return min(r_resolver, r_requestor)
 
     @asyncio.coroutine
     def _best_effort_allocate(self, query, addr, host_obj, service_data, host_ipv4):
@@ -1062,6 +1045,16 @@ class PolicyBasedResourceAllocation(container3.Container):
         # Get Circular Pool address pool stats
         ap_cpool = self.pooltable.get('circularpool')
         pool_size, pool_allocated, pool_available = ap_cpool.get_stats()
+
+        # Get related DNS metadata
+        dns_resolver = addr[0]
+        dns_host = query.reputation_requestor
+        dns_bind = False
+        # Create DNS bound connection if all parameters are available
+        if query.reputation_resolver is None or dns_host is None:
+            dns_bind = False
+        elif query.reputation_resolver.sla and dns_host.ipaddr:
+            dns_bind = True
 
         # Get list of reusable addresses
         reuse_ipaddr_l = self._connection_circularpool_get_overloadable(service_data)
@@ -1075,18 +1068,9 @@ class PolicyBasedResourceAllocation(container3.Container):
             allocated_ipv4 = ap_cpool.allocate()
             self._logger.debug('Allocated address from CircularPool: {} / allocated={} available={}'.format(allocated_ipv4, ap_cpool.get_allocated(), ap_cpool.get_available()))
         else:
-            self._logger.warning('Failed to allocate a new address from CircularPool: {} @ N/A'.format(fqdn_alias))
+            _dns_host_ipaddr = dns_host.ipaddr if dns_host else None
+            self._logger.warning('Failed to allocate a new address from CircularPool: {} for {} @ {}'.format(fqdn_alias, _dns_host_ipaddr, dns_resolver))
             return None
-
-
-        dns_resolver = addr[0]
-        dns_host = query.reputation_requestor
-        dns_bind = False
-        # Create DNS bound connection if all parameters are available
-        if query.reputation_resolver is None or dns_host is None:
-            dns_bind = False
-        elif query.reputation_resolver.sla and dns_host.ipaddr:
-            dns_bind = True
 
         # Continue to creating the connection
         # Create RealmGateway connection
