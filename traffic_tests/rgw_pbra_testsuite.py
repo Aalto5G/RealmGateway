@@ -16,73 +16,6 @@ We consider the following types of traffic:
 
 
 ####################################################################################################
-
-#1. Legitimate DNS+data clients
-We distinguish 2 phases:
-a. DNS resolution: Resolve an FQDN issuing an A query request to a DNS server.
-b. Data transfer: Begin an echo client instance (TCP/UDP) to the given IP address and port.
-
-
-#2. Legitimate DNS clients
-a. DNS resolution: Resolve an FQDN issuing an A query request to a DNS server.
-
-
-#3. Legitimate data clients
-b. Data transfer: Begin an echo client instance (TCP/UDP) to the given IP address and port.
-
-
-#4. Spoofed DNS clients
-c. Spoofed DNS resolution: Resolve an FQDN issuing an A query request to a DNS server impersonating another host/server.
-This is a special case because impersonating a DNS resolver we could try to fake DNS options to also affect reputation of a host.
-We use Scapy for packet manipulation.
-
-#5. Spoofed data clients
-d. Spoofed data transfer: Send TCP SYN or UDP messages as an echo client instance to the given IP address and port.
-We use Scapy for packet manipulation.
-
-
-How do we mix all of this in the same program?
-We define the requirements for actions {a,b,c,d} separately.
-
-#a. DNS resolution
- - FQDN
- - Query type fixed to A and recursive enabled
- - Source socket address
- - Remote socket address
- - Retransmission scheme
-
-#b. Data transfer
- - Source socket address
- - Remote socket address
- - Protocol
- - Retransmission scheme
-
-#c. Spoofed DNS resolution
- - FQDN
- - Query type fixed to A and recursive enabled
- - EDNS0 options?
- - Source socket address
- - Remote socket address
- - Retransmission scheme ?
- - Implementation details:
-    + Use the same code as "a. DNS resolution" from a *fake* IP source
-    + Measure success/failure based on A record type found in response
-
-#d. Spoofed data transfer
- - Source socket address
- - Remote socket address
- - Protocol
- - Implementation details:
-    + Use the same code as "b. Data transfer" from a *fake* IP source
-    + TCP: Measure success/failure based on TCP SYN.ACK TCP opt parameters (or TCP RST) (scapy?)
-    + UDP: Measure success/failure based on any response
-
-
-NB: A configuration file example is added at the end of the file, after the Python code
-
-Requires: ./async_echoserver_v3.py -b 127.0.0.1:12345
-Requires: ./async_echoserver_v3.py -b 127.0.0.1:2000 127.0.0.1:2001 127.0.0.1:2002 127.0.0.1:2003 127.0.0.1:2004 127.0.0.1:2005 127.0.0.1:2006 127.0.0.1:2007 127.0.0.1:2008 127.0.0.1:2009
-
 """
 
 import asyncio
@@ -695,8 +628,9 @@ class RealDNSDataTraffic(_TestTraffic):
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
         reuseaddr = kwargs.setdefault('reuseaddr', True)
-        kwargs.setdefault('dns_delay', (0,0))
-        kwargs.setdefault('data_delay', (0,0))
+        dns_delay_t = kwargs.setdefault('dns_delay', (0,0))
+        data_delay_t = kwargs.setdefault('data_delay', (0,0))
+        data_backoff_t = kwargs.setdefault('data_backoff', (0,0))
         edns_options = kwargs.get('edns_options', [])
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
@@ -717,8 +651,9 @@ class RealDNSDataTraffic(_TestTraffic):
             data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
             # Use timeout template(s) and delays
             dns_timeouts, data_timeouts = kwargs['dns_timeouts'], kwargs['data_timeouts']
-            dns_delay = int(random.uniform(*kwargs['dns_delay']) * 1000)
-            data_delay = int(random.uniform(*kwargs['data_delay']) * 1000)
+            dns_delay = int(random.uniform(*dns_delay_t) * 1000)
+            data_delay = int(random.uniform(*data_delay_t) * 1000)
+            data_backoff = random.uniform(*data_backoff_t)
             # Log task parameters
             task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={} // Data {}:{}/{} => {}:{}/{} timeouts={} delay={:.4f}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
                                                                                                                            dns_raddr[0], dns_raddr[1], dns_raddr[2],
@@ -730,7 +665,7 @@ class RealDNSDataTraffic(_TestTraffic):
             # Build dictionary with selected parameters for running the task
             args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
                       'dns_laddr': dns_laddr, 'dns_raddr': dns_raddr, 'dns_timeouts': dns_timeouts, 'dns_delay': dns_delay,
-                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts, 'data_delay': data_delay,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts, 'data_delay': data_delay, 'data_backoff': data_backoff,
                       'edns_options': edns_options,
                       }
             # Append the newly defined task with its parameters
@@ -753,6 +688,7 @@ class RealDNSDataTraffic(_TestTraffic):
         data_raddr      = kwargs['data_raddr']
         data_timeouts   = kwargs['data_timeouts']
         data_delay      = kwargs['data_delay']
+        data_backoff    = kwargs['data_backoff']
         reuseaddr       = kwargs['reuseaddr']
         edns_options    = kwargs.get('edns_options', [])
 
@@ -798,6 +734,11 @@ class RealDNSDataTraffic(_TestTraffic):
         else:
             metadata_d['dns_success'] = True
 
+        # This represents the network delay between DNS client and resolver
+        if data_backoff > 0:
+            RealDNSDataTraffic.logger.debug('Backoff {:.3f} ms before initiating data connection'.format(data_backoff))
+            await asyncio.sleep(data_backoff)
+
         ## Run data transfer
         ts_start_data = _now()
         data_b = '{}@{}'.format(data_fqdn, data_ripaddr)
@@ -810,9 +751,9 @@ class RealDNSDataTraffic(_TestTraffic):
         metadata_d['data_duration'] = ts_end - ts_start_data
         metadata_d['data_start']    = ts_start_data
         metadata_d['data_end']      = ts_end
-        metadata_d['data_laddr'] = data_laddr
-        metadata_d['data_raddr'] = (data_ripaddr, data_rport, data_rproto)
-        metadata_d['duration'] = ts_end - ts_start
+        metadata_d['data_laddr']    = data_laddr
+        metadata_d['data_raddr']    = (data_ripaddr, data_rport, data_rproto)
+        metadata_d['duration']      = ts_end - ts_start
 
         # Evaluate data transfer
         if data_recv is None:
@@ -839,7 +780,8 @@ class RealDNSTraffic(_TestTraffic):
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
         reuseaddr = kwargs.setdefault('reuseaddr', True)
-        kwargs.setdefault('dns_delay', (0,0))
+        dns_delay_t = kwargs.setdefault('dns_delay', (0,0))
+        edns_options = kwargs.get('edns_options', [])
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -859,7 +801,7 @@ class RealDNSTraffic(_TestTraffic):
             data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'], kwargs['data_raddr'])
             # Use timeout template(s) and delays
             dns_timeouts = kwargs['dns_timeouts']
-            dns_delay = int(random.uniform(*kwargs['dns_delay']) * 1000)
+            dns_delay = int(random.uniform(*dns_delay_t) * 1000)
             # Log task parameters
             task_str = 'DNS {}:{}/{} => {}:{}/{} timeouts={} // Data {}:{}/{}'.format(dns_laddr[0], dns_laddr[1], dns_laddr[2],
                                                                                       dns_raddr[0], dns_raddr[1], dns_raddr[2],
@@ -870,6 +812,7 @@ class RealDNSTraffic(_TestTraffic):
             args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
                       'dns_laddr': dns_laddr, 'dns_raddr': dns_raddr, 'dns_timeouts': dns_timeouts, 'dns_delay': dns_delay,
                       'data_laddr': data_laddr, 'data_raddr': data_raddr,
+                      'edns_options': edns_options,
                       }
             # Append the newly defined task with its parameters
             scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
@@ -889,7 +832,7 @@ class RealDNSTraffic(_TestTraffic):
         data_laddr      = kwargs['data_laddr']
         data_raddr      = kwargs['data_raddr']
         reuseaddr       = kwargs['reuseaddr']
-        edns_options    = kwargs.get('edns_options', [])
+        edns_options    = kwargs['edns_options']
 
         RealDNSTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
         ts_start = _now()
@@ -916,11 +859,11 @@ class RealDNSTraffic(_TestTraffic):
         metadata_d['dns_duration'] = ts_end - ts_start
         metadata_d['dns_start']    = ts_start
         metadata_d['dns_end']      = ts_end
-        metadata_d['dns_laddr'] = dns_laddr
-        metadata_d['dns_raddr'] = dns_raddr
-        metadata_d['dns_fqdn'] = data_fqdn
-        metadata_d['duration'] = ts_end - ts_start
-        metadata_d['data_raddr'] = (data_ripaddr, data_rport, data_rproto)
+        metadata_d['dns_laddr']    = dns_laddr
+        metadata_d['dns_raddr']    = dns_raddr
+        metadata_d['dns_fqdn']     = data_fqdn
+        metadata_d['duration']     = ts_end - ts_start
+        metadata_d['data_raddr']   = (data_ripaddr, data_rport, data_rproto)
 
         # Evaluate DNS resolution
         if data_ripaddr is None:
@@ -947,7 +890,8 @@ class RealDataTraffic(_TestTraffic):
         scheduled_tasks = []
         # Set default variables that might not be defined in configuration / Allow easy test of specific features
         reuseaddr = kwargs.setdefault('reuseaddr', True)
-        kwargs.setdefault('data_delay', (0,0))
+        data_delay_t = kwargs.setdefault('data_delay', (0,0))
+        data_backoff_t = kwargs.setdefault('data_backoff', (0,0))
         # Adjust next taskdelay time
         taskdelay = kwargs['ts_start']
         iterations = int(kwargs['load'] * kwargs['duration'])
@@ -966,7 +910,8 @@ class RealDataTraffic(_TestTraffic):
             data_laddr, data_raddr = _get_service_tuple(kwargs['data_laddr'],  kwargs['data_raddr'])
             # Use timeout template(s) and delays
             data_timeouts = kwargs['data_timeouts']
-            data_delay = int(random.uniform(*kwargs['data_delay']) * 1000)
+            data_delay = int(random.uniform(*data_delay_t) * 1000)
+            data_backoff = random.uniform(*data_backoff_t)
             # Log task parameters
             task_str = 'Data {}:{}/{} => {}:{}/{} timeouts={}'.format(data_laddr[0], data_laddr[1], data_laddr[2],
                                                                       data_raddr[0], data_raddr[1], data_raddr[2],
@@ -974,7 +919,7 @@ class RealDataTraffic(_TestTraffic):
             RealDataTraffic.logger.info('[#{}] Scheduled task {} @ {:.4f} / {}'.format(task_nth, task_type, taskdelay - TS_ZERO, task_str))
             # Build dictionary with selected parameters for running the task
             args_d = {'task_nth': task_nth, 'task_type': task_type, 'reuseaddr': reuseaddr,
-                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts, 'data_delay': data_delay,
+                      'data_laddr': data_laddr, 'data_raddr': data_raddr, 'data_timeouts': data_timeouts, 'data_delay': data_delay, 'data_backoff': data_backoff,
                       }
             # Append the newly defined task with its parameters
             scheduled_tasks.append({'offset': taskdelay - TS_ZERO, 'cls': task_type, 'kwargs': args_d})
@@ -991,6 +936,7 @@ class RealDataTraffic(_TestTraffic):
         data_raddr      = kwargs['data_raddr']
         data_timeouts   = kwargs['data_timeouts']
         data_delay      = kwargs['data_delay']
+        data_backoff    = kwargs['data_backoff']
         reuseaddr       = kwargs['reuseaddr']
 
         RealDataTraffic.logger.info('[{:.4f}] Running task #{}'.format(_now(TS_ZERO), task_nth))
@@ -1001,6 +947,11 @@ class RealDataTraffic(_TestTraffic):
         data_lipaddr, data_lport, data_lproto = data_laddr
         # Select socket type based on protocol number
         data_sockettype = 'tcp' if data_rproto == 6 else 'udp'
+
+        # This represents the network delay between DNS client and resolver
+        if data_backoff > 0:
+            RealDataTraffic.logger.debug('Backoff {:.3f} ms before initiating data connection'.format(data_backoff))
+            await asyncio.sleep(data_backoff)
 
         ## Run data transfer
         data_b = '{}@{}'.format(data_ripaddr, data_ripaddr)
@@ -1013,9 +964,9 @@ class RealDataTraffic(_TestTraffic):
         metadata_d['data_duration'] = ts_end - ts_start
         metadata_d['data_start']    = ts_start
         metadata_d['data_end']      = ts_end
-        metadata_d['data_laddr'] = data_laddr
-        metadata_d['data_raddr'] = data_raddr
-        metadata_d['duration'] = ts_end - ts_start
+        metadata_d['data_laddr']    = data_laddr
+        metadata_d['data_raddr']    = data_raddr
+        metadata_d['duration']      = ts_end - ts_start
 
         # Evaluate data transfer
         if data_recv is None:
