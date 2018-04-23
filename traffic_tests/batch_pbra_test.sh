@@ -41,7 +41,7 @@ declare -a configfiles=(
                         )
 
 # Uncomment next line if session files are already created
-#declare -a configfiles=()
+declare -a configfiles=()
 
 echo "Initiating dry-run execution of ${#configfiles[@]} test(s) to generate session files"
 echo ""
@@ -90,8 +90,8 @@ do
     # Restart code in RealmGateway
     echo "> Starting RealmGateway!"
     nohup bash -c "lxc-attach -n gwa -- /home/ubuntu/run_gwa.demo.sh" &
-    echo ">> Waiting 20 sec(s) to allow RealmGateway initialization..."
-    sleep 20
+    echo ">> Waiting 10 sec(s) to allow RealmGateway initialization..."
+    sleep 10
     # Get current PID of RealmGateway
     RGW_PID=`/bin/ps -ef | grep "rgw.py" | grep "\-\-name gwa.demo" | grep -v "grep" | awk '{print $2}'`
     echo "> Running RealmGateway @ $RGW_PID"
@@ -105,7 +105,7 @@ do
     echo ""
     echo "> Terminating RealmGateway @ $RGW_PID"
     kill -SIGTERM $RGW_PID
-    sleep 10
+    sleep 8
     kill -SIGKILL $RGW_PID
     sleep 2
     echo ""
@@ -119,9 +119,6 @@ done
 
 # Declare test files in order
 declare -a sessionfiles=(
-#                         "ideal.test1.session.json"
-#                         "ideal.test2.session.json"
-#                         "ideal.test3.session.json"
                          "noise.test1.dns.1%.session.json"
                          "noise.test1.dns.5%.session.json"
                          "noise.test1.dns.10%.session.json"
@@ -159,8 +156,8 @@ do
     # Restart code in RealmGateway
     echo "> Starting RealmGateway!"
     nohup bash -c "lxc-attach -n gwa -- /home/ubuntu/run_gwa.demo.sh" &
-    echo ">> Waiting 20 sec(s) to allow RealmGateway initialization..."
-    sleep 20
+    echo ">> Waiting 10 sec(s) to allow RealmGateway initialization..."
+    sleep 10
     # Get current PID of RealmGateway
     RGW_PID=`/bin/ps -ef | grep "rgw.py" | grep "\-\-name gwa.demo" | grep -v "grep" | awk '{print $2}'`
     echo "> Running RealmGateway @ $RGW_PID"
@@ -174,7 +171,7 @@ do
     echo ""
     echo "> Terminating RealmGateway @ $RGW_PID"
     kill -SIGTERM $RGW_PID
-    sleep 10
+    sleep 8
     kill -SIGKILL $RGW_PID
     sleep 2
     echo ""
