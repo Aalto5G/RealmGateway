@@ -1006,25 +1006,17 @@ class PolicyBasedResourceAllocation(container3.Container):
             reputation = self._compute_policy_math_reputation(r_resolver, r_requestor, policy['math'])
 
             # 1. Minimum reputation is required for allocating a new IP address for an FQDN service
-            if fqdn and reputation >= policy['fqdn_new']:
-                self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'fqdn_new', reputation, policy['fqdn_new']))
-                allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-                return allocated_ipv4
-
+            if ((fqdn and reputation >= policy['fqdn_new']) or
             # 2. Minimum reputation is required for allocating a new IP address for an SFQDN service
-            elif sfqdn and reputation >= policy['sfqdn_new'] and sfqdn_reuse is False:
-                self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_new', reputation, policy['sfqdn_new']))
-                allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
-                return allocated_ipv4
-
+                (sfqdn and reputation >= policy['sfqdn_new'] and sfqdn_reuse is False) or
             # 3. Minimum reputation is required for overloading an existing IP address for an SFQDN service
-            elif sfqdn and reputation >= policy['sfqdn_reuse'] and sfqdn_reuse is True:
-                self._logger.info('load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, 'sfqdn_reuse', reputation, policy['sfqdn_reuse']))
+                (sfqdn and reputation >= policy['sfqdn_reuse'] and sfqdn_reuse is True)):
+                self._logger.info('Policy accepted! load={:.2f}%% allocation={} reputation={:.2f} // reputation offered {:.2f} / {}({:.2f},{:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation, policy['math'], r_resolver, r_requestor))
                 allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
                 return allocated_ipv4
 
             # Fine-grained logging of policy violation
-            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f} ({:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation))
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f} // reputation offered {:.2f} / {}({:.2f},{:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation, policy['math'], r_resolver, r_requestor))
 
         # No policy could be executed
         return None
@@ -1169,6 +1161,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def _describe_service_data(self, service_data, partial_reuse=True):
         """ Return fqdn, sfqdn_reuse booleans according to service_data definition """
+        # TODO: This is not checking the current connection table to see if a service can be overloaded. Should it?
         if service_data['port'] == 0 and service_data['protocol'] == 0:
             fqdn = True
             sfqdn_reuse = False
