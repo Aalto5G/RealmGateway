@@ -674,8 +674,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             query.reputation_resolver = dnsgroup_obj
 
     def _load_metadata_requestor(self, query, addr, create=False):
-        # TODO: Bind ncid based on specific dns group id instead of resolver ipaddr (as to respect EDNS0 NCID cluster specification)
-
         # Collect metadata from DNS query related to requestor based on DNS options (EDNS0)
         dnshost_obj = None
         meta_ipaddr = None
@@ -684,6 +682,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         meta_flag = False
 
         for opt in query.options:
+            # My custom EDNS0 options implement this method (changes in the dnspython API)
             if hasattr(opt, 'to_text'):
                 self._logger.debug('Found EDNS0: {}'.format(opt.to_text()))
             else:
@@ -709,7 +708,6 @@ class PolicyBasedResourceAllocation(container3.Container):
             return
 
         ipaddr_lookupkey = format(ipaddress.ip_network('{}/{}'.format(meta_ipaddr, meta_mask), strict=False).network_address)
-        ncid_lookupkey = (meta_ncid, addr[0]) # tuple of ncid tag and resolver IP address
 
         if self.has((KEY_DNSHOST_IPADDR, ipaddr_lookupkey)):
             # Get existing object
@@ -722,7 +720,12 @@ class PolicyBasedResourceAllocation(container3.Container):
             self.add(dnshost_obj)
 
         '''
-        # Needs to be tested
+        # TODO: Bind ncid based on specific dns group id instead of resolver ipaddr (as to respect EDNS0 NCID cluster specification)
+                The value can be obtained from the query object // query.reputation_resolver.group_id
+        NB: The code for uStateDNSHost has not been tested for ncid creation!
+            What follows is an example of a potential implementation.
+
+        ncid_lookupkey = (meta_ncid, query.reputation_resolver.group_id) # tuple of ncid tag and resolver IP address
         elif self.has((KEY_DNSHOST_NCID, ncid_lookupkey)):
             # Get existing object
             dnshost_obj = self.get((KEY_DNSHOST_NCID, ncid_lookupkey))
