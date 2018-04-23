@@ -1174,6 +1174,11 @@ class PolicyBasedResourceAllocation(container3.Container):
         else:
             fqdn = False
             sfqdn_reuse = False
+
+        # Associate sfqdn_reuse flag with the overloadable existing connections for such service_data
+        if sfqdn_reuse is True and len(self._connection_circularpool_get_overloadable(service_data)) == 0:
+            sfqdn_reuse = False
+
         return (fqdn, sfqdn_reuse)
 
     def _connection_circularpool_get_overloadable(self, service_data):
