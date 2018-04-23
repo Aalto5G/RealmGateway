@@ -21,8 +21,11 @@ global_traffic:
         data_raddr: [["test200.gwa.demo", 2000, 6], ["test201.gwa.demo", 2000, 6], ["test202.gwa.demo", 2000, 6], ["test203.gwa.demo", 2000, 6], ["tcp2000.test200.gwa.demo", 2000, 6], ["tcp2001.test201.gwa.demo", 2001, 6], ["tcp2002.test202.gwa.demo", 2002, 6], ["tcp2003.test203.gwa.demo", 2003, 6], ["test200.gwa.demo", 2000, 17], ["test201.gwa.demo", 2000, 17], ["test202.gwa.demo", 2000, 17], ["test203.gwa.demo", 2000, 17], ["udp2000.test200.gwa.demo", 2000, 17], ["udp2001.test201.gwa.demo", 2001, 17], ["udp2002.test202.gwa.demo", 2002, 17], ["udp2003.test203.gwa.demo", 2003, 17]]
 
         dns_timeouts: [1,1,1,1]
+        dns_delay: [0.010, 0.010]
+
         data_timeouts: [1]
-        data_delay: [0.000, 0.000]
+        data_delay: [0.020, 0.020]
+        data_backoff: [0.020, 0.020]
 
 
 # This models all the test traffic
