@@ -4,12 +4,11 @@ CIRCULARPOOL:
         - {'initial_reputation': 0.9, 'sla': true, 'nodes': ['74.125.74.1', '74.125.74.2', '74.125.74.3', '74.125.74.4', '74.125.74.5', '74.125.74.6', '74.125.74.7', '74.125.74.8', '74.125.74.9', '74.125.74.10', '74.125.74.11', '74.125.74.12', '74.125.74.13', '74.125.74.14', '74.125.74.15']}
     CONTROL_VARIABLES:
         SYSTEM_LOAD:
-            - {'threshold': 99, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
-            - {'threshold': 66, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'}
-            - {'threshold': 33, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'}
-            - {'threshold':  0, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'}
+            - {'threshold_min': 80, 'threshold_max': 100, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
+            - {'threshold_min': 66, 'threshold_max': 100, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'}
+            - {'threshold_min': 33, 'threshold_max': 100, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'}
+            - {'threshold_min':  0, 'threshold_max': 100, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'}
         PBRA_DNS_POLICY_TCPCNAME:  false
         PBRA_DNS_POLICY_TCP:       true
         PBRA_DNS_POLICY_CNAME:     true
-        PBRA_DNS_LOG_UNTRUSTED:    true
-        PBRA_DNS_LOAD_POLICING:    true
+        PBRA_DNS_LOG_UNTRUSTED:    false
