@@ -55,7 +55,6 @@ from dns.rdatatype import *
 
 # Reputation and system load
 PBRA_REPUTATION_MIDDLE = 0.45
-SYSTEM_LOAD_ENABLED   = lambda x: x>=0
 
 # Keys for uStateDNSResolver
 KEY_DNSNODE_IPADDR  = 10
@@ -529,7 +528,6 @@ class PolicyBasedResourceAllocation(container3.Container):
     * PBRA_DNS_POLICY_CNAME establishes that allocation is only allowed via temporary alias names of CNAME responses
         These two policies can be enabled or disabled independently
     * PBRA_DNS_LOG_UNTRUSTED enables logging all untrusted UDP DNS query attempts
-    * PBRA_DNS_LOAD_POLICING enables dynamic fine-grained policy enforcement based on system load
 
     # Load levels in 100% (Use -1 value in threshold parameter to disable step)
     ## math choices 'min', 'max', 'avg'
@@ -542,15 +540,13 @@ class PolicyBasedResourceAllocation(container3.Container):
     PBRA_DNS_POLICY_TCP       = False
     PBRA_DNS_POLICY_CNAME     = False
     PBRA_DNS_LOG_UNTRUSTED    = False
-    PBRA_DNS_LOAD_POLICING    = False
     # Define default system load policies
-    SYSTEM_LOAD = [{'threshold': 80, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'},
-                   {'threshold': 66, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'},
-                   {'threshold': 33, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'},
-                   {'threshold':  0, 'fqdn_new': 0.2, 'sfqdn_new': 0.1, 'sfqdn_reuse': 0.0, 'math': 'max'},
-                   {'threshold': -1, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'min'} # This is disabled
+    SYSTEM_LOAD = [
+                   #{'threshold_min': 80, 'threshold_max': 100, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'},
+                   #{'threshold_min': 66, 'threshold_max': 100, 'fqdn_new': 0.6, 'sfqdn_new': 0.4, 'sfqdn_reuse': 0.3, 'math': 'avg'},
+                   #{'threshold_min': 33, 'threshold_max': 100, 'fqdn_new': 0.3, 'sfqdn_new': 0.2, 'sfqdn_reuse': 0.1, 'math': 'max'},
+                   {'threshold_min':  0, 'threshold_max': 100, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'},
                    ]
-
 
     def __init__(self, **kwargs):
         """ Initialize as a Container """
@@ -579,7 +575,6 @@ class PolicyBasedResourceAllocation(container3.Container):
         self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_TCP', self.PBRA_DNS_POLICY_TCP))
         self._logger.info('Control variable: {}={}'.format('PBRA_DNS_POLICY_CNAME', self.PBRA_DNS_POLICY_CNAME))
         self._logger.info('Control variable: {}={}'.format('PBRA_DNS_LOG_UNTRUSTED', self.PBRA_DNS_LOG_UNTRUSTED))
-        self._logger.info('Control variable: {}={}'.format('PBRA_DNS_LOAD_POLICING', self.PBRA_DNS_LOAD_POLICING))
         self._logger.info('Control variable: {}=\n{}'.format('SYSTEM_LOAD', '\n'.join(format(_) for _ in self.SYSTEM_LOAD)))
 
 
@@ -1001,13 +996,8 @@ class PolicyBasedResourceAllocation(container3.Container):
             raise Exception('Programming error')
 
         # Obtain load policy parameters
-        if self.PBRA_DNS_LOAD_POLICING is False:
-            # Use best effort policy all the way
-            load_policies = [{'threshold': -1, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'}]
-            self._logger.debug('System load at {:.2f}%% / Best effort allocation'.format(sysload))
-        else:
-            load_policies = [entry for entry in self.SYSTEM_LOAD if entry['threshold'] >= sysload]
-            self._logger.debug('System load at {:.2f}%% / Attempting match of {} policy(ies)'.format(sysload, len(load_policies)))
+        load_policies = [entry for entry in self.SYSTEM_LOAD if (sysload >= entry['threshold_min'] and sysload <= entry['threshold_max'])]
+        self._logger.debug('System load at {:.2f}%% / Attempting match of {} policy(ies)'.format(sysload, len(load_policies)))
 
         for i, policy in enumerate(load_policies):
             self._logger.debug('[{}/{}] Testing policy / {}'.format(i+1, len(load_policies), policy))
@@ -1034,7 +1024,7 @@ class PolicyBasedResourceAllocation(container3.Container):
                 return allocated_ipv4
 
             # Fine-grained logging of policy violation
-            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f}/{:.2f}'.format(sysload, service_alloc, reputation, policy[service_alloc]))
+            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f} ({:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation))
 
         # No policy could be executed
         return None
