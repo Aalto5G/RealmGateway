@@ -602,25 +602,26 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def cleanup_timers(self):
         """ Perform a cleanup of expired timer objects """
+        self._logger.warning('Initiating cleanup of timers')
         nodes = self.lookup(KEY_TIMER, update=False, check_expire=False)
         if nodes is None:
             return
         for node in list(nodes):
             if node.hasexpired():
                 self.remove(node)
+        self._logger.warning('Terminated cleanup of timers')
 
     def debug_dnsgroups(self, transition = False):
         # For debugging purposes
-        #nodes = self.lookup(KEY_DNSGROUP, update=False, check_expire=False)
+        self._logger.warning('Initiating debug_dnsgroups: transition={}'.format(transition))
         nodes = self.lookup(KEY_DNS_REPUTATION, update=False, check_expire=False)
-        if nodes is None:
-            return
+        if nodes and transition:
+            for node in nodes:
+                self._logger.warning('[1] {}\n\t>> {}'.format(node, node.reputation_current))
+                node.transition_period()
+                self._logger.warning('[2] {}\n\t>> {}'.format(node, node.reputation_current))
 
-        if transition:
-            [node.transition_period() for node in nodes]
-            [print(node) for node in nodes]
-            #[node.show_reputation() for node in nodes]
-
+        self._logger.warning('Terminated debug_dnsgroups: transition={}'.format(transition))
 
     def _policy_tcp(self, query):
         # Answer TRUNCATED
@@ -1263,9 +1264,20 @@ class PolicyBasedResourceAllocation(container3.Container):
             This means that a CNAME service was allocated and resolved.
             Whether or not the internal cache had any record should not matter to establish any
             penalty on the reputation. If the CNAME was resolved, we deem this as an ok_event.
+
+            UPDATE!!!
+            On the event of dns-only traffic, we are currently artificially increasing the reputation for no good reason.
+            For every CNAME that is resolved, we are generating 1 event_ok(), regardless whether the IP address was used or not!!
+            This means that DDoS against the Circular Pool from a party actually increases the reputation of such party if it
+            follows the TCP/CNAME policies in place.
+
+            We could consider using event_trusted(), but this is already used in call to _dns_preprocess_rgw_wan_soa_event_logging()
+
+            After all, it seems this type of event cannot be used to alter reputation after all.
+            In this commit, we comment out the event_ok() call that remains in the code for future reference.
             """
             self._logger.debug('[OK] Timer expired {}'.format(timer_obj))
-            dnsgroup_obj.event_ok()
+            #dnsgroup_obj.event_ok()
 
         # Remove alias FQDN service from host
         host_obj.remove_service(KEY_SERVICE_SFQDN, timer_obj.alias_service)
