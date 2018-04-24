@@ -81,7 +81,7 @@ declare -a sessionfiles=(
                          )
 
 # Uncomment next line if basic tests have already run
-#declare -a sessionfiles=()
+declare -a sessionfiles=()
 
 echo "Initiating execution of ${#sessionfiles[@]} basic test(s) from session files"
 echo ""
