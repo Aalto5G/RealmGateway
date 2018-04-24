@@ -982,6 +982,10 @@ class PolicyBasedResourceAllocation(container3.Container):
         if query.reputation_requestor:
             r_requestor = query.reputation_requestor.reputation
 
+        # Obtain IP addressing information of DNS parties for improved logging
+        dns_host_ipaddr = query.reputation_requestor.ipaddr if query.reputation_requestor else None
+        dns_resolver_ipaddr = addr[0]
+
         # Normalize reputation values
         r_resolver, r_requestor = self._normalize_reputation_values(r_resolver, r_requestor)
 
@@ -992,18 +996,18 @@ class PolicyBasedResourceAllocation(container3.Container):
             service_alloc = 'sfqdn_new'
         elif sfqdn and sfqdn_reuse:
             service_alloc = 'sfqdn_reuse'
-        else:
-            raise Exception('Programming error')
 
         # Obtain load policy parameters
         load_policies = [entry for entry in self.SYSTEM_LOAD if (sysload >= entry['threshold_min'] and sysload <= entry['threshold_max'])]
-        self._logger.debug('System load at {:.2f}%% / Attempting match of {} policy(ies)'.format(sysload, len(load_policies)))
+        self._logger.info('System load at {:.2f}%% / Attempting match of {} policy(ies)'.format(sysload, len(load_policies)))
 
         for i, policy in enumerate(load_policies):
-            self._logger.debug('[{}/{}] Testing policy / {}'.format(i+1, len(load_policies), policy))
+            self._logger.debug('>> [{}/{}] Testing policy / {}'.format(i+1, len(load_policies), policy))
 
             # Calculate values for policy math
             reputation = self._compute_policy_math_reputation(r_resolver, r_requestor, policy['math'])
+            # Create log message
+            log_msg = 'load={:.2f}%% allocation={} reputation={:.2f} // reputation offered {:.2f} / {}({:.2f},{:.2f}) // {} @ {}'.format(sysload, service_alloc, policy[service_alloc], reputation, policy['math'], r_resolver, r_requestor, dns_host_ipaddr, dns_resolver_ipaddr)
 
             # 1. Minimum reputation is required for allocating a new IP address for an FQDN service
             if ((fqdn and reputation >= policy['fqdn_new']) or
@@ -1011,12 +1015,12 @@ class PolicyBasedResourceAllocation(container3.Container):
                 (sfqdn and reputation >= policy['sfqdn_new'] and sfqdn_reuse is False) or
             # 3. Minimum reputation is required for overloading an existing IP address for an SFQDN service
                 (sfqdn and reputation >= policy['sfqdn_reuse'] and sfqdn_reuse is True)):
-                self._logger.info('Policy accepted! load={:.2f}%% allocation={} reputation={:.2f} // reputation offered {:.2f} / {}({:.2f},{:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation, policy['math'], r_resolver, r_requestor))
+                self._logger.info('Policy accepted! {}'.format(log_msg))
                 allocated_ipv4 = yield from self._best_effort_allocate(query, addr, host_obj, service_data, host_ipv4)
                 return allocated_ipv4
 
             # Fine-grained logging of policy violation
-            self._logger.warning('Policy violation! load={:.2f}%% allocation={} reputation={:.2f} // reputation offered {:.2f} / {}({:.2f},{:.2f})'.format(sysload, service_alloc, policy[service_alloc], reputation, policy['math'], r_resolver, r_requestor))
+            self._logger.warning('Policy violation! {}'.format(log_msg))
 
         # No policy could be executed
         return None
