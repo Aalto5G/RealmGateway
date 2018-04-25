@@ -531,7 +531,7 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     # Load levels in 100% (Use -1 value in threshold parameter to disable step)
     ## math choices 'min', 'max', 'avg'
-    {'threshold': 80, 'fqdn_new': 1.0, 'sfqdn_new': 0.8, 'sfqdn_reuse': 0.7, 'math': 'min'}
+    {'threshold_min':  0, 'threshold_max': 100, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'}
 
     """
 
@@ -1166,7 +1166,6 @@ class PolicyBasedResourceAllocation(container3.Container):
 
     def _describe_service_data(self, service_data, partial_reuse=True):
         """ Return fqdn, sfqdn_reuse booleans according to service_data definition """
-        # TODO: This is not checking the current connection table to see if a service can be overloaded. Should it?
         if service_data['port'] == 0 and service_data['protocol'] == 0:
             fqdn = True
             sfqdn_reuse = False
