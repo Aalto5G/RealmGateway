@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
+
 """
 BSD 3-Clause License
 
-Copyright (c) 2018, Jesus Llorente Santos
+Copyright (c) 2018, Jesus Llorente Santos, Aalto University, Finland
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,7 +32,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-#!/usr/bin/env python3
 import dns
 import dns.message
 import dns.name
