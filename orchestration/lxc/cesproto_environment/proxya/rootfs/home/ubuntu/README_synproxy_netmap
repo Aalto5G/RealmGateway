@@ -2,7 +2,7 @@ Juha-Matti Tilli has developed a Layer-2 transparent SYNPROXY implementation via
 The script is available under the name ```synproxy_netmap.sh```
 
 The service has been demonized and can be also started via ```systemctl start synproxy_netmap```.
-It can also be run manually via ```/home/YOURUSERNAME/synproxy/synproxy/nmsynproxy netmap:wan0p netmap:wan0```.
+It can also be run manually via ```/home/YOURUSERNAME/synproxy/synproxy/ldpsynproxy wan0p wan0```.
 
 
 Installation guide
