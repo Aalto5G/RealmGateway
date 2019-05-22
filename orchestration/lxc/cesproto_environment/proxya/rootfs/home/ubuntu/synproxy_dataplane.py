@@ -257,7 +257,7 @@ class SYNProxyDataplane():
                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=1,priority=100,in_port=4      actions=output:1"',
                    ### Table 2: Controls the packet pipelining
                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=2,priority=100                actions=resubmit(,10),resubmit(,11),resubmit(,12)"',
-                   ### Table 10: Load port values in NXM registry
+                   ### Table 10: Load port values in NXM True
                    'ovs-ofctl add-flow -O OpenFlow13 br-synproxy "table=10,priority=100               actions=load:0x0001->NXM_NX_REG0[0..15],load:0x0002->NXM_NX_REG1[0..15],load:0x0003->NXM_NX_REG2[0..15],load:0x0004->NXM_NX_REG3[0..15]"',
                    ### Table 11: Contains the learning flows
                    # Learn new flows coming from WAN

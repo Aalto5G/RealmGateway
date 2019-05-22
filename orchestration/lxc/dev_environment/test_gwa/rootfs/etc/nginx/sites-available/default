@@ -6,6 +6,7 @@ server {
     listen 8080;
     listen 8443 ssl;
 
+
     # Set the server name matching the SSL certificate
     server_name  *.gwa.demo;
 

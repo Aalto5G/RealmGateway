@@ -37,14 +37,17 @@ import pprint
 import os
 import urllib.parse
 from contextlib import suppress
+import json
 
 from helpers_n_wrappers import utils3
 from helpers_n_wrappers import aiohttp_client
 
 
 class DataRepository(object):
-    def __init__(self, name='DataRepository', **kwargs):
+    @classmethod
+    async def create(cls, name='DataRepository', **kwargs):
         """ Initialize """
+        self = DataRepository()
         self._logger = logging.getLogger(name)
         self.configfile = None
         self.configfolder = None
@@ -54,9 +57,15 @@ class DataRepository(object):
         utils3.set_attributes(self, override=True, **kwargs)
         self._cached_policy_host = None
         self._cached_policy_ces = None
-        self._reload_policies()
+        await self._reload_policies()
         # Initiate HTTP session with PolicyDatabase
         self.rest_api_init()
+        return self
+
+    async def replace(self):
+        await self._reload_policies()
+
+
 
     def shutdown(self):
         self._logger.warning('Shutdown')
@@ -66,33 +75,42 @@ class DataRepository(object):
         """ Create long lived HTTP session """
         self.rest_api = aiohttp_client.HTTPRestClient(n)
 
+
     def rest_api_close(self):
         try:
             self.rest_api.close()
         except:
             pass
 
+    @asyncio.coroutine
     def _reload_policies(self):
-        self._reload_policy_host()
-        self._reload_policy_ces()
+        yield from self._reload_policy_host()
+        yield from self._reload_policy_ces()
 
+    @asyncio.coroutine
     def _reload_policy_host(self):
         # Load from file
         self._logger.info('Loading HOST POLICIES from file   <{}>'.format(self.configfile))
         d_file = self._load_data_file(self.configfile)
         # Load from folder
         self._logger.info('Loading HOST POLICIES from folder <{}>'.format(self.configfolder))
-        d_folder = self._load_data_folder(self.configfolder)
+        d_folder = yield from self.get_policies_api()
+       # d_folder = self._load_data_folder(self.configfolder)
         # Folder overrides single policy file definitions
         self._cached_policy_host = {**d_file, **d_folder}
 
+    @asyncio.coroutine
     def _reload_policy_ces(self):
         # Load from file
         self._logger.info('Loading CES POLICIES from file   <{}>'.format(self.policyfile))
         d_file = self._load_data_file(self.policyfile)
         # Load from folder
         self._logger.info('Loading CES POLICIES from folder <{}>'.format(self.policyfolder))
-        d_folder = self._load_data_folder(self.policyfolder)
+        #d_folder = self._load_data_folder(self.policyfolder)
+
+        d_folder= yield from self.get_iptables_api()
+        #print("This is from API", d_folder)
+
         # Folder overrides single policy file definitions
         self._cached_policy_ces = {**d_file, **d_folder}
 
@@ -103,7 +121,7 @@ class DataRepository(object):
         data_d = {}
         try:
             self._logger.debug('Loading file <{}>'.format(filename))
-            data_d = yaml.load(open(filename,'r'))
+            data_d = yaml.safe_load(open(filename,'r'))
         except FileNotFoundError:
             self._logger.warning('Repository file not found <{}>'.format(filename))
         except:
@@ -123,6 +141,7 @@ class DataRepository(object):
                 path_filename = os.path.join(os.getcwd(), foldername, filename)
                 d = self._load_data_file(path_filename)
                 data_d = {**data_d, **d}
+                #print('\n\n\n Ths data is from repo {} \n\n\n'.format(data_d))
         except:
             self._logger.warning('Failed to load repository folder <{}>'.format(foldername))
         finally:
@@ -169,3 +188,55 @@ class DataRepository(object):
         data_d['CIRCULARPOOL'] = [{'max':2}]
         data_d['GROUP'] = ['IPS_GROUP_PREPAID1']
         return data_d
+
+    @asyncio.coroutine
+    def get_policies_api(self):
+
+        policy_client = aiohttp_client.HTTPRestClient(5)
+        data_api = yield from policy_client.do_get('http://127.0.0.1:8000/API/firewall_policy/ID', params=None, timeout=None)
+
+        host_ids = []
+        host_info = json.loads(data_api)
+        for item in host_info:
+            temp = item[2]
+            host_ids.append(temp)
+
+        print("\n\n\n{} \n\n\n".format(host_ids))
+
+        python_obj = {}
+        new_client = aiohttp_client.HTTPRestClient(5)
+
+        for ids in host_ids:
+            fetch_policy = yield from new_client.do_get('http://127.0.0.1:8000/API/firewall_policy_user/FQDN/' + str(ids) + '?', params=None,timeout=None)
+            python_obj[str(ids)] = json.loads(fetch_policy)
+
+        policy_client.close()
+        new_client.close()
+
+
+        return python_obj
+
+    @asyncio.coroutine
+    def get_iptables_api(self):
+        params=['CIRCULARPOOL','IPSET','IPTABLES']
+
+
+        bootstrap_data ={}
+        policy_data ={}
+        count=0
+        new_client = aiohttp_client.HTTPRestClient(5)
+
+        for item in params:
+            dictionary= {'policy_name': item}
+            fetch_policy = yield from new_client.do_get('http://127.0.0.1:8000/API/bootstrap_policies_ces', params= dictionary,timeout=None)
+            bootstrap_data= json.loads(fetch_policy)
+
+            for key in bootstrap_data:
+                policy_data[key]= bootstrap_data[key]
+
+        new_client.close()
+
+        return policy_data
+
+
+

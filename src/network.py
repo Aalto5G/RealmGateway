@@ -423,6 +423,13 @@ class Network(object):
         ## Add rules to iptables
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_INGRESS}, 'dst':ipaddr, 'target':host_chain}))
         rules_batch.append((self.ipt_host_chain, {'mark':{'mark':MASK_HOST_EGRESS},  'src':ipaddr, 'target':host_chain}))
+
+        rules_batch.append((host_chain, {'target': host_chain_admin}, 0))
+        rules_batch.append((host_chain, {'target': host_chain_user}, 0))
+        rules_batch.append((host_chain, {'target': host_chain_ces, 'mark': {'mark': MASK_HOST_CES}}, 0))
+        # Add a variable for default host policy
+        rules_batch.append((host_chain, {'target': self.ipt_host_unknown}, 0))
+
         # Use new batch functions
         iptc_helper3.batch_delete_rules('filter', rules_batch, ipv6=False)
 
