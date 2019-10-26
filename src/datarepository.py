@@ -38,7 +38,7 @@ import os
 import urllib.parse
 from contextlib import suppress
 import json
-
+import datetime
 from helpers_n_wrappers import utils3
 from helpers_n_wrappers import aiohttp_client
 
@@ -84,8 +84,10 @@ class DataRepository(object):
 
     @asyncio.coroutine
     def _reload_policies(self):
+        print("This is the clock time before RELOADING policies\n", datetime.datetime.now())
         yield from self._reload_policy_host()
         yield from self._reload_policy_ces()
+        print("This is the clock time after RELOADING policies\n", datetime.datetime.now())
 
     @asyncio.coroutine
     def _reload_policy_host(self):
@@ -95,7 +97,7 @@ class DataRepository(object):
         # Load from folder
         self._logger.info('Loading HOST POLICIES from folder <{}>'.format(self.configfolder))
         d_folder = yield from self.get_policies_api()
-       # d_folder = self._load_data_folder(self.configfolder)
+        #d_folder = self._load_data_folder(self.configfolder)
         # Folder overrides single policy file definitions
         self._cached_policy_host = {**d_file, **d_folder}
 
@@ -191,8 +193,9 @@ class DataRepository(object):
 
     @asyncio.coroutine
     def get_policies_api(self):
-
-        policy_client = aiohttp_client.HTTPRestClient(5)
+        print("This is the clock time before retrieving the policies\n", datetime.datetime.now() )
+        #DATE TIME NOW
+        policy_client = aiohttp_client.HTTPRestClient(1)
         data_api = yield from policy_client.do_get('http://127.0.0.1:8000/API/firewall_policy/ID', params=None, timeout=None)
 
         host_ids = []
@@ -201,15 +204,16 @@ class DataRepository(object):
             temp = item[2]
             host_ids.append(temp)
 
-        print("\n\n\n{} \n\n\n".format(host_ids))
+        #print("\n\n\n{} \n\n\n".format(host_ids))
 
         python_obj = {}
-        new_client = aiohttp_client.HTTPRestClient(5)
+        new_client = aiohttp_client.HTTPRestClient(1)
 
         for ids in host_ids:
             fetch_policy = yield from new_client.do_get('http://127.0.0.1:8000/API/firewall_policy_user/FQDN/' + str(ids) + '?', params=None,timeout=None)
             python_obj[str(ids)] = json.loads(fetch_policy)
 
+        print("This is the time after the polciies have been retrieved \n", datetime.datetime.now())
         policy_client.close()
         new_client.close()
 
@@ -225,7 +229,7 @@ class DataRepository(object):
         policy_data ={}
         count=0
         new_client = aiohttp_client.HTTPRestClient(5)
-
+        print("This is the clock time before retrieving the  CES policies\n", datetime.datetime.now())
         for item in params:
             dictionary= {'policy_name': item}
             fetch_policy = yield from new_client.do_get('http://127.0.0.1:8000/API/bootstrap_policies_ces', params= dictionary,timeout=None)
@@ -233,7 +237,7 @@ class DataRepository(object):
 
             for key in bootstrap_data:
                 policy_data[key]= bootstrap_data[key]
-
+        print("This is the clock time after retrieving the  CES policies\n", datetime.datetime.now())
         new_client.close()
 
         return policy_data
