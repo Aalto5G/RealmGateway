@@ -5,6 +5,6 @@ CIRCULARPOOL:
         SYSTEM_LOAD:
             - {'threshold_min':  0, 'threshold_max': 100, 'fqdn_new': 0.0, 'sfqdn_new': 0.0, 'sfqdn_reuse': 0.0, 'math': 'max'}
         PBRA_DNS_POLICY_TCPCNAME:  false
-        PBRA_DNS_POLICY_TCP:       false
-        PBRA_DNS_POLICY_CNAME:     false
+        PBRA_DNS_POLICY_TCP:       true
+        PBRA_DNS_POLICY_CNAME:     true
         PBRA_DNS_LOG_UNTRUSTED:    false

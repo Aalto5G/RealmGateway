@@ -191,7 +191,6 @@ IPTABLES:
     # This policy includes the rules for the DNS server. The policy defines a basic system of leaky-buckets and ultimately a contention based mechanism to admit a packet to the DNS server running in userspace.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
-            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'create': true, 'flush': true}

@@ -191,7 +191,6 @@ IPTABLES:
     # This policy includes the rules for the DNS server. The policy defines a basic system of leaky-buckets and ultimately a contention based mechanism to admit a packet to the DNS server running in userspace.
         requires:
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
-            - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_LAN',              'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN',              'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_TUN',              'create': true, 'flush': true}
@@ -203,6 +202,7 @@ IPTABLES:
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_WKGREYLIST',   'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_GLOBAL_LIMIT', 'create': true, 'flush': true}
             - {'table': 'filter', 'chain': 'POLICY_DNS_WAN_DOMAIN_LIMIT', 'create': true, 'flush': true}
+#           - {'table': 'filter', 'chain': 'POLICY_DNS',                  'create': true, 'flush': true}
         rules:
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': {'mark': {'mark': '0xff000002/0xff00000f'}, 'comment': {'comment': 'Continue in POLICY_DNS_LAN'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS_LAN'}}
             - {'table': 'filter', 'chain': 'POLICY_DNS',                  'rule': {'mark': {'mark': '0xff000003/0xff00000f'}, 'comment': {'comment': 'Continue in POLICY_DNS_WAN'}, 'udp': {'dport': '53'}, 'protocol': 'udp', 'target': 'POLICY_DNS_WAN'}}

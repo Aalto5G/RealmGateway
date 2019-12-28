@@ -394,7 +394,6 @@ class DNSCallbacks(object):
         del self.activequeries[key]
         cback(query, addr, response)
 
-
     @asyncio.coroutine
     def dns_process_rgw_wan_soa(self, query, addr, cback):
         """ Process DNS query from public network of a name in a SOA zone """

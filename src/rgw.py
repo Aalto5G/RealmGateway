@@ -79,6 +79,7 @@ import os
 import time
 import yaml
 from contextlib import suppress
+import json
 
 from callbacks import DNSCallbacks, PacketCallbacks
 from connection import ConnectionTable
@@ -91,7 +92,9 @@ from pbra import PolicyBasedResourceAllocation
 from pool import PoolContainer, NamePool, AddressPoolShared, AddressPoolUser
 from suricata import SuricataAlert
 from helpers_n_wrappers import utils3
+from helpers_n_wrappers.aiohttp_client import HTTPRestClient
 from global_variables import RUNNING_TASKS
+
 
 
 def setup_logging_yaml(default_path='logging.yaml',
@@ -213,6 +216,8 @@ def parse_arguments():
 class RealmGateway(object):
     def __init__(self, args):
         self._config = args
+
+        self._oldmap = {}
         # Get event loop
         self._loop = asyncio.get_event_loop()
         # Get logger
@@ -256,6 +261,21 @@ class RealmGateway(object):
         # Ready!
         self._logger.warning('RealmGateway_v2 is ready!')
 
+    @asyncio.coroutine
+    def update_policy(self):
+        while True:
+
+            yield from asyncio.sleep(10)
+            # Initialize Data Repository
+            self._logger.warning('Reinitializing Data Repository')
+            configfile = self._config.getdefault('repository_subscriber_file', None)
+            configfolder = self._config.getdefault('repository_subscriber_folder', None)
+            policyfile = self._config.getdefault('repository_policy_file', None)
+            policyfolder = self._config.getdefault('repository_policy_folder', None)
+            api_url = self._config.getdefault('repository_api_url', None)
+            yield from self._datarepository.replace()
+            yield from self._init_subscriberdata()
+
 
     @asyncio.coroutine
     def _init_datarepository(self):
@@ -266,9 +286,12 @@ class RealmGateway(object):
         policyfile   = self._config.getdefault('repository_policy_file', None)
         policyfolder = self._config.getdefault('repository_policy_folder', None)
         api_url      = self._config.getdefault('repository_api_url', None)
-        self._datarepository = DataRepository(configfile = configfile, configfolder = configfolder,
+        self._datarepository = yield from DataRepository.create(configfile = configfile, configfolder = configfolder,
                                               policyfile = policyfile, policyfolder = policyfolder,
                                               api_url = api_url)
+
+        self._loop.create_task(self.update_policy())
+
 
     @asyncio.coroutine
     def _init_pools(self):
@@ -420,11 +443,26 @@ class RealmGateway(object):
     def _init_subscriberdata(self):
         self._logger.warning('Initializing subscriber data')
         tzero = self._loop.time()
+        self._map= {}
+
         for subs_id, subs_data in self._datarepository.get_policy_host_all({}).items():
-            ipaddr = subs_data['ID']['ipv4'][0]
-            fqdn = subs_data['ID']['fqdn'][0]
-            self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
-            yield from self._dnscb.ddns_register_user(fqdn, 1, ipaddr)
+            try:
+                ipaddr = subs_data['ID']['ipv4'][0]
+                fqdn = subs_data['ID']['fqdn'][0]
+                self._map[fqdn]= ipaddr
+                self._logger.debug('Registering subscriber {} / {}@{}'.format(subs_id, fqdn, ipaddr))
+                yield from self._dnscb.ddns_register_user(fqdn, 1, ipaddr)
+
+            except:
+                pass
+        removed_users= self._oldmap.keys() - self._map.keys()
+        for fqdn in removed_users:
+            ipaddr = self._oldmap[fqdn]
+            self._logger.debug('Degistering subscriber / {}@{}'.format( fqdn, ipaddr))
+            yield from self._dnscb.ddns_deregister_user(fqdn, 1, ipaddr)
+
+        self._oldmap = self._map
+
         self._logger.info('Completed initializacion of subscriber data in {:.3f} sec'.format(self._loop.time()-tzero))
 
     @asyncio.coroutine
@@ -488,6 +526,8 @@ if __name__ == '__main__':
     try:
         # Create object instance
         obj = RealmGateway(args)
+
+
         loop.run_until_complete(obj.run())
         loop.run_forever()
     except KeyboardInterrupt:

@@ -918,7 +918,7 @@ class PolicyBasedResourceAllocation(container3.Container):
         host_conns = self.connectiontable.stats((connection.KEY_RGW_FQDN, host_obj.fqdn)) # Use host fqdn as connection id
 
         # Evaluate host policy for quick exit
-        if host_conns >= host_policy['max']:
+        if host_conns >= host_policy[0]['max']:
             self._logger.warning('RealmGateway host policy exceeded: {} pending connection(s)'.format(host_policy['max']))
             return None
 
